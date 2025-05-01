@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #0f4c81;
+  --primary-light: #3a6ea5;
+  --primary-dark: #00305a;
+  --secondary: #ff6b35;
+  --secondary-light: #ff8c5a;
+  --secondary-dark: #e54b00;
+  --accent: #f0f4f8;
+  --dark: #1e293b;
+  --dark-gray: #334155;
+  --medium-gray: #64748b;
+  --light-gray: #e2e8f0;
+  --light: #ffffff;
+  --gray-100: #f8fafc;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-100 text-gray-800;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-medium text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)] transition-colors;
+  }
+
+  .card-header {
+    @apply border-b-2 border-[var(--primary)] pb-3 mb-4;
+  }
+
+  .section-title {
+    @apply text-[var(--primary)] font-semibold;
+  }
+
+  .form-input {
+    @apply rounded-md border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary;
+  }
+
+  .table-header {
+    @apply bg-primary text-white font-medium text-sm py-2 px-3;
+  }
+
+  .table-cell {
+    @apply py-2 px-3 border-b border-gray-200;
+  }
+
+  .table-row-hover {
+    @apply hover:bg-gray-50 transition-colors;
+  }
+}
