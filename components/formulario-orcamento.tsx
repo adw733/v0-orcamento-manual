@@ -2,13 +2,15 @@
 
 import React from "react"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Edit, Check, X, DollarSign, ImageIcon, Loader2 } from "lucide-react"
-import type { Cliente, Produto, Orcamento, ItemOrcamento } from "@/types/types"
-import { useToast } from "@/components/ui/use-toast"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Trash2, Edit, Check, X, ImageIcon, DollarSign, Loader2 } from "lucide-react"
+import type { Cliente, Produto, Orcamento, ItemOrcamento, Tecido } from "@/types/types"
+import { supabase } from "@/lib/supabase"
 
 interface FormularioOrcamentoProps {
   orcamento: Orcamento
@@ -36,6 +38,42 @@ const tamanhosPadrao = {
   G7: 0,
 }
 
+// Componente isolado para o campo de descrição da estampa
+const DescricaoEstampaInput = ({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) => {
+  const [localValue, setLocalValue] = useState(value || "")
+
+  // Sincroniza o valor local quando o valor externo muda
+  useEffect(() => {
+    setLocalValue(value || "")
+  }, [value])
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value
+    setLocalValue(newValue)
+  }
+
+  const handleBlur = () => {
+    onChange(localValue)
+  }
+
+  return (
+    <Textarea
+      value={localValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder="Descreva os detalhes da estampa (posição, cores, tamanho, etc.)"
+      className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+      rows={3}
+    />
+  )
+}
+
 export default function FormularioOrcamento({
   orcamento,
   clientes,
@@ -58,232 +96,157 @@ export default function FormularioOrcamento({
   })
   const [itemEmEdicao, setItemEmEdicao] = useState<ItemOrcamento | null>(null)
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null)
-  const [imagemPreview, setImagemPreview] = useState<string | null>(null)
-  const [imagemEditPreview, setImagemEditPreview] = useState<string | null>(null)
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const { toast } = useToast()
+  // Refs para os inputs de arquivo
+  const novoImagemInputRef = useRef<HTMLInputElement>(null)
+  const editImagemInputRef = useRef<HTMLInputElement>(null)
+
+  // Carregar clientes do Supabase ao montar o componente
+  useEffect(() => {
+    const carregarClientes = async () => {
+      if (clientes.length === 0) {
+        try {
+          setIsLoading(true)
+          const { data, error } = await supabase.from("clientes").select("*").order("nome")
+
+          if (error) {
+            console.warn("Erro ao carregar clientes do Supabase, usando dados mock:", error)
+            // Os clientes serão carregados pelo componente pai (GeradorOrcamento)
+          }
+        } catch (error) {
+          console.error("Erro ao carregar clientes:", error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    carregarClientes()
+  }, [clientes])
+
+  // Mostrar tabela de tamanhos automaticamente quando um produto for selecionado
+  useEffect(() => {
+    if (novoItem.produtoId) {
+      // Produto selecionado, mostrar tabela de tamanhos
+    }
+  }, [novoItem.produtoId])
 
   const handleClienteChange = (clienteId: string) => {
     const cliente = clientes.find((c) => c.id === clienteId) || null
     atualizarOrcamento({ cliente })
   }
 
-  const handleProdutoChange = (produtoId: string) => {
-    const produto = produtos.find((p) => p.id === produtoId)
-    if (produto) {
-      setProdutoSelecionado(produto)
-      setNovoItem({
-        ...novoItem,
-        produtoId,
-        produto,
-        valorUnitario: produto.valorBase,
-      })
-    }
-  }
-
-  // Função para comprimir imagem base64
-  const comprimirImagem = (base64Image: string, qualidade = 0.7): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      img.src = base64Image
-      img.onload = () => {
-        const canvas = document.createElement("canvas")
-        const ctx = canvas.getContext("2d")
-
-        // Calcular novas dimensões (reduzir para 50% se for muito grande)
-        let width = img.width
-        let height = img.height
-
-        if (width > 800 || height > 800) {
-          const ratio = Math.min(800 / width, 800 / height)
-          width = width * ratio
-          height = height * ratio
-        }
-
-        canvas.width = width
-        canvas.height = height
-
-        if (!ctx) {
-          reject(new Error("Não foi possível obter o contexto do canvas"))
-          return
-        }
-
-        ctx.drawImage(img, 0, 0, width, height)
-
-        // Converter para JPEG com qualidade reduzida
-        const compressedImage = canvas.toDataURL("image/jpeg", qualidade)
-        resolve(compressedImage)
-      }
-
-      img.onerror = () => {
-        reject(new Error("Erro ao carregar a imagem"))
-      }
-    })
-  }
-
-  // Função para lidar com o upload de imagens
-  const handleImagemUpload = async (event: React.ChangeEvent<HTMLInputElement>, isEditing: boolean) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    // Verificar o tamanho do arquivo (limitar a 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "Erro",
-        description: "A imagem é muito grande. O tamanho máximo é 5MB.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsUploadingImage(true)
-
+  const handleProdutoChange = async (produtoId: string) => {
     try {
-      // Converter o arquivo para base64
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        const base64Image = e.target?.result as string
+      setIsLoading(true)
 
-        try {
-          // Comprimir a imagem
-          const compressedImage = await comprimirImagem(base64Image, 0.6)
+      // Buscar o produto completo
+      const { data: produtoData, error: produtoError } = await supabase
+        .from("produtos")
+        .select("*")
+        .eq("id", produtoId)
+        .single()
 
-          if (isEditing && itemEmEdicao) {
-            setImagemEditPreview(compressedImage)
-            setItemEmEdicao({
-              ...itemEmEdicao,
-              imagem: compressedImage,
-            })
-          } else {
-            setImagemPreview(compressedImage)
-            setNovoItem({
-              ...novoItem,
-              imagem: compressedImage,
-            })
-          }
+      if (produtoError) throw produtoError
 
-          toast({
-            title: "Sucesso",
-            description: "Imagem carregada com sucesso!",
-          })
-        } catch (error) {
-          console.error("Erro ao comprimir imagem:", error)
-          toast({
-            title: "Erro",
-            description: "Não foi possível processar a imagem.",
-            variant: "destructive",
-          })
-        } finally {
-          setIsUploadingImage(false)
+      if (produtoData) {
+        // Buscar tecidos do produto
+        const { data: tecidosData, error: tecidosError } = await supabase
+          .from("tecidos")
+          .select("*")
+          .eq("produto_id", produtoId)
+
+        if (tecidosError) throw tecidosError
+
+        // Converter para o formato da aplicação
+        const produto: Produto = {
+          id: produtoData.id,
+          nome: produtoData.nome,
+          valorBase: Number(produtoData.valor_base),
+          tecidos: tecidosData
+            ? tecidosData.map((t) => ({
+                nome: t.nome,
+                composicao: t.composicao || "",
+              }))
+            : [],
+          cores: produtoData.cores || [],
+          tamanhosDisponiveis: produtoData.tamanhos_disponiveis || [],
         }
-      }
 
-      reader.onerror = () => {
-        toast({
-          title: "Erro",
-          description: "Não foi possível ler o arquivo.",
-          variant: "destructive",
+        setProdutoSelecionado(produto)
+        setNovoItem({
+          ...novoItem,
+          produtoId,
+          produto,
+          valorUnitario: produto.valorBase,
         })
-        setIsUploadingImage(false)
       }
-
-      reader.readAsDataURL(file)
     } catch (error) {
-      console.error("Erro ao processar a imagem:", error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível processar a imagem.",
-        variant: "destructive",
-      })
-      setIsUploadingImage(false)
+      console.error("Erro ao carregar produto:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleRemoverImagem = (isEditing: boolean) => {
-    if (isEditing && itemEmEdicao) {
-      setImagemEditPreview(null)
-      setItemEmEdicao({
-        ...itemEmEdicao,
-        imagem: undefined,
-      })
-    } else {
-      setImagemPreview(null)
-      setNovoItem({
-        ...novoItem,
-        imagem: undefined,
-      })
-    }
-
-    toast({
-      title: "Sucesso",
-      description: "Imagem removida com sucesso!",
-    })
-  }
-
-  const handleAdicionarItem = () => {
+  const handleAdicionarItem = async () => {
     if (novoItem.produtoId && novoItem.valorUnitario) {
-      const novoItemCompleto: ItemOrcamento = {
-        ...(novoItem as ItemOrcamento),
-        id: Date.now().toString(),
-        quantidade: novoItem.quantidade || 1,
+      try {
+        setIsLoading(true)
+
+        // Gerar ID para o novo item
+        const novoItemCompleto = {
+          ...(novoItem as ItemOrcamento),
+          id: Date.now().toString(),
+          quantidade: novoItem.quantidade || 1,
+        }
+
+        // Adicionar item
+        await adicionarItem(novoItemCompleto)
+
+        // Limpar formulário
+        setNovoItem({
+          produtoId: "",
+          quantidade: 0,
+          valorUnitario: 0,
+          tamanhos: { ...tamanhosPadrao },
+          tecidoSelecionado: undefined,
+          corSelecionada: undefined,
+          descricaoEstampa: "",
+          imagem: "",
+        })
+        setProdutoSelecionado(null)
+        setLinhaAtiva(null)
+      } catch (error) {
+        console.error("Erro ao adicionar item:", error)
+      } finally {
+        setIsLoading(false)
       }
-
-      adicionarItem(novoItemCompleto)
-
-      // Limpar o estado
-      setNovoItem({
-        produtoId: "",
-        quantidade: 0,
-        valorUnitario: 0,
-        tamanhos: { ...tamanhosPadrao },
-        tecidoSelecionado: undefined,
-        corSelecionada: undefined,
-        descricaoEstampa: "",
-        imagem: "",
-      })
-      setProdutoSelecionado(null)
-      setLinhaAtiva(null)
-      setImagemPreview(null)
-
-      toast({
-        title: "Item adicionado",
-        description: "O item foi adicionado ao orçamento com sucesso.",
-      })
     }
   }
 
   const iniciarEdicaoItem = (item: ItemOrcamento) => {
     setItemEmEdicao({ ...item })
     setEditandoItem(item.id)
-
-    // Se o item já tem uma imagem, mostrar o preview
-    if (item.imagem) {
-      setImagemEditPreview(item.imagem)
-    } else {
-      setImagemEditPreview(null)
-    }
-
     // Buscar o produto para ter acesso às opções de tecido, cor e tamanho
     if (item.produto) {
       setProdutoSelecionado(item.produto)
     }
   }
 
-  const salvarEdicaoItem = () => {
+  const salvarEdicaoItem = async () => {
     if (itemEmEdicao) {
-      atualizarItem(itemEmEdicao.id, itemEmEdicao)
-
-      // Limpar o estado
-      setEditandoItem(null)
-      setItemEmEdicao(null)
-      setProdutoSelecionado(null)
-      setImagemEditPreview(null)
-
-      toast({
-        title: "Sucesso",
-        description: "Item atualizado com sucesso!",
-      })
+      try {
+        setIsLoading(true)
+        await atualizarItem(itemEmEdicao.id, itemEmEdicao)
+        setEditandoItem(null)
+        setItemEmEdicao(null)
+        setProdutoSelecionado(null)
+      } catch (error) {
+        console.error("Erro ao salvar item:", error)
+      } finally {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -291,7 +254,6 @@ export default function FormularioOrcamento({
     setEditandoItem(null)
     setItemEmEdicao(null)
     setProdutoSelecionado(null)
-    setImagemEditPreview(null)
   }
 
   const handleTamanhoChange = (tamanho: keyof ItemOrcamento["tamanhos"], valor: number) => {
@@ -316,6 +278,85 @@ export default function FormularioOrcamento({
       tamanhos: novosTamanhos,
       quantidade: novaQuantidade,
     })
+  }
+
+  // Função para converter imagem para base64
+  const converterImagemParaBase64 = (file: File, callback: (base64: string) => void) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      callback(base64String)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Manipulador para upload de imagem para novo item
+  const handleNovaImagem = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      converterImagemParaBase64(file, (base64) => {
+        setNovoItem({ ...novoItem, imagem: base64 })
+      })
+    }
+  }
+
+  // Manipulador para upload de imagem para item em edição
+  const handleEditarImagem = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && itemEmEdicao) {
+      converterImagemParaBase64(file, (base64) => {
+        setItemEmEdicao({ ...itemEmEdicao, imagem: base64 })
+      })
+    }
+  }
+
+  // Manipuladores para tecido e cor
+  const handleTecidoChange = (tecidoNome: string) => {
+    if (produtoSelecionado) {
+      const tecido = produtoSelecionado.tecidos.find((t) => t.nome === tecidoNome)
+      if (tecido) {
+        if (editandoItem && itemEmEdicao) {
+          setItemEmEdicao({
+            ...itemEmEdicao,
+            tecidoSelecionado: tecido,
+          })
+        } else {
+          setNovoItem({
+            ...novoItem,
+            tecidoSelecionado: tecido,
+          })
+        }
+      }
+    }
+  }
+
+  const handleCorChange = (cor: string) => {
+    if (editandoItem && itemEmEdicao) {
+      setItemEmEdicao({
+        ...itemEmEdicao,
+        corSelecionada: cor,
+      })
+    } else {
+      setNovoItem({
+        ...novoItem,
+        corSelecionada: cor,
+      })
+    }
+  }
+
+  // Manipuladores para descrição da estampa
+  const handleDescricaoEstampaChange = (descricao: string) => {
+    if (editandoItem && itemEmEdicao) {
+      setItemEmEdicao({
+        ...itemEmEdicao,
+        descricaoEstampa: descricao,
+      })
+    } else {
+      setNovoItem({
+        ...novoItem,
+        descricaoEstampa: descricao,
+      })
+    }
   }
 
   // Versão redimensionada da tabela de tamanhos
@@ -375,67 +416,63 @@ export default function FormularioOrcamento({
     )
   }
 
-  // Componente para upload de imagem
-  const ImagemUploader = ({
-    isEditing,
-    imagemPreview,
-  }: { isEditing: boolean; imagemPreview: string | null | undefined }) => {
+  // Componente para gerenciar imagem (upload, prévia, remoção)
+  const GerenciadorImagem = ({
+    imagem,
+    onChange,
+    inputRef,
+    isEditing = true,
+  }: {
+    imagem?: string
+    onChange: (novaImagem: string) => void
+    inputRef: React.RefObject<HTMLInputElement>
+    isEditing?: boolean
+  }) => {
+    if (!isEditing) return null
+
     return (
       <div className="mt-4">
         <Label className="text-primary">Imagem para Ficha Técnica</Label>
-        <div className="flex flex-wrap items-start gap-4 mt-2">
-          <div className="flex flex-col gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => document.getElementById(isEditing ? "edit-image-input" : "new-image-input")?.click()}
-              className="flex items-center gap-2"
-              disabled={isUploadingImage}
-            >
-              {isUploadingImage ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <ImageIcon className="h-4 w-4" />
-                  {imagemPreview ? "Trocar Imagem" : "Adicionar Imagem"}
-                </>
-              )}
-            </Button>
-            <input
-              id={isEditing ? "edit-image-input" : "new-image-input"}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleImagemUpload(e, isEditing)}
-              className="hidden"
-              disabled={isUploadingImage}
-            />
-            {imagemPreview && (
+        <div className="flex items-center gap-4 mt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => inputRef.current?.click()}
+            className="flex items-center gap-2 border-dashed border-2 hover:bg-accent transition-colors"
+          >
+            <ImageIcon className="h-4 w-4" />
+            {imagem ? "Trocar Imagem" : "Adicionar Imagem"}
+          </Button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) {
+                converterImagemParaBase64(file, (base64) => {
+                  onChange(base64)
+                })
+              }
+            }}
+            className="hidden"
+          />
+          {imagem && (
+            <div className="relative">
+              <img
+                src={imagem || "/placeholder.svg"}
+                alt="Prévia da imagem"
+                className="h-20 w-20 object-cover rounded-md border shadow-sm"
+              />
               <Button
                 type="button"
-                variant="destructive"
-                size="sm"
-                onClick={() => handleRemoverImagem(isEditing)}
-                className="w-fit"
-                disabled={isUploadingImage}
+                variant="ghost"
+                size="icon"
+                className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                onClick={() => onChange("")}
               >
-                <X className="h-4 w-4 mr-2" /> Remover imagem
+                <X className="h-3 w-3" />
               </Button>
-            )}
-          </div>
-          {imagemPreview && (
-            <div className="border rounded-md p-2 shadow-sm">
-              <img
-                src={imagemPreview || "/placeholder.svg"}
-                alt="Prévia da imagem"
-                className="h-32 object-contain"
-                onError={(e) => {
-                  console.error("Erro ao carregar imagem preview")
-                  ;(e.target as HTMLImageElement).src = "/generic-product-display.png"
-                }}
-              />
             </div>
           )}
         </div>
@@ -443,8 +480,84 @@ export default function FormularioOrcamento({
     )
   }
 
+  // Componente para seleção de tecido e cor
+  const SeletorTecidoCor = ({
+    produto,
+    tecidoSelecionado,
+    corSelecionada,
+    descricaoEstampa,
+    onTecidoChange,
+    onCorChange,
+    onDescricaoEstampaChange,
+    isEditing = true,
+  }: {
+    produto: Produto | null
+    tecidoSelecionado?: Tecido
+    corSelecionada?: string
+    descricaoEstampa?: string
+    onTecidoChange: (tecido: string) => void
+    onCorChange: (cor: string) => void
+    onDescricaoEstampaChange: (descricao: string) => void
+    isEditing?: boolean
+  }) => {
+    if (!produto || !isEditing) return null
+
+    return (
+      <div className="space-y-4 mt-4">
+        {/* Seletor de Tecido */}
+        <div>
+          <Label className="text-primary">Tecido</Label>
+          <Select value={tecidoSelecionado?.nome || ""} onValueChange={onTecidoChange}>
+            <SelectTrigger className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+              <SelectValue placeholder="Selecione o tecido" />
+            </SelectTrigger>
+            <SelectContent>
+              {produto.tecidos.map((tecido, index) => (
+                <SelectItem key={index} value={tecido.nome}>
+                  {tecido.nome} - {tecido.composicao}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Seletor de Cor */}
+        <div>
+          <Label className="text-primary">Cor</Label>
+          <Select value={corSelecionada || ""} onValueChange={onCorChange}>
+            <SelectTrigger className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+              <SelectValue placeholder="Selecione a cor" />
+            </SelectTrigger>
+            <SelectContent>
+              {produto.cores.map((cor, index) => (
+                <SelectItem key={index} value={cor}>
+                  {cor}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Descrição da Estampa */}
+        <div>
+          <Label className="text-primary">Descrição da Estampa</Label>
+          <DescricaoEstampaInput value={descricaoEstampa || ""} onChange={onDescricaoEstampaChange} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-md shadow-lg flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span>Processando...</span>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="numero" className="text-primary mb-1.5">
@@ -475,19 +588,18 @@ export default function FormularioOrcamento({
         <Label htmlFor="cliente" className="text-primary mb-1.5">
           Selecione o Cliente
         </Label>
-        <select
-          id="cliente"
-          value={orcamento.cliente?.id || ""}
-          onChange={(e) => handleClienteChange(e.target.value)}
-          className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-        >
-          <option value="">Selecione um cliente</option>
-          {clientes.map((cliente) => (
-            <option key={cliente.id} value={cliente.id}>
-              {cliente.nome}
-            </option>
-          ))}
-        </select>
+        <Select value={orcamento.cliente?.id || ""} onValueChange={handleClienteChange}>
+          <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+            <SelectValue placeholder="Selecione um cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            {clientes.map((cliente) => (
+              <SelectItem key={cliente.id} value={cliente.id}>
+                {cliente.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-4">
@@ -530,14 +642,8 @@ export default function FormularioOrcamento({
                             : item.descricaoEstampa}
                         </div>
                       )}
-                      {item.imagem && (
-                        <div className="text-xs mt-1">
-                          <span className="bg-success text-white px-1.5 py-0.5 rounded text-[10px] mr-1">IMAGEM</span>
-                          Imagem incluída
-                        </div>
-                      )}
                     </td>
-                    <td className="p-3">
+                    <td className="p-3 text-center">
                       {editandoItem === item.id ? (
                         <Input
                           type="number"
@@ -571,18 +677,18 @@ export default function FormularioOrcamento({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={salvarEdicaoItem}
                               className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
-                              disabled={isUploadingImage}
+                              onClick={salvarEdicaoItem}
+                              disabled={isLoading}
                             >
-                              <Check className="h-4 w-4" />
+                              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={cancelarEdicaoItem}
                               className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                              disabled={isUploadingImage}
+                              onClick={cancelarEdicaoItem}
+                              disabled={isLoading}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -594,6 +700,7 @@ export default function FormularioOrcamento({
                               size="icon"
                               className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
                               onClick={() => iniciarEdicaoItem(item)}
+                              disabled={isLoading}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -602,6 +709,7 @@ export default function FormularioOrcamento({
                               size="icon"
                               onClick={() => removerItem(item.id)}
                               className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                              disabled={isLoading}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -613,83 +721,32 @@ export default function FormularioOrcamento({
                   {editandoItem === item.id && itemEmEdicao && (
                     <tr>
                       <td colSpan={5} className="p-4 bg-accent/50 border-t border-b">
-                        <div className="space-y-4">
-                          {/* Seletor de Tecido */}
-                          <div>
-                            <Label className="text-primary">Tecido</Label>
-                            <select
-                              value={itemEmEdicao.tecidoSelecionado?.nome || ""}
-                              onChange={(e) => {
-                                const tecido = item.produto?.tecidos.find((t) => t.nome === e.target.value)
-                                if (tecido) {
-                                  setItemEmEdicao({
-                                    ...itemEmEdicao,
-                                    tecidoSelecionado: tecido,
-                                  })
-                                }
-                              }}
-                              className="w-full h-10 px-3 py-2 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
-                              <option value="">Selecione o tecido</option>
-                              {item.produto?.tecidos.map((tecido, index) => (
-                                <option key={index} value={tecido.nome}>
-                                  {tecido.nome} - {tecido.composicao}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                        {/* Seletor de Tecido, Cor e Descrição da Estampa */}
+                        <SeletorTecidoCor
+                          produto={item.produto || null}
+                          tecidoSelecionado={itemEmEdicao.tecidoSelecionado}
+                          corSelecionada={itemEmEdicao.corSelecionada}
+                          descricaoEstampa={itemEmEdicao.descricaoEstampa}
+                          onTecidoChange={(tecido) => handleTecidoChange(tecido)}
+                          onCorChange={(cor) => handleCorChange(cor)}
+                          onDescricaoEstampaChange={handleDescricaoEstampaChange}
+                        />
 
-                          {/* Seletor de Cor */}
-                          <div>
-                            <Label className="text-primary">Cor</Label>
-                            <select
-                              value={itemEmEdicao.corSelecionada || ""}
-                              onChange={(e) => {
-                                setItemEmEdicao({
-                                  ...itemEmEdicao,
-                                  corSelecionada: e.target.value,
-                                })
-                              }}
-                              className="w-full h-10 px-3 py-2 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
-                              <option value="">Selecione a cor</option>
-                              {item.produto?.cores.map((cor, index) => (
-                                <option key={index} value={cor}>
-                                  {cor}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                        {/* Tabela de Tamanhos */}
+                        {renderTabelaTamanhos(
+                          itemEmEdicao.tamanhos,
+                          itemEmEdicao.quantidade,
+                          true,
+                          (tamanho, valor) => handleTamanhoChange(tamanho as keyof ItemOrcamento["tamanhos"], valor),
+                          item.produto?.tamanhosDisponiveis,
+                        )}
 
-                          {/* Descrição da Estampa */}
-                          <div>
-                            <Label className="text-primary">Descrição da Estampa</Label>
-                            <textarea
-                              value={itemEmEdicao.descricaoEstampa || ""}
-                              onChange={(e) => {
-                                setItemEmEdicao({
-                                  ...itemEmEdicao,
-                                  descricaoEstampa: e.target.value,
-                                })
-                              }}
-                              placeholder="Descreva os detalhes da estampa (posição, cores, tamanho, etc.)"
-                              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                              rows={3}
-                            />
-                          </div>
-
-                          {/* Tabela de Tamanhos */}
-                          {renderTabelaTamanhos(
-                            itemEmEdicao.tamanhos,
-                            itemEmEdicao.quantidade,
-                            true,
-                            (tamanho, valor) => handleTamanhoChange(tamanho as keyof ItemOrcamento["tamanhos"], valor),
-                            item.produto?.tamanhosDisponiveis,
-                          )}
-
-                          {/* Componente de upload de imagem */}
-                          <ImagemUploader isEditing={true} imagemPreview={imagemEditPreview} />
-                        </div>
+                        {/* Gerenciador de imagem para o item em edição */}
+                        <GerenciadorImagem
+                          imagem={itemEmEdicao.imagem}
+                          onChange={(novaImagem) => setItemEmEdicao({ ...itemEmEdicao, imagem: novaImagem })}
+                          inputRef={editImagemInputRef}
+                        />
                       </td>
                     </tr>
                   )}
@@ -700,23 +757,24 @@ export default function FormularioOrcamento({
               <tr className="border-t hover:bg-accent/30 transition-colors">
                 <td className="p-3" onClick={() => setLinhaAtiva("novo")}>
                   {linhaAtiva === "novo" ? (
-                    <select
-                      value={novoItem.produtoId || ""}
-                      onChange={(e) => handleProdutoChange(e.target.value)}
-                      className="w-full h-9 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                    >
-                      <option value="">Selecione um produto</option>
-                      {produtos.map((produto) => (
-                        <option key={produto.id} value={produto.id}>
-                          {produto.nome}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={novoItem.produtoId || ""} onValueChange={handleProdutoChange}>
+                      <SelectTrigger className="h-9 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                        <SelectValue placeholder="Selecione um produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {produtos.map((produto) => (
+                          <SelectItem key={produto.id} value={produto.id}>
+                            {produto.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <Button
                       variant="ghost"
                       className="w-full justify-start text-primary h-9 hover:bg-primary/10 hover:text-primary-dark"
                       onClick={() => setLinhaAtiva("novo")}
+                      disabled={isLoading}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Adicionar item...
@@ -754,10 +812,10 @@ export default function FormularioOrcamento({
                         variant="ghost"
                         size="icon"
                         onClick={handleAdicionarItem}
-                        disabled={!novoItem.produtoId || !novoItem.valorUnitario || isUploadingImage}
+                        disabled={isLoading || !novoItem.produtoId || !novoItem.valorUnitario}
                         className="h-8 w-8 text-white bg-primary hover:bg-primary-dark disabled:bg-gray-300"
                       >
-                        <Plus className="h-4 w-4" />
+                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                       </Button>
                     </div>
                   )}
@@ -768,83 +826,32 @@ export default function FormularioOrcamento({
               {linhaAtiva === "novo" && novoItem.produtoId && (
                 <tr>
                   <td colSpan={5} className="p-4 bg-accent/50 border-t border-b">
-                    <div className="space-y-4">
-                      {/* Seletor de Tecido */}
-                      <div>
-                        <Label className="text-primary">Tecido</Label>
-                        <select
-                          value={novoItem.tecidoSelecionado?.nome || ""}
-                          onChange={(e) => {
-                            const tecido = produtoSelecionado?.tecidos.find((t) => t.nome === e.target.value)
-                            if (tecido) {
-                              setNovoItem({
-                                ...novoItem,
-                                tecidoSelecionado: tecido,
-                              })
-                            }
-                          }}
-                          className="w-full h-10 px-3 py-2 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                        >
-                          <option value="">Selecione o tecido</option>
-                          {produtoSelecionado?.tecidos.map((tecido, index) => (
-                            <option key={index} value={tecido.nome}>
-                              {tecido.nome} - {tecido.composicao}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    {/* Seletor de Tecido, Cor e Descrição da Estampa */}
+                    <SeletorTecidoCor
+                      produto={produtoSelecionado}
+                      tecidoSelecionado={novoItem.tecidoSelecionado}
+                      corSelecionada={novoItem.corSelecionada}
+                      descricaoEstampa={novoItem.descricaoEstampa}
+                      onTecidoChange={(tecido) => handleTecidoChange(tecido)}
+                      onCorChange={(cor) => handleCorChange(cor)}
+                      onDescricaoEstampaChange={handleDescricaoEstampaChange}
+                    />
 
-                      {/* Seletor de Cor */}
-                      <div>
-                        <Label className="text-primary">Cor</Label>
-                        <select
-                          value={novoItem.corSelecionada || ""}
-                          onChange={(e) => {
-                            setNovoItem({
-                              ...novoItem,
-                              corSelecionada: e.target.value,
-                            })
-                          }}
-                          className="w-full h-10 px-3 py-2 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                        >
-                          <option value="">Selecione a cor</option>
-                          {produtoSelecionado?.cores.map((cor, index) => (
-                            <option key={index} value={cor}>
-                              {cor}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    {/* Tabela de Tamanhos */}
+                    {renderTabelaTamanhos(
+                      novoItem.tamanhos || {},
+                      novoItem.quantidade || 0,
+                      true,
+                      (tamanho, valor) => handleNovoTamanhoChange(tamanho as keyof ItemOrcamento["tamanhos"], valor),
+                      produtoSelecionado?.tamanhosDisponiveis,
+                    )}
 
-                      {/* Descrição da Estampa */}
-                      <div>
-                        <Label className="text-primary">Descrição da Estampa</Label>
-                        <textarea
-                          value={novoItem.descricaoEstampa || ""}
-                          onChange={(e) => {
-                            setNovoItem({
-                              ...novoItem,
-                              descricaoEstampa: e.target.value,
-                            })
-                          }}
-                          placeholder="Descreva os detalhes da estampa (posição, cores, tamanho, etc.)"
-                          className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          rows={3}
-                        />
-                      </div>
-
-                      {/* Tabela de Tamanhos */}
-                      {renderTabelaTamanhos(
-                        novoItem.tamanhos || {},
-                        novoItem.quantidade || 0,
-                        true,
-                        (tamanho, valor) => handleNovoTamanhoChange(tamanho as keyof ItemOrcamento["tamanhos"], valor),
-                        produtoSelecionado?.tamanhosDisponiveis,
-                      )}
-
-                      {/* Componente de upload de imagem */}
-                      <ImagemUploader isEditing={false} imagemPreview={imagemPreview} />
-                    </div>
+                    {/* Gerenciador de imagem para o novo item */}
+                    <GerenciadorImagem
+                      imagem={novoItem.imagem}
+                      onChange={(novaImagem) => setNovoItem({ ...novoItem, imagem: novaImagem })}
+                      inputRef={novoImagemInputRef}
+                    />
                   </td>
                 </tr>
               )}
@@ -866,12 +873,12 @@ export default function FormularioOrcamento({
         <Label htmlFor="observacoes" className="text-primary mb-1.5">
           Observações
         </Label>
-        <textarea
+        <Textarea
           id="observacoes"
           value={orcamento.observacoes}
           onChange={(e) => atualizarOrcamento({ observacoes: e.target.value })}
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
         />
       </div>
 

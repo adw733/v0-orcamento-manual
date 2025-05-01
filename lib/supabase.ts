@@ -1,38 +1,19 @@
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
-// Cria um cliente Supabase para o lado do servidor
-export const createServerSupabaseClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Create a singleton Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!supabaseUrl || !supabaseKey) {
-    console.error("Variáveis de ambiente do Supabase não configuradas")
-    throw new Error("Variáveis de ambiente do Supabase não configuradas")
-  }
-
-  return createClient<Database>(supabaseUrl, supabaseKey)
+// Check if environment variables are available
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn(
+    "Supabase credentials not found. Using mock client. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.",
+  )
 }
 
-// Cria um cliente Supabase para o lado do cliente
-let clientSupabaseInstance: ReturnType<typeof createClientSupabaseClient> | null = null
-
-export const createClientSupabaseClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.error("Variáveis de ambiente do Supabase não configuradas")
-    throw new Error("Variáveis de ambiente do Supabase não configuradas")
-  }
-
-  return createClient<Database>(supabaseUrl, supabaseKey)
-}
-
-// Singleton para o cliente Supabase no lado do cliente
-export const getClientSupabaseInstance = () => {
-  if (!clientSupabaseInstance) {
-    clientSupabaseInstance = createClientSupabaseClient()
-  }
-  return clientSupabaseInstance
-}
+// Create the client with fallback values for development
+export const supabase = createClient<Database>(
+  supabaseUrl || "https://your-project.supabase.co",
+  supabaseAnonKey || "your-anon-key",
+)

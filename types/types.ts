@@ -49,6 +49,7 @@ export interface ItemOrcamento {
 }
 
 export interface Orcamento {
+  id?: string
   numero: string
   data: string
   cliente: Cliente | null

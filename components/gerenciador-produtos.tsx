@@ -7,9 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Trash2, Pencil, Save, X, Package, DollarSign, Shirt, Palette, Ruler } from "lucide-react"
 import type { Produto, Tecido } from "@/types/types"
-import { produtoService } from "@/services/produto-service"
-import { useToast } from "@/components/ui/use-toast"
-import { Skeleton } from "@/components/ui/skeleton"
+import { supabase } from "@/lib/supabase"
+import { mockProdutos } from "@/lib/mock-data"
 
 interface GerenciadorProdutosProps {
   produtos: Produto[]
@@ -29,86 +28,154 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [produtoEditando, setProdutoEditando] = useState<Produto | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
 
   // Estados para gerenciar tecidos
   const [novoTecido, setNovoTecido] = useState<Tecido>({ nome: "", composicao: "" })
   const [novaCor, setNovaCor] = useState("")
   const [novoTamanho, setNovoTamanho] = useState("")
 
-  const { toast } = useToast()
-
+  // Carregar produtos do Supabase ao montar o componente
   useEffect(() => {
-    carregarProdutos()
-  }, [])
+    const carregarProdutos = async () => {
+      try {
+        setIsLoading(true)
 
-  const carregarProdutos = async () => {
-    setIsLoading(true)
-    try {
-      const produtosCarregados = await produtoService.getAll()
-      setProdutos(produtosCarregados)
-    } catch (error) {
-      console.error("Erro ao carregar produtos:", error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os produtos.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+        // Buscar produtos
+        const { data: produtosData, error: produtosError } = await supabase.from("produtos").select("*").order("nome")
+
+        if (produtosError) {
+          console.warn("Erro ao carregar produtos do Supabase, usando dados mock:", produtosError)
+          setProdutos(mockProdutos)
+          return
+        }
+
+        if (produtosData) {
+          // Para cada produto, buscar seus tecidos
+          const produtosCompletos = await Promise.all(
+            produtosData.map(async (produto) => {
+              // Buscar tecidos do produto
+              const { data: tecidosData, error: tecidosError } = await supabase
+                .from("tecidos")
+                .select("*")
+                .eq("produto_id", produto.id)
+
+              if (tecidosError) throw tecidosError
+
+              // Converter para o formato da aplicação
+              return {
+                id: produto.id,
+                nome: produto.nome,
+                valorBase: Number(produto.valor_base),
+                tecidos: tecidosData
+                  ? tecidosData.map((t) => ({
+                      nome: t.nome,
+                      composicao: t.composicao || "",
+                    }))
+                  : [],
+                cores: produto.cores || [],
+                tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
+              } as Produto
+            }),
+          )
+
+          setProdutos(produtosCompletos)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar produtos:", error)
+        setProdutos(mockProdutos)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
+
+    carregarProdutos()
+  }, [setProdutos])
 
   const handleAdicionarProduto = async () => {
     if (novoProduto.nome && novoProduto.valorBase) {
-      setIsSaving(true)
       try {
-        const produtoCriado = await produtoService.create(novoProduto as Omit<Produto, "id">)
-        adicionarProduto(produtoCriado)
-        setNovoProduto({
-          nome: "",
-          valorBase: 0,
-          tecidos: [],
-          cores: [],
-          tamanhosDisponiveis: [],
-        })
-        setNovoTecido({ nome: "", composicao: "" })
-        setNovaCor("")
-        setNovoTamanho("")
-        toast({
-          title: "Sucesso",
-          description: "Produto adicionado com sucesso!",
-        })
+        setIsLoading(true)
+
+        // Inserir produto no Supabase
+        const { data: produtoData, error: produtoError } = await supabase
+          .from("produtos")
+          .insert({
+            nome: novoProduto.nome,
+            valor_base: novoProduto.valorBase,
+            cores: novoProduto.cores || [],
+            tamanhos_disponiveis: novoProduto.tamanhosDisponiveis || [],
+          })
+          .select()
+
+        if (produtoError) throw produtoError
+
+        if (produtoData && produtoData[0]) {
+          // Inserir tecidos do produto
+          if (novoProduto.tecidos && novoProduto.tecidos.length > 0) {
+            const tecidosParaInserir = novoProduto.tecidos.map((tecido) => ({
+              nome: tecido.nome,
+              composicao: tecido.composicao,
+              produto_id: produtoData[0].id,
+            }))
+
+            const { error: tecidosError } = await supabase.from("tecidos").insert(tecidosParaInserir)
+
+            if (tecidosError) throw tecidosError
+          }
+
+          // Converter para o formato da aplicação
+          const novoProdutoFormatado: Produto = {
+            id: produtoData[0].id,
+            nome: produtoData[0].nome,
+            valorBase: Number(produtoData[0].valor_base),
+            tecidos: novoProduto.tecidos || [],
+            cores: novoProduto.cores || [],
+            tamanhosDisponiveis: novoProduto.tamanhosDisponiveis || [],
+          }
+
+          // Adicionar à lista local
+          adicionarProduto(novoProdutoFormatado)
+
+          // Limpar formulário
+          setNovoProduto({
+            nome: "",
+            valorBase: 0,
+            tecidos: [],
+            cores: [],
+            tamanhosDisponiveis: [],
+          })
+          setNovoTecido({ nome: "", composicao: "" })
+          setNovaCor("")
+          setNovoTamanho("")
+        }
       } catch (error) {
         console.error("Erro ao adicionar produto:", error)
-        toast({
-          title: "Erro",
-          description: "Não foi possível adicionar o produto.",
-          variant: "destructive",
-        })
       } finally {
-        setIsSaving(false)
+        setIsLoading(false)
       }
     }
   }
 
   const handleRemoverProduto = async (id: string) => {
-    if (confirm("Tem certeza que deseja remover este produto?")) {
-      try {
-        await produtoService.delete(id)
-        setProdutos(produtos.filter((produto) => produto.id !== id))
-        toast({
-          title: "Sucesso",
-          description: "Produto removido com sucesso!",
-        })
-      } catch (error) {
-        console.error("Erro ao remover produto:", error)
-        toast({
-          title: "Erro",
-          description: "Não foi possível remover o produto.",
-          variant: "destructive",
-        })
-      }
+    try {
+      setIsLoading(true)
+
+      // Remover tecidos do produto
+      const { error: tecidosError } = await supabase.from("tecidos").delete().eq("produto_id", id)
+
+      if (tecidosError) throw tecidosError
+
+      // Remover produto
+      const { error: produtoError } = await supabase.from("produtos").delete().eq("id", id)
+
+      if (produtoError) throw produtoError
+
+      // Remover da lista local
+      setProdutos(produtos.filter((produto) => produto.id !== id))
+    } catch (error) {
+      console.error("Erro ao remover produto:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -124,25 +191,52 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
 
   const salvarEdicao = async () => {
     if (produtoEditando) {
-      setIsSaving(true)
       try {
-        const produtoAtualizado = await produtoService.update(produtoEditando)
-        setProdutos(produtos.map((produto) => (produto.id === produtoAtualizado.id ? produtoAtualizado : produto)))
+        setIsLoading(true)
+
+        // Atualizar produto no Supabase
+        const { error: produtoError } = await supabase
+          .from("produtos")
+          .update({
+            nome: produtoEditando.nome,
+            valor_base: produtoEditando.valorBase,
+            cores: produtoEditando.cores,
+            tamanhos_disponiveis: produtoEditando.tamanhosDisponiveis,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", produtoEditando.id)
+
+        if (produtoError) throw produtoError
+
+        // Remover tecidos antigos
+        const { error: deleteTecidosError } = await supabase
+          .from("tecidos")
+          .delete()
+          .eq("produto_id", produtoEditando.id)
+
+        if (deleteTecidosError) throw deleteTecidosError
+
+        // Inserir novos tecidos
+        if (produtoEditando.tecidos && produtoEditando.tecidos.length > 0) {
+          const tecidosParaInserir = produtoEditando.tecidos.map((tecido) => ({
+            nome: tecido.nome,
+            composicao: tecido.composicao,
+            produto_id: produtoEditando.id,
+          }))
+
+          const { error: tecidosError } = await supabase.from("tecidos").insert(tecidosParaInserir)
+
+          if (tecidosError) throw tecidosError
+        }
+
+        // Atualizar na lista local
+        setProdutos(produtos.map((produto) => (produto.id === produtoEditando.id ? produtoEditando : produto)))
         setEditandoId(null)
         setProdutoEditando(null)
-        toast({
-          title: "Sucesso",
-          description: "Produto atualizado com sucesso!",
-        })
       } catch (error) {
         console.error("Erro ao atualizar produto:", error)
-        toast({
-          title: "Erro",
-          description: "Não foi possível atualizar o produto.",
-          variant: "destructive",
-        })
       } finally {
-        setIsSaving(false)
+        setIsLoading(false)
       }
     }
   }
@@ -241,31 +335,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-primary flex items-center gap-2">
-            <span className="bg-primary text-white p-1 rounded-md text-xs">PRODUTOS</span>
-            Gerenciar Produtos
-          </h3>
-          <Skeleton className="h-6 w-40" />
-        </div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="overflow-hidden shadow-sm border-0">
-              <CardContent className="p-0">
-                <div className="p-4">
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -277,267 +346,267 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
       </div>
 
       <div className="space-y-4">
-        {produtos.map((produto) => (
-          <Card key={produto.id} className="overflow-hidden shadow-sm border-0 hover:shadow-md transition-shadow">
-            <CardContent className="p-0">
-              {editandoId === produto.id && produtoEditando ? (
-                <div className="p-4 space-y-4 bg-accent/50">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor={`edit-nome-${produto.id}`} className="text-primary flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Nome
-                      </Label>
-                      <Input
-                        id={`edit-nome-${produto.id}`}
-                        value={produtoEditando.nome}
-                        onChange={(e) =>
-                          setProdutoEditando({
-                            ...produtoEditando,
-                            nome: e.target.value,
-                          })
-                        }
-                        className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`edit-valor-${produto.id}`} className="text-primary flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        Valor Base
-                      </Label>
-                      <Input
-                        id={`edit-valor-${produto.id}`}
-                        type="number"
-                        value={produtoEditando.valorBase}
-                        onChange={(e) =>
-                          setProdutoEditando({
-                            ...produtoEditando,
-                            valorBase: Number.parseFloat(e.target.value),
-                          })
-                        }
-                        className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tecidos */}
-                  <div>
-                    <Label className="text-primary flex items-center gap-2">
-                      <Shirt className="h-4 w-4" />
-                      Tecidos Disponíveis
-                    </Label>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex gap-2">
+        {isLoading && produtos.length === 0 ? (
+          <div className="text-center py-4">Carregando produtos...</div>
+        ) : (
+          produtos.map((produto) => (
+            <Card key={produto.id} className="overflow-hidden shadow-sm border-0 hover:shadow-md transition-shadow">
+              <CardContent className="p-0">
+                {editandoId === produto.id && produtoEditando ? (
+                  <div className="p-4 space-y-4 bg-accent/50">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`edit-nome-${produto.id}`} className="text-primary flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          Nome
+                        </Label>
                         <Input
-                          placeholder="Nome do tecido"
-                          value={novoTecido.nome}
-                          onChange={(e) => setNovoTecido({ ...novoTecido, nome: e.target.value })}
+                          id={`edit-nome-${produto.id}`}
+                          value={produtoEditando.nome}
+                          onChange={(e) =>
+                            setProdutoEditando({
+                              ...produtoEditando,
+                              nome: e.target.value,
+                            })
+                          }
                           className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                         />
-                        <Input
-                          placeholder="Composição"
-                          value={novoTecido.composicao}
-                          onChange={(e) => setNovoTecido({ ...novoTecido, composicao: e.target.value })}
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                        <Button
-                          onClick={adicionarTecido}
-                          className="bg-primary hover:bg-primary-dark text-white"
-                          disabled={!novoTecido.nome || !novoTecido.composicao}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
                       </div>
-                      <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
-                        {produtoEditando.tecidos.map((tecido, index) => (
-                          <div key={index} className="flex justify-between items-center p-2 bg-accent rounded-md">
-                            <div>
-                              <span className="font-medium">{tecido.nome}</span>
-                              <span className="text-xs text-gray-500 ml-2">({tecido.composicao})</span>
+                      <div>
+                        <Label htmlFor={`edit-valor-${produto.id}`} className="text-primary flex items-center gap-2">
+                          <DollarSign className="h-4 w-4" />
+                          Valor Base
+                        </Label>
+                        <Input
+                          id={`edit-valor-${produto.id}`}
+                          type="number"
+                          value={produtoEditando.valorBase}
+                          onChange={(e) =>
+                            setProdutoEditando({
+                              ...produtoEditando,
+                              valorBase: Number.parseFloat(e.target.value),
+                            })
+                          }
+                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tecidos */}
+                    <div>
+                      <Label className="text-primary flex items-center gap-2">
+                        <Shirt className="h-4 w-4" />
+                        Tecidos Disponíveis
+                      </Label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Nome do tecido"
+                            value={novoTecido.nome}
+                            onChange={(e) => setNovoTecido({ ...novoTecido, nome: e.target.value })}
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                          <Input
+                            placeholder="Composição"
+                            value={novoTecido.composicao}
+                            onChange={(e) => setNovoTecido({ ...novoTecido, composicao: e.target.value })}
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                          <Button
+                            onClick={adicionarTecido}
+                            className="bg-primary hover:bg-primary-dark text-white"
+                            disabled={!novoTecido.nome || !novoTecido.composicao}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
+                          {produtoEditando.tecidos.map((tecido, index) => (
+                            <div key={index} className="flex justify-between items-center p-2 bg-accent rounded-md">
+                              <div>
+                                <span className="font-medium">{tecido.nome}</span>
+                                <span className="text-xs text-gray-500 ml-2">({tecido.composicao})</span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removerTecido(index)}
+                                className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removerTecido(index)}
-                              className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        {produtoEditando.tecidos.length === 0 && (
-                          <p className="text-sm text-gray-500 italic p-2">Nenhum tecido adicionado</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Cores */}
-                  <div>
-                    <Label className="text-primary flex items-center gap-2">
-                      <Palette className="h-4 w-4" />
-                      Cores Disponíveis
-                    </Label>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Nome da cor"
-                          value={novaCor}
-                          onChange={(e) => setNovaCor(e.target.value)}
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                        <Button
-                          onClick={adicionarCor}
-                          className="bg-primary hover:bg-primary-dark text-white"
-                          disabled={!novaCor}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
-                        {produtoEditando.cores.map((cor, index) => (
-                          <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                            <span className="text-sm">{cor}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removerCor(index)}
-                              className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                        {produtoEditando.cores.length === 0 && (
-                          <p className="text-sm text-gray-500 italic p-2">Nenhuma cor adicionada</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tamanhos */}
-                  <div>
-                    <Label className="text-primary flex items-center gap-2">
-                      <Ruler className="h-4 w-4" />
-                      Tamanhos Disponíveis
-                    </Label>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Tamanho (ex: PP, P, M...)"
-                          value={novoTamanho}
-                          onChange={(e) => setNovoTamanho(e.target.value)}
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                        <Button
-                          onClick={adicionarTamanho}
-                          className="bg-primary hover:bg-primary-dark text-white"
-                          disabled={!novoTamanho}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
-                        {produtoEditando.tamanhosDisponiveis.map((tamanho, index) => (
-                          <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                            <span className="text-sm font-medium">{tamanho}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removerTamanho(index)}
-                              className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                        {produtoEditando.tamanhosDisponiveis.length === 0 && (
-                          <p className="text-sm text-gray-500 italic p-2">Nenhum tamanho adicionado</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={cancelarEdicao} className="text-gray-500 hover:text-gray-700">
-                      <X className="h-4 w-4 mr-2" /> Cancelar
-                    </Button>
-                    <Button
-                      onClick={salvarEdicao}
-                      className="bg-primary hover:bg-primary-dark text-white"
-                      disabled={isSaving}
-                    >
-                      {isSaving ? (
-                        <>Salvando...</>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" /> Salvar
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-primary text-white p-2 rounded-full">
-                        <Package className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">{produto.nome}</h4>
-                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                          <DollarSign className="h-3 w-3" />
-                          {produto.valorBase.toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => iniciarEdicao(produto)}
-                        className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoverProduto(produto.id)}
-                        className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="mt-3 text-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-accent/50 p-3 rounded-md">
-                      <div>
-                        <p className="font-medium text-primary text-xs mb-1">Tecidos</p>
-                        <div className="text-xs">
-                          {produto.tecidos.map((tecido, index) => (
-                            <p key={index}>
-                              {tecido.nome}: <span className="text-gray-500">{tecido.composicao}</span>
-                            </p>
                           ))}
+                          {produtoEditando.tecidos.length === 0 && (
+                            <p className="text-sm text-gray-500 italic p-2">Nenhum tecido adicionado</p>
+                          )}
                         </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-primary text-xs mb-1">Cores</p>
-                        <p className="text-xs">{produto.cores.join(", ")}</p>
+                    </div>
+
+                    {/* Cores */}
+                    <div>
+                      <Label className="text-primary flex items-center gap-2">
+                        <Palette className="h-4 w-4" />
+                        Cores Disponíveis
+                      </Label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Nome da cor"
+                            value={novaCor}
+                            onChange={(e) => setNovaCor(e.target.value)}
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                          <Button
+                            onClick={adicionarCor}
+                            className="bg-primary hover:bg-primary-dark text-white"
+                            disabled={!novaCor}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
+                          {produtoEditando.cores.map((cor, index) => (
+                            <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                              <span className="text-sm">{cor}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removerCor(index)}
+                                className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          {produtoEditando.cores.length === 0 && (
+                            <p className="text-sm text-gray-500 italic p-2">Nenhuma cor adicionada</p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-primary text-xs mb-1">Tamanhos</p>
-                        <p className="text-xs">{produto.tamanhosDisponiveis.join(", ")}</p>
+                    </div>
+
+                    {/* Tamanhos */}
+                    <div>
+                      <Label className="text-primary flex items-center gap-2">
+                        <Ruler className="h-4 w-4" />
+                        Tamanhos Disponíveis
+                      </Label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Tamanho (ex: PP, P, M...)"
+                            value={novoTamanho}
+                            onChange={(e) => setNovoTamanho(e.target.value)}
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                          <Button
+                            onClick={adicionarTamanho}
+                            className="bg-primary hover:bg-primary-dark text-white"
+                            disabled={!novoTamanho}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
+                          {produtoEditando.tamanhosDisponiveis.map((tamanho, index) => (
+                            <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                              <span className="text-sm font-medium">{tamanho}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removerTamanho(index)}
+                                className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          {produtoEditando.tamanhosDisponiveis.length === 0 && (
+                            <p className="text-sm text-gray-500 italic p-2">Nenhum tamanho adicionado</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={cancelarEdicao} className="text-gray-500 hover:text-gray-700">
+                        <X className="h-4 w-4 mr-2" /> Cancelar
+                      </Button>
+                      <Button
+                        onClick={salvarEdicao}
+                        className="bg-primary hover:bg-primary-dark text-white"
+                        disabled={isLoading}
+                      >
+                        <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-primary text-white p-2 rounded-full">
+                          <Package className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-gray-900">{produto.nome}</h4>
+                          <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            {produto.valorBase.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => iniciarEdicao(produto)}
+                          className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
+                          disabled={isLoading}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoverProduto(produto.id)}
+                          className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                          disabled={isLoading}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-accent/50 p-3 rounded-md">
+                        <div>
+                          <p className="font-medium text-primary text-xs mb-1">Tecidos</p>
+                          <div className="text-xs">
+                            {produto.tecidos.map((tecido, index) => (
+                              <p key={index}>
+                                {tecido.nome}: <span className="text-gray-500">{tecido.composicao}</span>
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="font-medium text-primary text-xs mb-1">Cores</p>
+                          <p className="text-xs">{produto.cores.join(", ")}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-primary text-xs mb-1">Tamanhos</p>
+                          <p className="text-xs">{produto.tamanhosDisponiveis.join(", ")}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                )}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       <Card className="overflow-hidden shadow-sm border-0 border-t-4 border-t-primary">
@@ -721,15 +790,9 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
             <Button
               onClick={handleAdicionarProduto}
               className="w-full bg-primary hover:bg-primary-dark text-white transition-colors"
-              disabled={isSaving || !novoProduto.nome || !novoProduto.valorBase}
+              disabled={isLoading || !novoProduto.nome || !novoProduto.valorBase}
             >
-              {isSaving ? (
-                <>Adicionando...</>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" /> Adicionar Produto
-                </>
-              )}
+              <Plus className="h-4 w-4 mr-2" /> {isLoading ? "Adicionando..." : "Adicionar Produto"}
             </Button>
           </div>
         </CardContent>

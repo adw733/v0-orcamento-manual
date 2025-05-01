@@ -104,14 +104,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                                 : item.descricaoEstampa}
                             </p>
                           )}
-                          {item.imagem && (
-                            <p className="text-xs mt-1">
-                              <span className="bg-success text-white px-1.5 py-0.5 rounded text-[10px] mr-1">
-                                IMAGEM
-                              </span>
-                              Imagem incluída
-                            </p>
-                          )}
                         </div>
                       </td>
                       <td className="p-3 text-center">{item.quantidade}</td>
@@ -182,23 +174,14 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                 </h3>
 
                 <div className="space-y-4">
-                  {/* Imagem do item - Agora usando a URL da imagem */}
+                  {/* Imagem do item */}
                   {item.imagem && (
                     <div className="flex justify-center mb-4">
-                      <div className="border rounded-md p-4 shadow-sm max-w-md">
-                        <h4 className="font-bold text-sm mb-2 text-primary text-center">Imagem do Produto</h4>
-                        <div className="flex justify-center">
-                          <img
-                            src={item.imagem || "/placeholder.svg"}
-                            alt={`${item.produto?.nome || "Produto"}`}
-                            className="max-h-64 object-contain"
-                            onError={(e) => {
-                              console.error("Erro ao carregar imagem na ficha técnica")
-                              ;(e.target as HTMLImageElement).src = "/generic-product-display.png"
-                            }}
-                          />
-                        </div>
-                      </div>
+                      <img
+                        src={item.imagem || "/placeholder.svg"}
+                        alt={item.produto?.nome || "Imagem do produto"}
+                        className="max-h-64 object-contain border rounded-md shadow-sm"
+                      />
                     </div>
                   )}
 

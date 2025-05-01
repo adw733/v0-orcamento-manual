@@ -4,19 +4,16 @@ import { useState, useRef, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { FileDown, FileText, Users, ShoppingBag, Save, List } from "lucide-react"
+import { FileDown, FileText, Users, ShoppingBag } from "lucide-react"
 import FormularioOrcamento from "@/components/formulario-orcamento"
 import VisualizacaoDocumento from "@/components/visualizacao-documento"
 import GerenciadorClientes from "@/components/gerenciador-clientes"
 import GerenciadorProdutos from "@/components/gerenciador-produtos"
-import GerenciadorOrcamentos from "@/components/gerenciador-orcamentos"
 import type { Cliente, Produto, Orcamento, ItemOrcamento } from "@/types/types"
-import { clienteService } from "@/services/cliente-service"
-import { produtoService } from "@/services/produto-service"
-import { orcamentoService } from "@/services/orcamento-service"
 import { jsPDF } from "jspdf"
 import html2canvas from "html2canvas"
-import { useToast } from "@/components/ui/use-toast"
+import { supabase } from "@/lib/supabase"
+import { mockClientes, mockProdutos } from "@/lib/mock-data"
 
 export default function GeradorOrcamento() {
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -32,41 +29,118 @@ export default function GeradorOrcamento() {
     validadeOrcamento: "15 dias",
   })
   const [isExporting, setIsExporting] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [orcamentoAtual, setOrcamentoAtual] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [orcamentoSalvo, setOrcamentoSalvo] = useState<string | null>(null)
 
   const documentoRef = useRef<HTMLDivElement>(null)
 
-  const { toast } = useToast()
-
+  // Carregar orçamento salvo, se houver
   useEffect(() => {
-    const carregarDados = async () => {
-      setIsLoading(true)
+    const carregarOrcamentoSalvo = async () => {
       try {
-        // Carregar clientes
-        const clientesData = await clienteService.getAll()
-        setClientes(clientesData)
+        const { data, error } = await supabase
+          .from("orcamentos")
+          .select("*, cliente:cliente_id(*)")
+          .order("created_at", { ascending: false })
+          .limit(1)
 
-        // Carregar produtos
-        const produtosData = await produtoService.getAll()
-        setProdutos(produtosData)
+        if (error) {
+          console.warn("Erro ao carregar orçamento do Supabase:", error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          const orcamentoData = data[0]
+
+          // Carregar itens do orçamento
+          const { data: itensData, error: itensError } = await supabase
+            .from("itens_orcamento")
+            .select("*, produto:produto_id(*)")
+            .eq("orcamento_id", orcamentoData.id)
+
+          if (itensError) throw itensError
+
+          // Converter para o formato da aplicação
+          const itensFormatados: ItemOrcamento[] = itensData
+            ? itensData.map((item) => {
+                // Buscar o produto completo
+                const produto = item.produto
+                  ? {
+                      id: item.produto.id,
+                      nome: item.produto.nome,
+                      valorBase: Number(item.produto.valor_base),
+                      tecidos: [], // Será preenchido depois
+                      cores: item.produto.cores || [],
+                      tamanhosDisponiveis: item.produto.tamanhos_disponiveis || [],
+                    }
+                  : undefined
+
+                return {
+                  id: item.id,
+                  produtoId: item.produto_id || "",
+                  produto,
+                  quantidade: item.quantidade,
+                  valorUnitario: Number(item.valor_unitario),
+                  tecidoSelecionado: item.tecido_nome
+                    ? {
+                        nome: item.tecido_nome,
+                        composicao: item.tecido_composicao || "",
+                      }
+                    : undefined,
+                  corSelecionada: item.cor_selecionada || undefined,
+                  descricaoEstampa: item.descricao_estampa || undefined,
+                  tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
+                  imagem: item.imagem || undefined,
+                }
+              })
+            : []
+
+          // Converter cliente
+          const clienteFormatado = orcamentoData.cliente
+            ? {
+                id: orcamentoData.cliente.id,
+                nome: orcamentoData.cliente.nome,
+                cnpj: orcamentoData.cliente.cnpj || "",
+                endereco: orcamentoData.cliente.endereco || "",
+                telefone: orcamentoData.cliente.telefone || "",
+                email: orcamentoData.cliente.email || "",
+                contato: orcamentoData.cliente.contato || "",
+              }
+            : null
+
+          // Atualizar o estado do orçamento
+          setOrcamento({
+            id: orcamentoData.id,
+            numero: orcamentoData.numero,
+            data: orcamentoData.data,
+            cliente: clienteFormatado,
+            itens: itensFormatados,
+            observacoes: orcamentoData.observacoes || "",
+            condicoesPagamento: orcamentoData.condicoes_pagamento || "À vista",
+            prazoEntrega: orcamentoData.prazo_entrega || "30 dias",
+            validadeOrcamento: orcamentoData.validade_orcamento || "15 dias",
+          })
+
+          setOrcamentoSalvo(orcamentoData.id)
+        }
       } catch (error) {
-        console.error("Erro ao carregar dados:", error)
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar os dados iniciais.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
+        console.error("Erro ao carregar orçamento:", error)
       }
     }
 
-    carregarDados()
+    carregarOrcamentoSalvo()
   }, [])
 
-  // Modifique a função handleExportPDF para melhorar a qualidade das imagens no PDF
+  // Initialize with mock data if empty
+  useEffect(() => {
+    if (clientes.length === 0) {
+      setClientes(mockClientes)
+    }
+    if (produtos.length === 0) {
+      setProdutos(mockProdutos)
+    }
+  }, [clientes.length, produtos.length, setClientes, setProdutos])
+
   const handleExportPDF = async () => {
     if (isExporting || !documentoRef.current) return
     setIsExporting(true)
@@ -85,13 +159,11 @@ export default function GeradorOrcamento() {
         throw new Error("Elemento do orçamento não encontrado")
       }
 
-      // Renderizar o orçamento principal com melhor qualidade
+      // Renderizar o orçamento principal
       const orcamentoCanvas = await html2canvas(orcamentoElement as HTMLElement, {
-        scale: 2.5, // Aumentar a escala para melhor qualidade
+        scale: 2,
         useCORS: true,
-        logging: true, // Ativar logs para debug
-        allowTaint: true, // Permitir imagens de outros domínios
-        backgroundColor: "#ffffff",
+        logging: false,
       })
 
       // Adicionar o orçamento ao PDF
@@ -108,13 +180,11 @@ export default function GeradorOrcamento() {
           // Adicionar nova página para cada ficha técnica
           pdf.addPage()
 
-          // Renderizar a ficha técnica com melhor qualidade
+          // Renderizar a ficha técnica
           const fichaCanvas = await html2canvas(fichasTecnicas[i] as HTMLElement, {
-            scale: 2.5, // Aumentar a escala para melhor qualidade
+            scale: 2,
             useCORS: true,
-            logging: true, // Ativar logs para debug
-            allowTaint: true, // Permitir imagens de outros domínios
-            backgroundColor: "#ffffff",
+            logging: false,
           })
 
           // Adicionar a ficha técnica ao PDF
@@ -127,18 +197,9 @@ export default function GeradorOrcamento() {
 
       // Salvar o PDF
       pdf.save(`${orcamento.numero}.pdf`)
-
-      toast({
-        title: "Sucesso",
-        description: "PDF gerado com sucesso!",
-      })
     } catch (error) {
       console.error("Erro ao gerar PDF:", error)
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao gerar o PDF. Por favor, tente novamente.",
-        variant: "destructive",
-      })
+      alert("Ocorreu um erro ao gerar o PDF. Por favor, tente novamente.")
     } finally {
       setIsExporting(false)
     }
@@ -152,179 +213,199 @@ export default function GeradorOrcamento() {
     setProdutos([...produtos, produto])
   }
 
-  const atualizarOrcamento = (novoOrcamento: Partial<Orcamento>) => {
-    setOrcamento({ ...orcamento, ...novoOrcamento })
+  const atualizarOrcamento = async (novoOrcamento: Partial<Orcamento>) => {
+    const orcamentoAtualizado = { ...orcamento, ...novoOrcamento }
+    setOrcamento(orcamentoAtualizado)
+
+    // Salvar no Supabase se houver cliente selecionado
+    if (orcamentoAtualizado.cliente) {
+      try {
+        setIsLoading(true)
+
+        let orcamentoId = orcamentoSalvo
+
+        // Se não tiver ID, criar novo orçamento
+        if (!orcamentoId) {
+          const { data, error } = await supabase
+            .from("orcamentos")
+            .insert({
+              numero: orcamentoAtualizado.numero,
+              data: orcamentoAtualizado.data,
+              cliente_id: orcamentoAtualizado.cliente.id,
+              observacoes: orcamentoAtualizado.observacoes,
+              condicoes_pagamento: orcamentoAtualizado.condicoesPagamento,
+              prazo_entrega: orcamentoAtualizado.prazoEntrega,
+              validade_orcamento: orcamentoAtualizado.validadeOrcamento,
+              itens: JSON.stringify(orcamentoAtualizado.itens),
+            })
+            .select()
+
+          if (error) throw error
+
+          if (data && data[0]) {
+            orcamentoId = data[0].id
+            setOrcamentoSalvo(orcamentoId)
+
+            // Atualizar o ID do orçamento no estado
+            setOrcamento({
+              ...orcamentoAtualizado,
+              id: orcamentoId,
+            })
+          }
+        } else {
+          // Atualizar orçamento existente
+          const { error } = await supabase
+            .from("orcamentos")
+            .update({
+              numero: orcamentoAtualizado.numero,
+              data: orcamentoAtualizado.data,
+              cliente_id: orcamentoAtualizado.cliente.id,
+              observacoes: orcamentoAtualizado.observacoes,
+              condicoes_pagamento: orcamentoAtualizado.condicoesPagamento,
+              prazo_entrega: orcamentoAtualizado.prazoEntrega,
+              validade_orcamento: orcamentoAtualizado.validadeOrcamento,
+              itens: JSON.stringify(orcamentoAtualizado.itens),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orcamentoId)
+
+          if (error) throw error
+        }
+      } catch (error) {
+        console.error("Erro ao salvar orçamento:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
-  const adicionarItem = (item: ItemOrcamento) => {
+  const adicionarItem = async (item: ItemOrcamento) => {
+    const itensAtualizados = [...orcamento.itens, item]
     setOrcamento({
       ...orcamento,
-      itens: [...orcamento.itens, { ...item, id: Date.now().toString() }],
+      itens: itensAtualizados,
     })
+
+    // Salvar no Supabase se houver orçamento salvo
+    if (orcamentoSalvo) {
+      try {
+        setIsLoading(true)
+
+        const { error } = await supabase.from("itens_orcamento").insert({
+          orcamento_id: orcamentoSalvo,
+          produto_id: item.produtoId,
+          quantidade: item.quantidade,
+          valor_unitario: item.valorUnitario,
+          tecido_nome: item.tecidoSelecionado?.nome,
+          tecido_composicao: item.tecidoSelecionado?.composicao,
+          cor_selecionada: item.corSelecionada,
+          descricao_estampa: item.descricaoEstampa,
+          tamanhos: item.tamanhos,
+          imagem: item.imagem,
+        })
+
+        if (error) throw error
+
+        // Atualizar o orçamento no Supabase
+        await supabase
+          .from("orcamentos")
+          .update({
+            itens: JSON.stringify(itensAtualizados),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", orcamentoSalvo)
+      } catch (error) {
+        console.error("Erro ao adicionar item:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
-  const removerItem = (id: string) => {
+  const removerItem = async (id: string) => {
+    const itensAtualizados = orcamento.itens.filter((item) => item.id !== id)
     setOrcamento({
       ...orcamento,
-      itens: orcamento.itens.filter((item) => item.id !== id),
+      itens: itensAtualizados,
     })
+
+    // Remover do Supabase se houver orçamento salvo
+    if (orcamentoSalvo) {
+      try {
+        setIsLoading(true)
+
+        const { error } = await supabase.from("itens_orcamento").delete().eq("id", id)
+
+        if (error) throw error
+
+        // Atualizar o orçamento no Supabase
+        await supabase
+          .from("orcamentos")
+          .update({
+            itens: JSON.stringify(itensAtualizados),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", orcamentoSalvo)
+      } catch (error) {
+        console.error("Erro ao remover item:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
-  const atualizarItem = (id: string, novoItem: Partial<ItemOrcamento>) => {
+  const atualizarItem = async (id: string, novoItem: Partial<ItemOrcamento>) => {
+    const itensAtualizados = orcamento.itens.map((item) => (item.id === id ? { ...item, ...novoItem } : item))
     setOrcamento({
       ...orcamento,
-      itens: orcamento.itens.map((item) => (item.id === id ? { ...item, ...novoItem } : item)),
+      itens: itensAtualizados,
     })
+
+    // Atualizar no Supabase se houver orçamento salvo
+    if (orcamentoSalvo) {
+      try {
+        setIsLoading(true)
+
+        const itemAtualizado = itensAtualizados.find((item) => item.id === id)
+
+        if (itemAtualizado) {
+          const { error } = await supabase
+            .from("itens_orcamento")
+            .update({
+              quantidade: itemAtualizado.quantidade,
+              valor_unitario: itemAtualizado.valorUnitario,
+              tecido_nome: itemAtualizado.tecidoSelecionado?.nome,
+              tecido_composicao: itemAtualizado.tecidoSelecionado?.composicao,
+              cor_selecionada: itemAtualizado.corSelecionada,
+              descricao_estampa: itemAtualizado.descricaoEstampa,
+              tamanhos: itemAtualizado.tamanhos,
+              imagem: itemAtualizado.imagem,
+            })
+            .eq("id", id)
+
+          if (error) throw error
+
+          // Atualizar o orçamento no Supabase
+          await supabase
+            .from("orcamentos")
+            .update({
+              itens: JSON.stringify(itensAtualizados),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orcamentoSalvo)
+        }
+      } catch (error) {
+        console.error("Erro ao atualizar item:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
   const calcularTotal = () => {
     return orcamento.itens.reduce((total, item) => {
       return total + item.quantidade * item.valorUnitario
     }, 0)
-  }
-
-  // Modifique a função salvarOrcamento para garantir que as imagens sejam preservadas
-  const salvarOrcamento = async () => {
-    if (!orcamento.cliente) {
-      toast({
-        title: "Erro",
-        description: "Selecione um cliente antes de salvar o orçamento.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (orcamento.itens.length === 0) {
-      toast({
-        title: "Erro",
-        description: "Adicione pelo menos um item ao orçamento.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      // Verificar se há imagens nos itens
-      console.log(
-        "Salvando orçamento com itens:",
-        orcamento.itens.map((item) => ({
-          id: item.id,
-          produto: item.produto?.nome,
-          temImagem: !!item.imagem,
-          imagemLength: item.imagem ? item.imagem.length : 0,
-        })),
-      )
-
-      // Garantir que os itens tenham todas as propriedades necessárias
-      const orcamentoParaSalvar = {
-        ...orcamento,
-        itens: orcamento.itens.map((item) => ({
-          ...item,
-          // Garantir que a imagem seja mantida
-          imagem: item.imagem || null,
-        })),
-      }
-
-      let orcamentoSalvo: Orcamento
-
-      if (orcamentoAtual) {
-        // Atualizar orçamento existente
-        orcamentoSalvo = await orcamentoService.update({
-          ...orcamentoParaSalvar,
-          id: orcamentoAtual,
-        })
-        toast({
-          title: "Sucesso",
-          description: "Orçamento atualizado com sucesso!",
-        })
-      } else {
-        // Criar novo orçamento
-        orcamentoSalvo = await orcamentoService.create(orcamentoParaSalvar)
-        setOrcamentoAtual(orcamentoSalvo.id)
-        toast({
-          title: "Sucesso",
-          description: "Orçamento salvo com sucesso!",
-        })
-      }
-
-      // Atualizar o estado com o orçamento salvo para garantir consistência
-      setOrcamento({
-        ...orcamentoSalvo,
-        itens: orcamentoSalvo.itens.map((item) => ({
-          ...item,
-          imagem: item.imagem || undefined,
-        })),
-      })
-    } catch (error) {
-      console.error("Erro ao salvar orçamento:", error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar o orçamento.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // Modifique a função carregarOrcamento para garantir que as imagens sejam carregadas corretamente
-  const carregarOrcamento = async (id: string) => {
-    setIsLoading(true)
-    try {
-      const orcamentoCarregado = await orcamentoService.getById(id)
-
-      // Verificar se as imagens foram carregadas corretamente
-      console.log(
-        "Orçamento carregado com itens:",
-        orcamentoCarregado.itens.map((item) => ({
-          id: item.id,
-          produto: item.produto?.nome,
-          temImagem: !!item.imagem,
-          imagemLength: item.imagem ? item.imagem.length : 0,
-        })),
-      )
-
-      // Garantir que os itens tenham todas as propriedades necessárias
-      const itensProcessados = orcamentoCarregado.itens.map((item) => ({
-        ...item,
-        // Garantir que a imagem seja mantida
-        imagem: item.imagem || undefined,
-      }))
-
-      setOrcamento({
-        ...orcamentoCarregado,
-        itens: itensProcessados,
-      })
-      setOrcamentoAtual(id)
-      toast({
-        title: "Sucesso",
-        description: "Orçamento carregado com sucesso!",
-      })
-    } catch (error) {
-      console.error("Erro ao carregar orçamento:", error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar o orçamento.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const novoOrcamento = () => {
-    setOrcamentoAtual(null)
-    setOrcamento({
-      numero: "ORC-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 1000)).padStart(3, "0"),
-      data: new Date().toISOString().split("T")[0],
-      cliente: null,
-      itens: [],
-      observacoes: "",
-      condicoesPagamento: "À vista",
-      prazoEntrega: "30 dias",
-      validadeOrcamento: "15 dias",
-    })
   }
 
   return (
@@ -335,14 +416,6 @@ export default function GeradorOrcamento() {
           <p className="text-gray-500 mt-1">Crie orçamentos profissionais para uniformes industriais</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            onClick={salvarOrcamento}
-            disabled={isSaving || isLoading}
-            className="flex items-center gap-2 bg-success hover:bg-success/80 text-white transition-all shadow-sm"
-          >
-            <Save className="h-4 w-4" />
-            {isSaving ? "Salvando..." : "Salvar Orçamento"}
-          </Button>
           <Button
             onClick={handleExportPDF}
             disabled={isExporting || isLoading}
@@ -357,7 +430,7 @@ export default function GeradorOrcamento() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4 w-full overflow-hidden">
           <Tabs defaultValue="orcamento" className="w-full">
-            <TabsList className="grid grid-cols-4 w-full mb-2 bg-accent">
+            <TabsList className="grid grid-cols-3 w-full mb-2 bg-accent">
               <TabsTrigger
                 value="orcamento"
                 className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm flex items-center gap-2"
@@ -378,13 +451,6 @@ export default function GeradorOrcamento() {
               >
                 <ShoppingBag className="h-4 w-4" />
                 Produtos
-              </TabsTrigger>
-              <TabsTrigger
-                value="orcamentos"
-                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm flex items-center gap-2"
-              >
-                <List className="h-4 w-4" />
-                Orçamentos
               </TabsTrigger>
             </TabsList>
             <TabsContent value="orcamento" className="space-y-4">
@@ -421,17 +487,6 @@ export default function GeradorOrcamento() {
                     produtos={produtos}
                     adicionarProduto={adicionarProduto}
                     setProdutos={setProdutos}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="orcamentos">
-              <Card className="shadow-sm border-0">
-                <CardContent className="p-6">
-                  <GerenciadorOrcamentos
-                    carregarOrcamento={carregarOrcamento}
-                    novoOrcamento={novoOrcamento}
-                    orcamentoAtualId={orcamentoAtual}
                   />
                 </CardContent>
               </Card>
