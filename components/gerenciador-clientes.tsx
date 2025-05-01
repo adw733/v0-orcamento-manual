@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Trash2, Pencil, Save, X, Building, Phone, Mail, User } from "lucide-react"
+import { Plus, Trash2, Pencil, Save, X, Building, Phone, Mail, User, AlertCircle } from "lucide-react"
 import type { Cliente } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockClientes } from "@/lib/mock-data"
@@ -38,6 +38,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Carregar clientes do Supabase ao montar o componente
   useEffect(() => {
@@ -81,11 +82,16 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     if (novoCliente.nome) {
       try {
         setIsLoading(true)
+        setError(null)
+
+        // Gerar um UUID para o novo cliente
+        const clienteId = generateUUID()
 
         // Inserir no Supabase
         const { data, error } = await supabase
           .from("clientes")
           .insert({
+            id: clienteId,
             nome: novoCliente.nome,
             cnpj: novoCliente.cnpj || null,
             endereco: novoCliente.endereco || null,
@@ -124,6 +130,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
         }
       } catch (error) {
         console.error("Erro ao adicionar cliente:", error)
+        setError(`Erro ao adicionar cliente: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
       } finally {
         setIsLoading(false)
       }
@@ -131,10 +138,48 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
   }
 
   const handleRemoverCliente = async (id: string) => {
+    // Confirmar antes de excluir
+    if (!window.confirm("Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.")) {
+      return
+    }
+
     try {
       setIsLoading(true)
+      setError(null)
 
-      // Remover do Supabase
+      // Verificar se o cliente está sendo usado em algum orçamento
+      const { data: orcamentosRelacionados, error: orcamentosError } = await supabase
+        .from("orcamentos")
+        .select("id, numero")
+        .eq("cliente_id", id)
+
+      if (orcamentosError) throw orcamentosError
+
+      // Se existirem orçamentos relacionados, perguntar ao usuário se deseja excluí-los também
+      if (orcamentosRelacionados && orcamentosRelacionados.length > 0) {
+        const confirmarExclusao = window.confirm(
+          `Este cliente está associado a ${orcamentosRelacionados.length} orçamento(s). Todos esses orçamentos serão excluídos também. Deseja continuar?`,
+        )
+
+        if (!confirmarExclusao) {
+          setIsLoading(false)
+          return
+        }
+
+        // Excluir os itens de orçamento relacionados primeiro
+        for (const orcamento of orcamentosRelacionados) {
+          const { error: itensError } = await supabase.from("itens_orcamento").delete().eq("orcamento_id", orcamento.id)
+
+          if (itensError) throw itensError
+        }
+
+        // Excluir os orçamentos relacionados
+        const { error: deleteOrcamentosError } = await supabase.from("orcamentos").delete().eq("cliente_id", id)
+
+        if (deleteOrcamentosError) throw deleteOrcamentosError
+      }
+
+      // Agora podemos excluir o cliente com segurança
       const { error } = await supabase.from("clientes").delete().eq("id", id)
 
       if (error) throw error
@@ -143,6 +188,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
       setClientes(clientes.filter((cliente) => cliente.id !== id))
     } catch (error) {
       console.error("Erro ao remover cliente:", error)
+      setError(`Erro ao remover cliente: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
     } finally {
       setIsLoading(false)
     }
@@ -162,6 +208,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     if (clienteEditando) {
       try {
         setIsLoading(true)
+        setError(null)
 
         // Atualizar no Supabase
         const { error } = await supabase
@@ -185,6 +232,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
         setClienteEditando(null)
       } catch (error) {
         console.error("Erro ao atualizar cliente:", error)
+        setError(`Erro ao atualizar cliente: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
       } finally {
         setIsLoading(false)
       }
@@ -200,6 +248,13 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
         </h3>
         <span className="text-sm text-gray-500">{clientes.length} clientes cadastrados</span>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
 
       <div className="space-y-4">
         {isLoading && clientes.length === 0 ? (

@@ -306,6 +306,7 @@ export const orcamentoService = {
                   descricaoEstampa: item.descricao_estampa || undefined,
                   tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
                   imagem: item.imagem || undefined,
+                  observacao: item.observacao || undefined,
                 }
               }),
             )

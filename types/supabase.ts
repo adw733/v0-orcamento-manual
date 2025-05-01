@@ -144,6 +144,7 @@ export interface Database {
           descricao_estampa: string | null
           tamanhos: Json | null
           imagem: string | null
+          observacao: string | null
           created_at: string
         }
         Insert: {
@@ -158,6 +159,7 @@ export interface Database {
           descricao_estampa?: string | null
           tamanhos?: Json | null
           imagem?: string | null
+          observacao?: string | null
           created_at?: string
         }
         Update: {
@@ -172,6 +174,7 @@ export interface Database {
           descricao_estampa?: string | null
           tamanhos?: Json | null
           imagem?: string | null
+          observacao?: string | null
           created_at?: string
         }
       }

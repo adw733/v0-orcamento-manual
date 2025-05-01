@@ -83,62 +83,6 @@ const DescricaoEstampaInput = ({
   )
 }
 
-// Componente isolado para o campo de observação
-const ObservacaoInput = ({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (value: string) => void
-}) => {
-  const [localValue, setLocalValue] = useState(value || "")
-
-  // Sincroniza o valor local quando o valor externo muda
-  useEffect(() => {
-    setLocalValue(value || "")
-  }, [value])
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value
-    setLocalValue(newValue)
-  }
-
-  const handleBlur = () => {
-    onChange(localValue)
-  }
-
-  return (
-    <Textarea
-      value={localValue}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      placeholder="Observações sobre o item (detalhes, especificações, etc.)"
-      className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-      rows={2}
-    />
-  )
-}
-
-// With this new component:
-const ObservacaoField = ({
-  observacao,
-  onObservacaoChange,
-  isEditing = true,
-}: {
-  observacao?: string
-  onObservacaoChange: (observacao: string) => void
-  isEditing?: boolean
-}) => {
-  if (!isEditing) return null
-
-  return (
-    <div className="mt-4">
-      <Label className="text-primary">Observação</Label>
-      <ObservacaoInput value={observacao || ""} onChange={onObservacaoChange} />
-    </div>
-  )
-}
-
 export default function FormularioOrcamento({
   orcamento,
   clientes,
@@ -157,11 +101,11 @@ export default function FormularioOrcamento({
     valorUnitario: 0,
     tamanhos: { ...tamanhosPadrao },
     imagem: "",
-    observacao: "",
   })
   const [itemEmEdicao, setItemEmEdicao] = useState<ItemOrcamento | null>(null)
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Refs para os inputs de arquivo
   const novoImagemInputRef = useRef<HTMLInputElement>(null)
@@ -205,17 +149,36 @@ export default function FormularioOrcamento({
   const handleProdutoChange = async (produtoId: string) => {
     try {
       setIsLoading(true)
+      setErrorMessage(null)
 
+      // Primeiro, verificar se o produto está na lista local
+      const produtoLocal = produtos.find((p) => p.id === produtoId)
+
+      if (produtoLocal) {
+        // Se o produto estiver na lista local, use-o diretamente
+        setProdutoSelecionado(produtoLocal)
+        setNovoItem({
+          ...novoItem,
+          produtoId,
+          produto: produtoLocal,
+          valorUnitario: produtoLocal.valorBase,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Se não estiver na lista local, busque do Supabase
       // Buscar o produto completo
-      const { data: produtoData, error: produtoError } = await supabase
+      const { data: produtosData, error: produtoError } = await supabase
         .from("produtos")
         .select("*")
         .eq("id", produtoId)
-        .single()
 
-      if (produtoError) throw produtoError
+      if (produtoError) {
+        throw produtoError
+      }
 
-      if (produtoData) {
+      if (produtosData && produtosData.length > 0) {
         // Buscar tecidos do produto
         const { data: tecidosData, error: tecidosError } = await supabase
           .from("tecidos")
@@ -226,17 +189,17 @@ export default function FormularioOrcamento({
 
         // Converter para o formato da aplicação
         const produto: Produto = {
-          id: produtoData.id,
-          nome: produtoData.nome,
-          valorBase: Number(produtoData.valor_base),
+          id: produtosData[0].id,
+          nome: produtosData[0].nome,
+          valorBase: Number(produtosData[0].valor_base),
           tecidos: tecidosData
             ? tecidosData.map((t) => ({
                 nome: t.nome,
                 composicao: t.composicao || "",
               }))
             : [],
-          cores: produtoData.cores || [],
-          tamanhosDisponiveis: produtoData.tamanhos_disponiveis || [],
+          cores: produtosData[0].cores || [],
+          tamanhosDisponiveis: produtosData[0].tamanhos_disponiveis || [],
         }
 
         setProdutoSelecionado(produto)
@@ -246,15 +209,25 @@ export default function FormularioOrcamento({
           produto,
           valorUnitario: produto.valorBase,
         })
+      } else {
+        // Produto não encontrado
+        setErrorMessage("Produto não encontrado no banco de dados")
+        setProdutoSelecionado(null)
+        setNovoItem({
+          ...novoItem,
+          produtoId: "",
+          produto: undefined,
+          valorUnitario: 0,
+        })
       }
     } catch (error) {
       console.error("Erro ao carregar produto:", error)
+      setErrorMessage(`Erro ao carregar produto: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Update the handleAdicionarItem function to use UUID
   const handleAdicionarItem = async () => {
     if (novoItem.produtoId && novoItem.valorUnitario) {
       try {
@@ -276,7 +249,6 @@ export default function FormularioOrcamento({
           quantidade: 0,
           valorUnitario: 0,
           tamanhos: { ...tamanhosPadrao },
-          observacao: "",
           imagem: "",
         })
         setProdutoSelecionado(null)
@@ -423,21 +395,6 @@ export default function FormularioOrcamento({
     }
   }
 
-  // Add this function near the other handler functions:
-  const handleObservacaoChange = (observacao: string) => {
-    if (editandoItem && itemEmEdicao) {
-      setItemEmEdicao({
-        ...itemEmEdicao,
-        observacao,
-      })
-    } else {
-      setNovoItem({
-        ...novoItem,
-        observacao,
-      })
-    }
-  }
-
   // Versão redimensionada da tabela de tamanhos
   const renderTabelaTamanhos = (
     tamanhos: Record<string, number>,
@@ -570,6 +527,12 @@ export default function FormularioOrcamento({
         </div>
       )}
 
+      {errorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md mb-4">
+          <p className="text-sm">{errorMessage}</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="numero" className="text-primary mb-1.5">
@@ -634,11 +597,6 @@ export default function FormularioOrcamento({
                   <tr className="border-t hover:bg-accent/30 transition-colors">
                     <td className="p-3">
                       <div className="font-medium">{item.produto?.nome}</div>
-                      {item.observacao && (
-                        <div className="text-xs mt-1 text-gray-600 italic">
-                          {item.observacao.length > 50 ? `${item.observacao.substring(0, 50)}...` : item.observacao}
-                        </div>
-                      )}
                     </td>
                     <td className="p-3 text-center">
                       {editandoItem === item.id ? (
@@ -718,12 +676,6 @@ export default function FormularioOrcamento({
                   {editandoItem === item.id && itemEmEdicao && (
                     <tr>
                       <td colSpan={5} className="p-4 bg-accent/50 border-t border-b">
-                        {/* Seletor de Tecido, Cor e Descrição da Estampa */}
-                        <ObservacaoField
-                          observacao={itemEmEdicao.observacao}
-                          onObservacaoChange={handleObservacaoChange}
-                        />
-
                         {/* Tabela de Tamanhos */}
                         {renderTabelaTamanhos(
                           itemEmEdicao.tamanhos,
@@ -818,9 +770,6 @@ export default function FormularioOrcamento({
               {linhaAtiva === "novo" && novoItem.produtoId && (
                 <tr>
                   <td colSpan={5} className="p-4 bg-accent/50 border-t border-b">
-                    {/* Seletor de Tecido, Cor e Descrição da Estampa */}
-                    <ObservacaoField observacao={novoItem.observacao} onObservacaoChange={handleObservacaoChange} />
-
                     {/* Tabela de Tamanhos */}
                     {renderTabelaTamanhos(
                       novoItem.tamanhos || {},

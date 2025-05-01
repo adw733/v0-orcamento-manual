@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Trash2, Pencil, Save, X, Package, DollarSign, Shirt, Palette, Ruler } from "lucide-react"
+import { Plus, Trash2, Pencil, Save, X, Package, DollarSign, Shirt, Palette, Ruler, AlertCircle } from "lucide-react"
 import type { Produto, Tecido } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockProdutos } from "@/lib/mock-data"
@@ -37,6 +37,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [produtoEditando, setProdutoEditando] = useState<Produto | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Estados para gerenciar tecidos
   const [novoTecido, setNovoTecido] = useState<Tecido>({ nome: "", composicao: "" })
@@ -100,16 +101,23 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     carregarProdutos()
   }, [setProdutos])
 
+  // Modifique a função handleAdicionarProduto para garantir que o ID seja gerado corretamente
+
+  // Substitua a função handleAdicionarProduto atual por esta versão atualizada:
   const handleAdicionarProduto = async () => {
     if (novoProduto.nome && novoProduto.valorBase) {
       try {
         setIsLoading(true)
+        setError(null)
+
+        // Gerar um UUID para o novo produto
+        const produtoId = generateUUID()
 
         // Inserir produto no Supabase
         const { data: produtoData, error: produtoError } = await supabase
           .from("produtos")
           .insert({
-            id: generateUUID(),
+            id: produtoId,
             nome: novoProduto.nome,
             valor_base: novoProduto.valorBase,
             cores: novoProduto.cores || [],
@@ -160,15 +168,48 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         }
       } catch (error) {
         console.error("Erro ao adicionar produto:", error)
+        setError(`Erro ao adicionar produto: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
       } finally {
         setIsLoading(false)
       }
     }
   }
 
+  // Modificar a função handleRemoverProduto para verificar e lidar com itens de orçamento relacionados
   const handleRemoverProduto = async (id: string) => {
+    // Confirmar antes de excluir
+    if (!window.confirm("Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.")) {
+      return
+    }
+
     try {
       setIsLoading(true)
+      setError(null)
+
+      // Verificar se o produto está sendo usado em algum item de orçamento
+      const { data: itensRelacionados, error: itensError } = await supabase
+        .from("itens_orcamento")
+        .select("id, orcamento_id")
+        .eq("produto_id", id)
+
+      if (itensError) throw itensError
+
+      // Se existirem itens relacionados, perguntar ao usuário se deseja excluí-los também
+      if (itensRelacionados && itensRelacionados.length > 0) {
+        const confirmarExclusao = window.confirm(
+          `Este produto está sendo usado em ${itensRelacionados.length} item(ns) de orçamento. Todos esses itens serão excluídos também. Deseja continuar?`,
+        )
+
+        if (!confirmarExclusao) {
+          setIsLoading(false)
+          return
+        }
+
+        // Excluir os itens de orçamento relacionados
+        const { error: deleteItensError } = await supabase.from("itens_orcamento").delete().eq("produto_id", id)
+
+        if (deleteItensError) throw deleteItensError
+      }
 
       // Remover tecidos do produto
       const { error: tecidosError } = await supabase.from("tecidos").delete().eq("produto_id", id)
@@ -184,6 +225,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
       setProdutos(produtos.filter((produto) => produto.id !== id))
     } catch (error) {
       console.error("Erro ao remover produto:", error)
+      setError(`Erro ao remover produto: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
     } finally {
       setIsLoading(false)
     }
@@ -203,6 +245,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     if (produtoEditando) {
       try {
         setIsLoading(true)
+        setError(null)
 
         // Atualizar produto no Supabase
         const { error: produtoError } = await supabase
@@ -245,6 +288,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         setProdutoEditando(null)
       } catch (error) {
         console.error("Erro ao atualizar produto:", error)
+        setError(`Erro ao atualizar produto: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
       } finally {
         setIsLoading(false)
       }
@@ -354,6 +398,13 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         </h3>
         <span className="text-sm text-gray-500">{produtos.length} produtos cadastrados</span>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
 
       <div className="space-y-4">
         {isLoading && produtos.length === 0 ? (
