@@ -4,14 +4,12 @@ import { useState, useRef, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { FileDown, FileText, Users, ShoppingBag } from "lucide-react"
+import { Printer, FileText, Users, ShoppingBag } from "lucide-react"
 import FormularioOrcamento from "@/components/formulario-orcamento"
 import VisualizacaoDocumento from "@/components/visualizacao-documento"
 import GerenciadorClientes from "@/components/gerenciador-clientes"
 import GerenciadorProdutos from "@/components/gerenciador-produtos"
 import type { Cliente, Produto, Orcamento, ItemOrcamento } from "@/types/types"
-import { jsPDF } from "jspdf"
-import html2canvas from "html2canvas"
 import { supabase } from "@/lib/supabase"
 import { mockClientes, mockProdutos } from "@/lib/mock-data"
 
@@ -37,7 +35,7 @@ export default function GeradorOrcamento() {
     prazoEntrega: "30 dias",
     validadeOrcamento: "15 dias",
   })
-  const [isExporting, setIsExporting] = useState(false)
+  const [isPrinting, setIsPrinting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [orcamentoSalvo, setOrcamentoSalvo] = useState<string | null>(null)
 
@@ -150,145 +148,111 @@ export default function GeradorOrcamento() {
     }
   }, [clientes.length, produtos.length, setClientes, setProdutos])
 
-  const handleExportPDF = async () => {
-    if (isExporting || !documentoRef.current) return
-    setIsExporting(true)
+  // Modifique a função handlePrint para garantir que os estilos sejam preservados na impressão
+  const handlePrint = () => {
+    setIsPrinting(true)
 
-    try {
-      // Create a clone of the document to work with
-      const documentClone = documentoRef.current.cloneNode(true) as HTMLElement
-      document.body.appendChild(documentClone)
-
-      // Make sure the clone is visible but off-screen
-      documentClone.style.position = "absolute"
-      documentClone.style.left = "-9999px"
-      documentClone.style.top = "0"
-      documentClone.style.width = "794px" // A4 width in pixels at 96 DPI
-      documentClone.style.backgroundColor = "white"
-      documentClone.style.transform = "none"
-
-      // Create PDF with A4 dimensions
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      })
-
-      // A4 dimensions
-      const pageWidth = 210 // mm
-      const pageHeight = 297 // mm
-
-      // Get all main sections to be captured
-      const orcamentoSection = documentClone.querySelector(
-        ".border.border-gray-300.rounded-md:nth-child(1)",
-      ) as HTMLElement
-      const fichasTecnicas = documentClone.querySelectorAll('[id^="ficha-"]')
-
-      // Process the main orçamento section
-      if (orcamentoSection) {
-        // Create a dedicated container for the orçamento
-        const orcamentoContainer = document.createElement("div")
-        orcamentoContainer.style.position = "absolute"
-        orcamentoContainer.style.left = "-9999px"
-        orcamentoContainer.style.top = "0"
-        orcamentoContainer.style.width = "794px" // A4 width in pixels at 96 DPI
-        orcamentoContainer.style.backgroundColor = "white"
-        orcamentoContainer.style.padding = "0"
-        orcamentoContainer.style.margin = "0"
-
-        // Clone the orçamento section
-        const orcamentoClone = orcamentoSection.cloneNode(true) as HTMLElement
-        orcamentoContainer.appendChild(orcamentoClone)
-
-        // Add to document
-        document.body.appendChild(orcamentoContainer)
-
-        try {
-          // Capture the orçamento section
-          const canvas = await html2canvas(orcamentoContainer, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: "#ffffff",
-            logging: true,
-          })
-
-          // Add to PDF
-          const imgData = canvas.toDataURL("image/jpeg", 1.0)
-          const imgWidth = pageWidth
-          const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-          pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight)
-
-          // Clean up
-          document.body.removeChild(orcamentoContainer)
-        } catch (error) {
-          console.error("Error capturing orçamento section:", error)
-        }
+    // Adicionar estilos de impressão dinamicamente
+    const style = document.createElement("style")
+    style.id = "print-styles"
+    style.innerHTML = `
+    @media print {
+      body * {
+        visibility: hidden;
       }
-
-      // Process each ficha técnica on a new page
-      for (let i = 0; i < fichasTecnicas.length; i++) {
-        const ficha = fichasTecnicas[i] as HTMLElement
-
-        // Create a container for the ficha
-        const fichaContainer = document.createElement("div")
-        fichaContainer.style.position = "absolute"
-        fichaContainer.style.left = "-9999px"
-        fichaContainer.style.top = "0"
-        fichaContainer.style.width = "794px"
-        fichaContainer.style.backgroundColor = "white"
-        fichaContainer.style.padding = "20px"
-
-        // Clone the header
-        const header = documentClone.querySelector(".bg-gradient-to-r.from-primary.to-primary-dark")
-        if (header) {
-          fichaContainer.appendChild(header.cloneNode(true))
-        }
-
-        // Add the ficha
-        fichaContainer.appendChild(ficha.cloneNode(true))
-        document.body.appendChild(fichaContainer)
-
-        try {
-          // Add a new page for each ficha (except the first one)
-          if (i > 0 || orcamentoSection) {
-            pdf.addPage()
-          }
-
-          // Capture the ficha
-          const canvas = await html2canvas(fichaContainer, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: "#ffffff",
-            logging: true,
-          })
-
-          // Add to PDF
-          const imgData = canvas.toDataURL("image/jpeg", 1.0)
-          const imgWidth = pageWidth
-          const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-          pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, imgHeight)
-
-          // Clean up
-          document.body.removeChild(fichaContainer)
-        } catch (error) {
-          console.error(`Error capturing ficha ${i}:`, error)
-        }
+      #print-container, #print-container * {
+        visibility: visible;
       }
+      #print-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      
+      /* Preservar cores e fundos na impressão */
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      
+      /* Garantir que os gradientes e cores de fundo sejam impressos */
+      .bg-gradient-to-r, .bg-primary, .bg-accent, .bg-white, .bg-white\/10 {
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+      }
+      
+      /* Garantir que o texto branco permaneça branco */
+      .text-white {
+        color: white !important;
+      }
+      
+      /* Garantir que as bordas sejam impressas */
+      .border, .border-t, .border-b, .border-l, .border-r {
+        border-color: inherit !important;
+      }
+      
+      .page-break-inside-avoid {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      
+      .page-break-before {
+        page-break-before: always !important;
+        break-before: always !important;
+      }
+      
+      table {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      
+      h3, h4 {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+      
+      img {
+        max-height: 350px;
+        max-width: 100%;
+        object-fit: contain;
+      }
+      
+      .ficha-tecnica {
+        page-break-before: always !important;
+        break-before: always !important;
+      }
+      
+      /* Garantir que cada ficha técnica comece em uma nova página */
+      .ficha-tecnica:not(:first-child) {
+        margin-top: 20px;
+      }
+    }
+  `
+    document.head.appendChild(style)
 
-      // Clean up
-      document.body.removeChild(documentClone)
+    // Criar um container temporário para impressão
+    const printContainer = document.createElement("div")
+    printContainer.id = "print-container"
 
-      // Save the PDF
-      pdf.save(`${orcamento.numero}.pdf`)
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error)
-      alert("Ocorreu um erro ao gerar o PDF. Por favor, tente novamente.")
-    } finally {
-      setIsExporting(false)
+    if (documentoRef.current) {
+      // Clonar o conteúdo do documento
+      const clonedContent = documentoRef.current.cloneNode(true)
+      printContainer.appendChild(clonedContent)
+      document.body.appendChild(printContainer)
+
+      // Imprimir
+      setTimeout(() => {
+        window.print()
+
+        // Limpar após a impressão
+        document.body.removeChild(printContainer)
+        document.head.removeChild(style)
+        setIsPrinting(false)
+      }, 500)
+    } else {
+      setIsPrinting(false)
     }
   }
 
@@ -504,12 +468,12 @@ export default function GeradorOrcamento() {
         </div>
         <div className="flex gap-2">
           <Button
-            onClick={handleExportPDF}
-            disabled={isExporting || isLoading}
+            onClick={handlePrint}
+            disabled={isPrinting || isLoading}
             className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
           >
-            <FileDown className="h-4 w-4" />
-            {isExporting ? "Gerando PDF..." : "Exportar PDF"}
+            <Printer className="h-4 w-4" />
+            {isPrinting ? "Imprimindo..." : "Imprimir"}
           </Button>
         </div>
       </div>

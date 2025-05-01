@@ -10,12 +10,32 @@ interface VisualizacaoDocumentoProps {
 export default function VisualizacaoDocumento({ orcamento, calcularTotal }: VisualizacaoDocumentoProps) {
   const dataFormatada = orcamento.data ? new Date(orcamento.data).toLocaleDateString("pt-BR") : ""
 
-  // Vamos melhorar os estilos para garantir que todos os elementos caibam corretamente na página A4
-
-  // Substitua a constante pdfStyles por esta versão aprimorada:
-
+  // Adicione estas propriedades CSS para garantir que as cores sejam preservadas na impressão
   const pdfStyles = `
   @media print {
+    /* Preservar cores e fundos na impressão */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    
+    /* Garantir que os gradientes e cores de fundo sejam impressos */
+    .bg-gradient-to-r, .bg-primary, .bg-accent, .bg-white, .bg-white\\/10 {
+      print-color-adjust: exact !important;
+      -webkit-print-color-adjust: exact !important;
+    }
+    
+    /* Garantir que o texto branco permaneça branco */
+    .text-white {
+      color: white !important;
+    }
+    
+    /* Garantir que as bordas sejam impressas */
+    .border, .border-t, .border-b, .border-l, .border-r {
+      border-color: inherit !important;
+    }
+    
     .page-break-inside-avoid {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
@@ -46,6 +66,11 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
       page-break-before: always !important;
       break-before: always !important;
     }
+    
+    /* Garantir que cada ficha técnica comece em uma nova página */
+    .ficha-tecnica:not(:first-child) {
+      margin-top: 20px;
+    }
   }
   
   /* Estilos para garantir que os elementos caibam na página A4 */
@@ -54,7 +79,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
     box-sizing: border-box;
     width: 100%;
     margin: 0;
-    padding: 0;
+    padding: 10px;
   }
   
   .pdf-content {
@@ -65,6 +90,9 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
   .pdf-header {
     width: 100%;
     box-sizing: border-box;
+    padding: 1rem;
+    background: linear-gradient(to right, #0f4c81, #00305a);
+    color: white;
   }
   
   .pdf-table {
@@ -139,9 +167,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
       <style>{pdfStyles}</style>
       {/* Orçamento */}
       <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm page-break-inside-avoid pdf-section">
-        {/* Vamos corrigir o cabeçalho para que ocupe toda a largura e ajustar o layout
-
-        1. Substitua a div do cabeçalho (classe "bg-gradient-to-r from-primary to-primary-dark p-6 pdf-header") por: */}
         <div className="bg-gradient-to-r from-primary to-primary-dark p-4 pdf-header w-full">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -185,8 +210,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
         </div>
 
         <div className="p-6 space-y-6 pdf-content">
-          {/* Também vamos modificar a seção de informações do cliente para ser mais compacta
-          // Encontre a seção de dados do cliente e substitua por: */}
           <div className="border-b pb-4 page-break-inside-avoid">
             <h3 className="font-bold mb-2 text-primary text-lg">DADOS DO CLIENTE</h3>
             {orcamento.cliente ? (
@@ -267,8 +290,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
           </div>
 
           <div className="space-y-4 page-break-inside-avoid">
-            {/* Vamos também modificar a seção de observações para ser mais compacta
-            // Encontre a seção de observações e substitua por: */}
             <div>
               <h3 className="font-bold mb-2 text-primary">OBSERVAÇÕES</h3>
               <p className="text-sm bg-accent p-3 rounded-md pdf-observacoes">
@@ -276,8 +297,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
               </p>
             </div>
 
-            {/* Por fim, vamos modificar a seção de condições para ser mais compacta
-            // Encontre a seção de condições e substitua por: */}
             <div className="grid grid-cols-3 gap-3 text-sm mt-3 pdf-grid">
               <div className="bg-accent p-2 rounded-md">
                 <h4 className="font-bold text-primary mb-1 text-sm">Condições de Pagamento</h4>
@@ -297,9 +316,14 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
       </div>
 
       {/* Ficha Técnica */}
-      {orcamento.itens.length > 0 && (
-        <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm page-break-before pdf-section">
-          {/* 2. Substitua também o cabeçalho da ficha técnica pelo mesmo padrão: */}
+      {orcamento.itens.map((item, index) => (
+        <div
+          key={`ficha-${item.id}`}
+          id={`ficha-${item.id}`}
+          className={`border border-gray-300 rounded-md overflow-hidden shadow-sm ${
+            index > 0 ? "mt-8" : ""
+          } page-break-before ficha-tecnica pdf-section`}
+        >
           <div className="bg-gradient-to-r from-primary to-primary-dark p-4 pdf-header w-full">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
@@ -330,7 +354,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-white font-sans tracking-tight">FICHA TÉCNICA</h1>
-                  <p className="text-white/80 text-sm">Uniformes Industriais</p>
+                  <p className="text-white/80 text-sm">{item.produto?.nome}</p>
                 </div>
               </div>
               <div className="text-right bg-white/10 p-2 rounded-md backdrop-blur-sm">
@@ -343,134 +367,101 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
           </div>
 
           <div className="p-6 space-y-6 pdf-content">
-            {orcamento.itens.map((item, index) => (
-              <div
-                key={`ficha-${item.id}`}
-                id={`ficha-${item.id}`}
-                className={`${index > 0 ? "page-break-before ficha-tecnica" : ""} pb-6 last:pb-0 page-break-inside-avoid`}
-              >
-                <h3 className="font-bold text-lg mb-4 text-primary border-b-2 border-primary pb-2">
-                  {item.produto?.nome}
-                </h3>
+            <h3 className="font-bold text-lg mb-4 text-primary border-b-2 border-primary pb-2">{item.produto?.nome}</h3>
 
-                <div className="space-y-4">
-                  {/* Imagem do item */}
-                  {/* 3. Modifique a classe CSS para a imagem do produto para garantir que ela seja exibida corretamente:
-
-                  Substitua:
-                  \`\`\`
+            <div className="space-y-4">
+              {item.imagem && (
+                <div className="flex justify-center mb-4">
                   <img
                     src={item.imagem || "/placeholder.svg"}
                     alt={item.produto?.nome || "Imagem do produto"}
-                    className="max-h-96 object-contain border rounded-md shadow-sm pdf-image"
-                  />
-                  \`\`\`
-
-                  Por:
-                  \`\`\`
-                  <img
-                    src={item.imagem || "/placeholder.svg"}
-                    alt={item.produto?.nome || "Imagem do produto"}
-                    className="object-contain border rounded-md shadow-sm"
+                    className="object-contain border rounded-md shadow-sm pdf-image"
                     style={{ maxHeight: "350px", maxWidth: "100%", display: "block", margin: "0 auto" }}
                   />
-                  \`\`\` */}
-                  {item.imagem && (
-                    <div className="flex justify-center mb-4">
-                      <img
-                        src={item.imagem || "/placeholder.svg"}
-                        alt={item.produto?.nome || "Imagem do produto"}
-                        className="object-contain border rounded-md shadow-sm pdf-image"
-                        style={{ maxHeight: "350px", maxWidth: "100%", display: "block", margin: "0 auto" }}
-                      />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pdf-grid">
+                <div className="bg-accent p-4 rounded-md">
+                  <h4 className="font-bold mb-2 text-primary">Tecido</h4>
+                  {item.tecidoSelecionado ? (
+                    <div className="text-sm">
+                      <p className="font-medium">{item.tecidoSelecionado.nome}</p>
+                      <p className="text-gray-600">{item.tecidoSelecionado.composicao}</p>
                     </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">Tecido não especificado</p>
                   )}
+                </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pdf-grid">
-                    <div className="bg-accent p-4 rounded-md">
-                      <h4 className="font-bold mb-2 text-primary">Tecido</h4>
-                      {item.tecidoSelecionado ? (
-                        <div className="text-sm">
-                          <p className="font-medium">{item.tecidoSelecionado.nome}</p>
-                          <p className="text-gray-600">{item.tecidoSelecionado.composicao}</p>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500 italic">Tecido não especificado</p>
-                      )}
-                    </div>
+                <div className="bg-accent p-4 rounded-md">
+                  <h4 className="font-bold mb-2 text-primary">Cor</h4>
+                  {item.corSelecionada ? (
+                    <p className="text-sm font-medium">{item.corSelecionada}</p>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">Cor não especificada</p>
+                  )}
+                </div>
 
-                    <div className="bg-accent p-4 rounded-md">
-                      <h4 className="font-bold mb-2 text-primary">Cor</h4>
-                      {item.corSelecionada ? (
-                        <p className="text-sm font-medium">{item.corSelecionada}</p>
-                      ) : (
-                        <p className="text-sm text-gray-500 italic">Cor não especificada</p>
-                      )}
-                    </div>
-
-                    <div className="bg-accent p-4 rounded-md">
-                      <h4 className="font-bold mb-2 text-primary">Estampa</h4>
-                      {item.descricaoEstampa ? (
-                        <p className="text-sm">{item.descricaoEstampa}</p>
-                      ) : (
-                        <p className="text-sm text-gray-500 italic">Sem estampa</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Agora vamos modificar a tabela de tamanhos para ser mais compacta
-                  // Encontre a seção da tabela de tamanhos e substitua por: */}
-                  <div className="mt-4">
-                    <h4 className="font-bold mb-2 text-primary">Quantidades por Tamanho</h4>
-                    <div className="bg-accent p-3 rounded-md overflow-x-auto">
-                      <table className="w-full border-collapse text-sm pdf-table">
-                        <thead>
-                          <tr>
-                            <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tl-md">
-                              TAM.
-                            </th>
-                            {Object.entries(item.tamanhos)
-                              .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
-                              .map(([tamanho]) => (
-                                <th
-                                  key={`header-${item.id}-${tamanho}`}
-                                  className="border border-gray-300 p-1 text-center bg-primary text-white"
-                                >
-                                  {tamanho}
-                                </th>
-                              ))}
-                            <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tr-md">
-                              TOTAL
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
-                            {Object.entries(item.tamanhos)
-                              .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
-                              .map(([tamanho, valor]) => (
-                                <td
-                                  key={`${item.id}-${tamanho}`}
-                                  className="border border-gray-300 p-1 text-center bg-white"
-                                >
-                                  {valor}
-                                </td>
-                              ))}
-                            <td className="border border-gray-300 p-1 text-center font-medium bg-white">
-                              {item.quantidade}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                <div className="bg-accent p-4 rounded-md">
+                  <h4 className="font-bold mb-2 text-primary">Estampa</h4>
+                  {item.descricaoEstampa ? (
+                    <p className="text-sm">{item.descricaoEstampa}</p>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">Sem estampa</p>
+                  )}
                 </div>
               </div>
-            ))}
+
+              <div className="mt-4">
+                <h4 className="font-bold mb-2 text-primary">Quantidades por Tamanho</h4>
+                <div className="bg-accent p-3 rounded-md overflow-x-auto">
+                  <table className="w-full border-collapse text-sm pdf-table">
+                    <thead>
+                      <tr>
+                        <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tl-md">
+                          TAM.
+                        </th>
+                        {Object.entries(item.tamanhos)
+                          .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
+                          .map(([tamanho]) => (
+                            <th
+                              key={`header-${item.id}-${tamanho}`}
+                              className="border border-gray-300 p-1 text-center bg-primary text-white"
+                            >
+                              {tamanho}
+                            </th>
+                          ))}
+                        <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tr-md">
+                          TOTAL
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
+                        {Object.entries(item.tamanhos)
+                          .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
+                          .map(([tamanho, valor]) => (
+                            <td
+                              key={`${item.id}-${tamanho}`}
+                              className="border border-gray-300 p-1 text-center bg-white"
+                            >
+                              {valor}
+                            </td>
+                          ))}
+                        <td className="border border-gray-300 p-1 text-center font-medium bg-white">
+                          {item.quantidade}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+      ))}
     </div>
   )
 }
