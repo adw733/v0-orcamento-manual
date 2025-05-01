@@ -155,58 +155,196 @@ export default function GeradorOrcamento() {
     setIsExporting(true)
 
     try {
-      // Criar um novo documento PDF
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      })
+      // Configurações para melhorar a qualidade
+      const scale = 2 // Escala para qualidade
 
-      // Capturar o orçamento principal (primeira div com a classe especificada)
-      const orcamentoElement = documentoRef.current.querySelector(".border.border-gray-300.rounded-md.overflow-hidden")
-      if (!orcamentoElement) {
-        throw new Error("Elemento do orçamento não encontrado")
+      // Dimensões da página A4 em pontos (jsPDF usa pontos por padrão)
+      // A4 = 210mm x 297mm = 595.28pt x 841.89pt
+      const pdfOptions = {
+        orientation: "portrait",
+        unit: "pt",
+        format: "a4",
+        compress: true,
+        precision: 16,
       }
 
-      // Renderizar o orçamento principal
-      const orcamentoCanvas = await html2canvas(orcamentoElement as HTMLElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      })
+      // Criar um novo documento PDF
+      const pdf = new jsPDF(pdfOptions)
 
-      // Adicionar o orçamento ao PDF
-      const imgData = orcamentoCanvas.toDataURL("image/jpeg", 0.95)
-      const imgWidth = 210 - 20 // A4 width - margins
-      const imgHeight = (orcamentoCanvas.height * imgWidth) / orcamentoCanvas.width
-      pdf.addImage(imgData, "JPEG", 10, 10, imgWidth, imgHeight)
+      // Dimensões da página A4 em pontos
+      const pageWidth = 595.28
+      const pageHeight = 841.89
+      const margin = 40 // Margem em pontos (aproximadamente 14mm)
+      const contentWidth = pageWidth - margin * 2
+      const contentHeight = pageHeight - margin * 2
 
-      // Processar as fichas técnicas
-      if (orcamento.itens.length > 0) {
-        // Obter todos os elementos de ficha técnica
-        const fichaTecnicaElements = documentoRef.current.querySelectorAll('[id^="ficha-"]')
+      // Função para renderizar um elemento HTML para canvas
+      const renderElementToCanvas = async (element) => {
+        if (!element) return null
 
-        if (fichaTecnicaElements && fichaTecnicaElements.length > 0) {
-          // Para cada ficha técnica, adicionar uma nova página ao PDF
-          for (let i = 0; i < fichaTecnicaElements.length; i++) {
-            const fichaTecnicaElement = fichaTecnicaElements[i] as HTMLElement
+        const canvas = await html2canvas(element, {
+          scale: scale,
+          useCORS: true,
+          logging: false,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+        })
 
-            // Adicionar nova página para cada ficha técnica
-            pdf.addPage()
+        return canvas
+      }
 
-            // Renderizar a ficha técnica
-            const fichaTecnicaCanvas = await html2canvas(fichaTecnicaElement, {
-              scale: 2,
-              useCORS: true,
-              logging: false,
-            })
+      // Função para adicionar uma imagem ao PDF com dimensionamento adequado
+      const addImageToPDF = (canvas, x, y, maxWidth, maxHeight) => {
+        if (!canvas) return { width: 0, height: 0 }
 
-            // Adicionar a ficha técnica ao PDF
-            const fichaTecnicaImgData = fichaTecnicaCanvas.toDataURL("image/jpeg", 0.95)
-            const fichaTecnicaImgWidth = 210 - 20 // A4 width - margins
-            const fichaTecnicaImgHeight = (fichaTecnicaCanvas.height * fichaTecnicaImgWidth) / fichaTecnicaCanvas.width
-            pdf.addImage(fichaTecnicaImgData, "JPEG", 10, 10, fichaTecnicaImgWidth, fichaTecnicaImgHeight)
+        // Calcular dimensões proporcionais
+        let imgWidth = canvas.width / scale
+        let imgHeight = canvas.height / scale
+
+        // Redimensionar se for maior que o espaço disponível
+        if (imgWidth > maxWidth) {
+          const ratio = maxWidth / imgWidth
+          imgWidth = maxWidth
+          imgHeight = imgHeight * ratio
+        }
+
+        // Verificar altura após redimensionamento da largura
+        if (imgHeight > maxHeight) {
+          const ratio = maxHeight / imgHeight
+          imgHeight = maxHeight
+          imgWidth = imgWidth * ratio
+        }
+
+        // Converter canvas para dataURL
+        const imgData = canvas.toDataURL("image/jpeg", 0.95)
+
+        // Adicionar ao PDF
+        pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight)
+
+        return { width: imgWidth, height: imgHeight }
+      }
+
+      // Capturar o documento inteiro
+      const mainElement = documentoRef.current
+
+      // Renderizar cabeçalho (será reutilizado em cada página)
+      const headerElement = mainElement.querySelector(".bg-gradient-to-r.from-primary.to-primary-dark")
+      const headerCanvas = await renderElementToCanvas(headerElement)
+
+      // Função para adicionar cabeçalho a cada página
+      const addHeaderToPage = () => {
+        const headerDimensions = addImageToPDF(headerCanvas, margin, margin, contentWidth, 100)
+        return margin + headerDimensions.height + 20 // Retorna a posição Y após o cabeçalho
+      }
+
+      // PÁGINA 1: ORÇAMENTO PRINCIPAL
+      let currentY = addHeaderToPage()
+
+      // Renderizar seção de dados do cliente
+      const clienteElement = mainElement.querySelector(".border-b.pb-4")
+      const clienteCanvas = await renderElementToCanvas(clienteElement)
+
+      if (clienteCanvas) {
+        const clienteDimensions = addImageToPDF(clienteCanvas, margin, currentY, contentWidth, 150)
+        currentY += clienteDimensions.height + 20
+      }
+
+      // Renderizar seção de itens do orçamento
+      const itensElement = mainElement.querySelector(".page-break-inside-avoid:nth-of-type(2)")
+      const itensCanvas = await renderElementToCanvas(itensElement)
+
+      if (itensCanvas) {
+        // Verificar se cabe na página atual, senão adicionar nova página
+        const estimatedHeight = (itensCanvas.height / scale) * (contentWidth / (itensCanvas.width / scale))
+
+        if (currentY + estimatedHeight > pageHeight - margin) {
+          pdf.addPage()
+          currentY = addHeaderToPage()
+        }
+
+        const itensDimensions = addImageToPDF(
+          itensCanvas,
+          margin,
+          currentY,
+          contentWidth,
+          pageHeight - currentY - margin,
+        )
+        currentY += itensDimensions.height + 20
+      }
+
+      // Renderizar seção de observações e condições
+      const obsElement = mainElement.querySelector(".space-y-4.page-break-inside-avoid")
+      const obsCanvas = await renderElementToCanvas(obsElement)
+
+      if (obsCanvas) {
+        // Verificar se cabe na página atual, senão adicionar nova página
+        const estimatedHeight = (obsCanvas.height / scale) * (contentWidth / (obsCanvas.width / scale))
+
+        if (currentY + estimatedHeight > pageHeight - margin) {
+          pdf.addPage()
+          currentY = addHeaderToPage()
+        }
+
+        addImageToPDF(obsCanvas, margin, currentY, contentWidth, pageHeight - currentY - margin)
+      }
+
+      // PÁGINAS DE FICHAS TÉCNICAS - Uma por página
+      const fichasTecnicas = mainElement.querySelectorAll('[id^="ficha-"]')
+
+      for (const ficha of fichasTecnicas) {
+        // Sempre começar uma nova página para cada ficha técnica
+        pdf.addPage()
+        currentY = addHeaderToPage()
+
+        // Renderizar título e informações básicas
+        const tituloFicha = ficha.querySelector("h3")?.parentElement
+        if (tituloFicha) {
+          const tituloCanvas = await renderElementToCanvas(tituloFicha)
+          const tituloDimensions = addImageToPDF(tituloCanvas, margin, currentY, contentWidth, 80)
+          currentY += tituloDimensions.height + 20
+        }
+
+        // Renderizar imagem do produto (se existir)
+        const imagemContainer = ficha.querySelector(".flex.justify-center")
+        if (imagemContainer) {
+          const imgCanvas = await renderElementToCanvas(imagemContainer)
+          // Limitar a altura da imagem para garantir que outros elementos caibam na página
+          const maxImgHeight = 250
+          const imgDimensions = addImageToPDF(imgCanvas, margin, currentY, contentWidth * 0.8, maxImgHeight)
+          currentY += imgDimensions.height + 20
+        }
+
+        // Renderizar informações de tecido, cor e estampa
+        const infoGrid = ficha.querySelector(".grid.grid-cols-1.md\\:grid-cols-3")
+        if (infoGrid) {
+          const gridCanvas = await renderElementToCanvas(infoGrid)
+          const gridDimensions = addImageToPDF(gridCanvas, margin, currentY, contentWidth, 150)
+          currentY += gridDimensions.height + 20
+        }
+
+        // Renderizar tabela de tamanhos
+        const h4Elements = ficha.querySelectorAll("h4")
+        let tabelaSection = null
+
+        // Encontrar o elemento h4 que contém o texto "Quantidades por Tamanho"
+        for (const h4 of h4Elements) {
+          if (h4.textContent && h4.textContent.includes("Quantidades por Tamanho")) {
+            tabelaSection = h4.parentElement
+            break
           }
+        }
+
+        if (tabelaSection) {
+          const tabelaCanvas = await renderElementToCanvas(tabelaSection)
+          // Verificar se a tabela cabe na página atual
+          const estimatedHeight = (tabelaCanvas.height / scale) * (contentWidth / (tabelaCanvas.width / scale))
+
+          if (currentY + estimatedHeight > pageHeight - margin) {
+            pdf.addPage()
+            currentY = addHeaderToPage()
+          }
+
+          addImageToPDF(tabelaCanvas, margin, currentY, contentWidth, pageHeight - currentY - margin)
         }
       }
 
