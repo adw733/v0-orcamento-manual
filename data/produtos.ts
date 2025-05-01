@@ -2,7 +2,7 @@ import type { Produto } from "@/types/types"
 
 export const produtosIniciais: Produto[] = [
   {
-    id: "1",
+    id: "323e4567-e89b-12d3-a456-426614174002",
     nome: "Camisa Operacional",
     valorBase: 45.9,
     tecidos: [
@@ -14,7 +14,7 @@ export const produtosIniciais: Produto[] = [
     tamanhosDisponiveis: ["PP", "P", "M", "G", "GG", "G1", "G2"],
   },
   {
-    id: "2",
+    id: "423e4567-e89b-12d3-a456-426614174003",
     nome: "Calça Cargo Industrial",
     valorBase: 69.9,
     tecidos: [
@@ -25,7 +25,7 @@ export const produtosIniciais: Produto[] = [
     tamanhosDisponiveis: ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4"],
   },
   {
-    id: "3",
+    id: "523e4567-e89b-12d3-a456-426614174004",
     nome: "Jaleco Técnico",
     valorBase: 55.5,
     tecidos: [

@@ -80,30 +80,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                       <td className="p-3">
                         <div>
                           <p className="font-medium">{item.produto?.nome}</p>
-                          {item.tecidoSelecionado && (
-                            <p className="text-xs mt-1">
-                              <span className="bg-primary text-white px-1.5 py-0.5 rounded text-[10px] mr-1">
-                                TECIDO
-                              </span>
-                              {item.tecidoSelecionado.nome}
-                            </p>
-                          )}
-                          {item.corSelecionada && (
-                            <p className="text-xs mt-1">
-                              <span className="bg-primary text-white px-1.5 py-0.5 rounded text-[10px] mr-1">COR</span>
-                              {item.corSelecionada}
-                            </p>
-                          )}
-                          {item.descricaoEstampa && (
-                            <p className="text-xs mt-1">
-                              <span className="bg-primary text-white px-1.5 py-0.5 rounded text-[10px] mr-1">
-                                ESTAMPA
-                              </span>
-                              {item.descricaoEstampa.length > 30
-                                ? `${item.descricaoEstampa.substring(0, 30)}...`
-                                : item.descricaoEstampa}
-                            </p>
-                          )}
+                          {item.observacao && <p className="text-xs mt-1 text-gray-600 italic">{item.observacao}</p>}
                         </div>
                       </td>
                       <td className="p-3 text-center">{item.quantidade}</td>

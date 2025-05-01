@@ -10,6 +10,15 @@ import type { Cliente } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockClientes } from "@/lib/mock-data"
 
+// Helper function to generate UUID
+const generateUUID = () => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0,
+      v = c === "x" ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 interface GerenciadorClientesProps {
   clientes: Cliente[]
   adicionarCliente: (cliente: Cliente) => void

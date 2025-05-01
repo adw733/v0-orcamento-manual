@@ -9,8 +9,17 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Trash2, Edit, Check, X, ImageIcon, DollarSign, Loader2 } from "lucide-react"
-import type { Cliente, Produto, Orcamento, ItemOrcamento, Tecido } from "@/types/types"
+import type { Cliente, Produto, Orcamento, ItemOrcamento } from "@/types/types"
 import { supabase } from "@/lib/supabase"
+
+// Helper function to generate UUID
+const generateUUID = () => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0,
+      v = c === "x" ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
 
 interface FormularioOrcamentoProps {
   orcamento: Orcamento
@@ -74,6 +83,62 @@ const DescricaoEstampaInput = ({
   )
 }
 
+// Componente isolado para o campo de observação
+const ObservacaoInput = ({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) => {
+  const [localValue, setLocalValue] = useState(value || "")
+
+  // Sincroniza o valor local quando o valor externo muda
+  useEffect(() => {
+    setLocalValue(value || "")
+  }, [value])
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value
+    setLocalValue(newValue)
+  }
+
+  const handleBlur = () => {
+    onChange(localValue)
+  }
+
+  return (
+    <Textarea
+      value={localValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder="Observações sobre o item (detalhes, especificações, etc.)"
+      className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+      rows={2}
+    />
+  )
+}
+
+// With this new component:
+const ObservacaoField = ({
+  observacao,
+  onObservacaoChange,
+  isEditing = true,
+}: {
+  observacao?: string
+  onObservacaoChange: (observacao: string) => void
+  isEditing?: boolean
+}) => {
+  if (!isEditing) return null
+
+  return (
+    <div className="mt-4">
+      <Label className="text-primary">Observação</Label>
+      <ObservacaoInput value={observacao || ""} onChange={onObservacaoChange} />
+    </div>
+  )
+}
+
 export default function FormularioOrcamento({
   orcamento,
   clientes,
@@ -92,7 +157,7 @@ export default function FormularioOrcamento({
     valorUnitario: 0,
     tamanhos: { ...tamanhosPadrao },
     imagem: "",
-    descricaoEstampa: "",
+    observacao: "",
   })
   const [itemEmEdicao, setItemEmEdicao] = useState<ItemOrcamento | null>(null)
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null)
@@ -189,15 +254,16 @@ export default function FormularioOrcamento({
     }
   }
 
+  // Update the handleAdicionarItem function to use UUID
   const handleAdicionarItem = async () => {
     if (novoItem.produtoId && novoItem.valorUnitario) {
       try {
         setIsLoading(true)
 
-        // Gerar ID para o novo item
+        // Generate UUID for the new item
         const novoItemCompleto = {
           ...(novoItem as ItemOrcamento),
-          id: Date.now().toString(),
+          id: generateUUID(),
           quantidade: novoItem.quantidade || 1,
         }
 
@@ -210,9 +276,7 @@ export default function FormularioOrcamento({
           quantidade: 0,
           valorUnitario: 0,
           tamanhos: { ...tamanhosPadrao },
-          tecidoSelecionado: undefined,
-          corSelecionada: undefined,
-          descricaoEstampa: "",
+          observacao: "",
           imagem: "",
         })
         setProdutoSelecionado(null)
@@ -359,6 +423,21 @@ export default function FormularioOrcamento({
     }
   }
 
+  // Add this function near the other handler functions:
+  const handleObservacaoChange = (observacao: string) => {
+    if (editandoItem && itemEmEdicao) {
+      setItemEmEdicao({
+        ...itemEmEdicao,
+        observacao,
+      })
+    } else {
+      setNovoItem({
+        ...novoItem,
+        observacao,
+      })
+    }
+  }
+
   // Versão redimensionada da tabela de tamanhos
   const renderTabelaTamanhos = (
     tamanhos: Record<string, number>,
@@ -480,73 +559,6 @@ export default function FormularioOrcamento({
     )
   }
 
-  // Componente para seleção de tecido e cor
-  const SeletorTecidoCor = ({
-    produto,
-    tecidoSelecionado,
-    corSelecionada,
-    descricaoEstampa,
-    onTecidoChange,
-    onCorChange,
-    onDescricaoEstampaChange,
-    isEditing = true,
-  }: {
-    produto: Produto | null
-    tecidoSelecionado?: Tecido
-    corSelecionada?: string
-    descricaoEstampa?: string
-    onTecidoChange: (tecido: string) => void
-    onCorChange: (cor: string) => void
-    onDescricaoEstampaChange: (descricao: string) => void
-    isEditing?: boolean
-  }) => {
-    if (!produto || !isEditing) return null
-
-    return (
-      <div className="space-y-4 mt-4">
-        {/* Seletor de Tecido */}
-        <div>
-          <Label className="text-primary">Tecido</Label>
-          <Select value={tecidoSelecionado?.nome || ""} onValueChange={onTecidoChange}>
-            <SelectTrigger className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-              <SelectValue placeholder="Selecione o tecido" />
-            </SelectTrigger>
-            <SelectContent>
-              {produto.tecidos.map((tecido, index) => (
-                <SelectItem key={index} value={tecido.nome}>
-                  {tecido.nome} - {tecido.composicao}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Seletor de Cor */}
-        <div>
-          <Label className="text-primary">Cor</Label>
-          <Select value={corSelecionada || ""} onValueChange={onCorChange}>
-            <SelectTrigger className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-              <SelectValue placeholder="Selecione a cor" />
-            </SelectTrigger>
-            <SelectContent>
-              {produto.cores.map((cor, index) => (
-                <SelectItem key={index} value={cor}>
-                  {cor}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Descrição da Estampa */}
-        <div>
-          <Label className="text-primary">Descrição da Estampa</Label>
-          <DescricaoEstampaInput value={descricaoEstampa || ""} onChange={onDescricaoEstampaChange} />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {isLoading && (
@@ -622,24 +634,9 @@ export default function FormularioOrcamento({
                   <tr className="border-t hover:bg-accent/30 transition-colors">
                     <td className="p-3">
                       <div className="font-medium">{item.produto?.nome}</div>
-                      {item.tecidoSelecionado && (
-                        <div className="text-xs mt-1">
-                          <span className="bg-primary text-white px-1.5 py-0.5 rounded text-[10px] mr-1">TECIDO</span>
-                          {item.tecidoSelecionado.nome}
-                        </div>
-                      )}
-                      {item.corSelecionada && (
-                        <div className="text-xs mt-1">
-                          <span className="bg-primary text-white px-1.5 py-0.5 rounded text-[10px] mr-1">COR</span>
-                          {item.corSelecionada}
-                        </div>
-                      )}
-                      {item.descricaoEstampa && (
-                        <div className="text-xs mt-1">
-                          <span className="bg-primary text-white px-1.5 py-0.5 rounded text-[10px] mr-1">ESTAMPA</span>
-                          {item.descricaoEstampa.length > 30
-                            ? `${item.descricaoEstampa.substring(0, 30)}...`
-                            : item.descricaoEstampa}
+                      {item.observacao && (
+                        <div className="text-xs mt-1 text-gray-600 italic">
+                          {item.observacao.length > 50 ? `${item.observacao.substring(0, 50)}...` : item.observacao}
                         </div>
                       )}
                     </td>
@@ -722,14 +719,9 @@ export default function FormularioOrcamento({
                     <tr>
                       <td colSpan={5} className="p-4 bg-accent/50 border-t border-b">
                         {/* Seletor de Tecido, Cor e Descrição da Estampa */}
-                        <SeletorTecidoCor
-                          produto={item.produto || null}
-                          tecidoSelecionado={itemEmEdicao.tecidoSelecionado}
-                          corSelecionada={itemEmEdicao.corSelecionada}
-                          descricaoEstampa={itemEmEdicao.descricaoEstampa}
-                          onTecidoChange={(tecido) => handleTecidoChange(tecido)}
-                          onCorChange={(cor) => handleCorChange(cor)}
-                          onDescricaoEstampaChange={handleDescricaoEstampaChange}
+                        <ObservacaoField
+                          observacao={itemEmEdicao.observacao}
+                          onObservacaoChange={handleObservacaoChange}
                         />
 
                         {/* Tabela de Tamanhos */}
@@ -827,15 +819,7 @@ export default function FormularioOrcamento({
                 <tr>
                   <td colSpan={5} className="p-4 bg-accent/50 border-t border-b">
                     {/* Seletor de Tecido, Cor e Descrição da Estampa */}
-                    <SeletorTecidoCor
-                      produto={produtoSelecionado}
-                      tecidoSelecionado={novoItem.tecidoSelecionado}
-                      corSelecionada={novoItem.corSelecionada}
-                      descricaoEstampa={novoItem.descricaoEstampa}
-                      onTecidoChange={(tecido) => handleTecidoChange(tecido)}
-                      onCorChange={(cor) => handleCorChange(cor)}
-                      onDescricaoEstampaChange={handleDescricaoEstampaChange}
-                    />
+                    <ObservacaoField observacao={novoItem.observacao} onObservacaoChange={handleObservacaoChange} />
 
                     {/* Tabela de Tamanhos */}
                     {renderTabelaTamanhos(

@@ -31,6 +31,7 @@ export interface ItemOrcamento {
   tecidoSelecionado?: Tecido
   corSelecionada?: string
   descricaoEstampa?: string
+  observacao?: string // Keep this line for UI compatibility
   tamanhos: {
     PP: number
     P: number

@@ -15,6 +15,15 @@ import html2canvas from "html2canvas"
 import { supabase } from "@/lib/supabase"
 import { mockClientes, mockProdutos } from "@/lib/mock-data"
 
+// Helper function to generate UUID
+const generateUUID = () => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0,
+      v = c === "x" ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 export default function GeradorOrcamento() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
