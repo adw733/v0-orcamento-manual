@@ -14,17 +14,41 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
     <div className="flex flex-col gap-8 p-4 font-sans text-gray-800">
       {/* Orçamento */}
       <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm">
-        <div className="bg-primary p-6 text-white">
+        <div className="bg-gradient-to-r from-primary to-primary-dark p-6">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold">ORÇAMENTO</h1>
-              <p className="text-sm opacity-90">Nº {orcamento.numero}</p>
+            <div className="flex items-center gap-4">
+              <div className="bg-white p-3 rounded-md shadow-md">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M12 2L4 5v14.5c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5V5l-8-3z"
+                    fill="#0f4c81"
+                    stroke="#0f4c81"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M12 6.5c-1.93 0-3.5 1.57-3.5 3.5v1.5h7v-1.5c0-1.93-1.57-3.5-3.5-3.5z"
+                    fill="white"
+                    stroke="white"
+                    strokeWidth="0.5"
+                  />
+                  <path
+                    d="M12 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"
+                    fill="white"
+                    stroke="white"
+                    strokeWidth="0.5"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white font-sans tracking-tight">ORÇAMENTO</h1>
+                <p className="text-white/80 font-light">Nº {orcamento.numero}</p>
+              </div>
             </div>
-            <div className="text-right">
-              <h2 className="text-xl font-bold">EMPRESA UNIFORMES</h2>
-              <p className="text-sm opacity-90">CNPJ: 00.000.000/0001-00</p>
-              <p className="text-sm opacity-90">contato@empresa.com.br</p>
-              <p className="text-sm opacity-90">(00) 0000-0000</p>
+            <div className="text-right bg-white/10 p-3 rounded-md backdrop-blur-sm">
+              <h2 className="text-xl font-bold text-white font-sans tracking-tight">ONEBASE</h2>
+              <p className="text-white/80 text-sm">CNPJ: 12.345.678/0001-90</p>
+              <p className="text-white/80 text-sm">contato@onebase.com.br</p>
+              <p className="text-white/80 text-sm">(11) 4321-1234</p>
             </div>
           </div>
         </div>
@@ -138,13 +162,48 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
       {/* Ficha Técnica */}
       {orcamento.itens.length > 0 && (
         <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm">
-          <div className="bg-primary p-6 text-white">
-            <h1 className="text-2xl font-bold">FICHA TÉCNICA</h1>
+          <div className="bg-gradient-to-r from-primary to-primary-dark p-6">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="bg-white p-3 rounded-md shadow-md">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M12 2L4 5v14.5c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5V5l-8-3z"
+                      fill="#0f4c81"
+                      stroke="#0f4c81"
+                      strokeWidth="1.5"
+                    />
+                    <path
+                      d="M12 6.5c-1.93 0-3.5 1.57-3.5 3.5v1.5h7v-1.5c0-1.93-1.57-3.5-3.5-3.5z"
+                      fill="white"
+                      stroke="white"
+                      strokeWidth="0.5"
+                    />
+                    <path
+                      d="M12 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"
+                      fill="white"
+                      stroke="white"
+                      strokeWidth="0.5"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white font-sans tracking-tight">FICHA TÉCNICA</h1>
+                  <p className="text-white/80 font-light">Uniformes Industriais</p>
+                </div>
+              </div>
+              <div className="text-right bg-white/10 p-3 rounded-md backdrop-blur-sm">
+                <h2 className="text-xl font-bold text-white font-sans tracking-tight">ONEBASE</h2>
+                <p className="text-white/80 text-sm">CNPJ: 12.345.678/0001-90</p>
+                <p className="text-white/80 text-sm">contato@onebase.com.br</p>
+                <p className="text-white/80 text-sm">(11) 4321-1234</p>
+              </div>
+            </div>
           </div>
 
           <div className="p-6 space-y-6">
             {orcamento.itens.map((item) => (
-              <div key={`ficha-${item.id}`} className="border-b pb-6 last:border-b-0 last:pb-0">
+              <div key={`ficha-${item.id}`} id={`ficha-${item.id}`} className="border-b pb-6 last:border-b-0 last:pb-0">
                 <h3 className="font-bold text-lg mb-4 text-primary border-b-2 border-primary pb-2 flex items-center">
                   <span className="bg-primary text-white px-2 py-1 rounded-md mr-2 text-sm">ITEM</span>
                   {item.produto?.nome}
@@ -157,7 +216,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                       <img
                         src={item.imagem || "/placeholder.svg"}
                         alt={item.produto?.nome || "Imagem do produto"}
-                        className="max-h-64 object-contain border rounded-md shadow-sm"
+                        className="max-h-96 object-contain border rounded-md shadow-sm"
                       />
                     </div>
                   )}
@@ -203,16 +262,14 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                             <th className="border border-gray-300 p-1 text-center bg-primary text-white w-[5%] rounded-tl-md">
                               TAM.
                             </th>
-                            {Object.entries(item.tamanhos)
-                              .filter(([_, valor]) => valor > 0)
-                              .map(([tamanho, _], index) => (
-                                <th
-                                  key={`header-${item.id}-${tamanho}`}
-                                  className={`border border-gray-300 p-1 text-center bg-primary text-white w-[7%]`}
-                                >
-                                  {tamanho}
-                                </th>
-                              ))}
+                            {Object.keys(item.tamanhos).map((tamanho) => (
+                              <th
+                                key={`header-${item.id}-${tamanho}`}
+                                className="border border-gray-300 p-1 text-center bg-primary text-white w-[7%]"
+                              >
+                                {tamanho}
+                              </th>
+                            ))}
                             <th className="border border-gray-300 p-1 text-center bg-primary text-white w-[5%] rounded-tr-md">
                               TOT.
                             </th>
@@ -221,16 +278,14 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                         <tbody>
                           <tr>
                             <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
-                            {Object.entries(item.tamanhos)
-                              .filter(([_, valor]) => valor > 0)
-                              .map(([tamanho, valor]) => (
-                                <td
-                                  key={`${item.id}-${tamanho}`}
-                                  className="border border-gray-300 p-1 text-center bg-white"
-                                >
-                                  {valor}
-                                </td>
-                              ))}
+                            {Object.entries(item.tamanhos).map(([tamanho, valor]) => (
+                              <td
+                                key={`${item.id}-${tamanho}`}
+                                className="border border-gray-300 p-1 text-center bg-white"
+                              >
+                                {valor}
+                              </td>
+                            ))}
                             <td className="border border-gray-300 p-1 text-center font-medium bg-white">
                               {item.quantidade}
                             </td>

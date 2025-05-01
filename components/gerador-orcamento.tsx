@@ -162,7 +162,7 @@ export default function GeradorOrcamento() {
         format: "a4",
       })
 
-      // Capturar o orçamento principal
+      // Capturar o orçamento principal (primeira div com a classe especificada)
       const orcamentoElement = documentoRef.current.querySelector(".border.border-gray-300.rounded-md.overflow-hidden")
       if (!orcamentoElement) {
         throw new Error("Elemento do orçamento não encontrado")
@@ -181,26 +181,32 @@ export default function GeradorOrcamento() {
       const imgHeight = (orcamentoCanvas.height * imgWidth) / orcamentoCanvas.width
       pdf.addImage(imgData, "JPEG", 10, 10, imgWidth, imgHeight)
 
-      // Capturar e adicionar cada ficha técnica em uma nova página
-      const fichasTecnicas = documentoRef.current.querySelectorAll(".border.border-gray-300.rounded-md.overflow-hidden")
+      // Processar as fichas técnicas
+      if (orcamento.itens.length > 0) {
+        // Obter todos os elementos de ficha técnica
+        const fichaTecnicaElements = documentoRef.current.querySelectorAll('[id^="ficha-"]')
 
-      if (fichasTecnicas.length > 1) {
-        for (let i = 1; i < fichasTecnicas.length; i++) {
-          // Adicionar nova página para cada ficha técnica
-          pdf.addPage()
+        if (fichaTecnicaElements && fichaTecnicaElements.length > 0) {
+          // Para cada ficha técnica, adicionar uma nova página ao PDF
+          for (let i = 0; i < fichaTecnicaElements.length; i++) {
+            const fichaTecnicaElement = fichaTecnicaElements[i] as HTMLElement
 
-          // Renderizar a ficha técnica
-          const fichaCanvas = await html2canvas(fichasTecnicas[i] as HTMLElement, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-          })
+            // Adicionar nova página para cada ficha técnica
+            pdf.addPage()
 
-          // Adicionar a ficha técnica ao PDF
-          const fichaImgData = fichaCanvas.toDataURL("image/jpeg", 0.95)
-          const fichaImgWidth = 210 - 20 // A4 width - margins
-          const fichaImgHeight = (fichaCanvas.height * fichaImgWidth) / fichaCanvas.width
-          pdf.addImage(fichaImgData, "JPEG", 10, 10, fichaImgWidth, fichaImgHeight)
+            // Renderizar a ficha técnica
+            const fichaTecnicaCanvas = await html2canvas(fichaTecnicaElement, {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+            })
+
+            // Adicionar a ficha técnica ao PDF
+            const fichaTecnicaImgData = fichaTecnicaCanvas.toDataURL("image/jpeg", 0.95)
+            const fichaTecnicaImgWidth = 210 - 20 // A4 width - margins
+            const fichaTecnicaImgHeight = (fichaTecnicaCanvas.height * fichaTecnicaImgWidth) / fichaTecnicaCanvas.width
+            pdf.addImage(fichaTecnicaImgData, "JPEG", 10, 10, fichaTecnicaImgWidth, fichaTecnicaImgHeight)
+          }
         }
       }
 
