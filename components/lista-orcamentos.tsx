@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -11,18 +13,27 @@ import type { Orcamento } from "@/types/types"
 interface ListaOrcamentosProps {
   onSelectOrcamento: (orcamentoId: string) => void
   onNovoOrcamento: () => void
-  onDeleteOrcamento: (orcamentoId: string) => void
+  onDeleteOrcamento: (orcamentoId: string) => Promise<void>
+  reloadRef?: React.MutableRefObject<(() => Promise<void>) | null>
 }
 
 export default function ListaOrcamentos({
   onSelectOrcamento,
   onNovoOrcamento,
   onDeleteOrcamento,
+  reloadRef,
 }: ListaOrcamentosProps) {
   const [orcamentos, setOrcamentos] = useState<Partial<Orcamento>[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [error, setError] = useState<string | null>(null)
+
+  // Expor a função de recarregar para o componente pai
+  useEffect(() => {
+    if (reloadRef) {
+      reloadRef.current = carregarOrcamentos
+    }
+  }, [reloadRef])
 
   useEffect(() => {
     carregarOrcamentos()
@@ -35,7 +46,7 @@ export default function ListaOrcamentos({
 
       const { data, error } = await supabase
         .from("orcamentos")
-        .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens")
+        .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens, created_at, updated_at")
         .order("created_at", { ascending: false })
 
       if (error) {
@@ -79,6 +90,8 @@ export default function ListaOrcamentos({
               }
             : null,
           itens: Array.isArray(itensParseados) ? itensParseados : [],
+          created_at: orcamento.created_at,
+          updated_at: orcamento.updated_at,
         }
       })
 
@@ -223,8 +236,26 @@ export default function ListaOrcamentos({
                   </div>
                   <div>
                     <p className="flex items-center gap-2">
-                      <span className="text-gray-500">Itens:</span>
-                      <span className="font-medium">{orcamento.itens?.length || 0}</span>
+                      <span className="text-gray-500">Data:</span>
+                      <span className="font-medium">
+                        {orcamento.updated_at
+                          ? new Date(orcamento.updated_at).toLocaleString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : orcamento.created_at
+                            ? new Date(orcamento.created_at).toLocaleString("pt-BR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "Data não disponível"}
+                      </span>
                     </p>
                   </div>
                   <div>

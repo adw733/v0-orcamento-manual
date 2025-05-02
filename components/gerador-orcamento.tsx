@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, FileText, Users, ShoppingBag, Save, Check, AlertCircle, Copy } from "lucide-react"
+import { Printer, FileText, Users, ShoppingBag, Save, Check, AlertCircle, PlusCircle } from "lucide-react"
 import FormularioOrcamento from "@/components/formulario-orcamento"
 import VisualizacaoDocumento from "@/components/visualizacao-documento"
 import GerenciadorClientes from "@/components/gerenciador-clientes"
@@ -56,6 +56,8 @@ export default function GeradorOrcamento() {
   const [abaAtiva, setAbaAtiva] = useState("orcamento")
 
   const documentoRef = useRef<HTMLDivElement>(null)
+
+  const recarregarOrcamentosRef = useRef<(() => Promise<void>) | null>(null)
 
   // Função para obter o próximo número de orçamento
   const obterProximoNumeroOrcamento = async (): Promise<string> => {
@@ -120,136 +122,9 @@ export default function GeradorOrcamento() {
     }
   }
 
-  // Carregar orçamento salvo, se houver
+  // Iniciar sempre com um orçamento vazio ao carregar a página
   useEffect(() => {
-    const carregarOrcamentoSalvo = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("orcamentos")
-          .select("*, cliente:cliente_id(*)")
-          .order("created_at", { ascending: false })
-          .limit(1)
-
-        if (error) {
-          console.warn("Erro ao carregar orçamento do Supabase:", error)
-          await criarNovoOrcamento()
-          return
-        }
-
-        if (data && data.length > 0) {
-          const orcamentoData = data[0]
-
-          // Verificar se o cliente existe
-          if (!orcamentoData.cliente) {
-            console.warn("Cliente não encontrado para este orçamento, criando novo orçamento")
-            await criarNovoOrcamento()
-            return
-          }
-
-          // Carregar itens do orçamento
-          const { data: itensData, error: itensError } = await supabase
-            .from("itens_orcamento")
-            .select("*, produto:produto_id(*)")
-            .eq("orcamento_id", orcamentoData.id)
-
-          if (itensError) throw itensError
-
-          // Converter para o formato da aplicação
-          const itensFormatados: ItemOrcamento[] = await Promise.all(
-            itensData
-              ? itensData.map(async (item) => {
-                  // Buscar o produto completo
-                  const produto = item.produto
-                    ? {
-                        id: item.produto.id,
-                        nome: item.produto.nome,
-                        valorBase: Number(item.produto.valor_base),
-                        tecidos: [], // Será preenchido depois
-                        cores: item.produto.cores || [],
-                        tamanhosDisponiveis: item.produto.tamanhos_disponiveis || [],
-                      }
-                    : undefined
-
-                  // Carregar estampas do item
-                  const { data: estampasData, error: estampasError } = await supabase
-                    .from("estampas")
-                    .select("*")
-                    .eq("item_orcamento_id", item.id)
-
-                  if (estampasError) {
-                    console.error("Erro ao listar estampas do item:", estampasError)
-                    throw estampasError
-                  }
-
-                  // Converter estampas para o formato da aplicação
-                  const estampas: Estampa[] = estampasData
-                    ? estampasData.map((estampa) => ({
-                        id: estampa.id,
-                        posicao: estampa.posicao || undefined,
-                        tipo: estampa.tipo || undefined,
-                        largura: estampa.largura || undefined,
-                      }))
-                    : []
-
-                  return {
-                    id: item.id,
-                    produtoId: item.produto_id || "",
-                    produto,
-                    quantidade: item.quantidade,
-                    valorUnitario: Number(item.valor_unitario),
-                    tecidoSelecionado: item.tecido_nome
-                      ? {
-                          nome: item.tecido_nome,
-                          composicao: item.tecido_composicao || "",
-                        }
-                      : undefined,
-                    corSelecionada: item.cor_selecionada || undefined,
-                    estampas: estampas.length > 0 ? estampas : [],
-                    tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
-                    imagem: item.imagem || undefined,
-                    observacao: item.observacao || undefined,
-                  }
-                })
-              : [],
-          )
-
-          // Converter cliente
-          const clienteFormatado = {
-            id: orcamentoData.cliente.id,
-            nome: orcamentoData.cliente.nome,
-            cnpj: orcamentoData.cliente.cnpj || "",
-            endereco: orcamentoData.cliente.endereco || "",
-            telefone: orcamentoData.cliente.telefone || "",
-            email: orcamentoData.cliente.email || "",
-            contato: orcamentoData.cliente.contato || "",
-          }
-
-          // Atualizar o estado do orçamento
-          setOrcamento({
-            id: orcamentoData.id,
-            numero: orcamentoData.numero,
-            data: orcamentoData.data,
-            cliente: clienteFormatado,
-            itens: itensFormatados,
-            observacoes: orcamentoData.observacoes || "",
-            condicoesPagamento: orcamentoData.condicoes_pagamento || "À vista",
-            prazoEntrega: orcamentoData.prazo_entrega || "30 dias",
-            validadeOrcamento: orcamentoData.validade_orcamento || "15 dias",
-          })
-
-          setOrcamentoSalvo(orcamentoData.id)
-        } else {
-          // Se não houver orçamentos, criar um novo
-          await criarNovoOrcamento()
-        }
-      } catch (error) {
-        console.error("Erro ao carregar orçamento:", error)
-        // Em caso de erro, criar um novo orçamento
-        await criarNovoOrcamento()
-      }
-    }
-
-    carregarOrcamentoSalvo()
+    criarNovoOrcamento()
   }, [])
 
   // Initialize with mock data if empty
@@ -1138,14 +1013,9 @@ export default function GeradorOrcamento() {
         mensagem: "Orçamento excluído com sucesso!",
       })
 
-      // Recarregar a lista de orçamentos
-      const { data: orcamentosAtualizados, error: orcamentosError } = await supabase
-        .from("orcamentos")
-        .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens")
-        .order("created_at", { ascending: false })
-
-      if (orcamentosError) {
-        console.error("Erro ao recarregar orçamentos:", orcamentosError)
+      // Recarregar a lista de orçamentos usando a função exposta pelo componente ListaOrcamentos
+      if (recarregarOrcamentosRef.current) {
+        await recarregarOrcamentosRef.current()
       }
     } catch (error) {
       console.error("Erro ao excluir orçamento:", error)
@@ -1167,14 +1037,24 @@ export default function GeradorOrcamento() {
           <p className="text-gray-500 mt-1">Crie orçamentos profissionais para uniformes industriais</p>
         </div>
         <div className="flex gap-2">
+          {/* Botão para novo orçamento */}
+          <Button
+            onClick={criarNovoOrcamento}
+            disabled={isLoading}
+            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
+          >
+            <PlusCircle className="h-4 w-4" />
+            {isLoading ? "Criando..." : "Novo Orçamento"}
+          </Button>
+
           {/* Botão para salvar como novo orçamento */}
           <Button
             onClick={salvarNovoOrcamento}
             disabled={isLoading || !orcamento.cliente}
             className="flex items-center gap-2 bg-secondary hover:bg-secondary-dark text-white transition-all shadow-sm"
           >
-            <Copy className="h-4 w-4" />
-            {isLoading ? "Salvando..." : "Salvar como Novo"}
+            <Save className="h-4 w-4" />
+            {isLoading ? "Salvando..." : "Salvar"}
           </Button>
 
           {/* Botão para atualizar orçamento existente */}
@@ -1272,6 +1152,7 @@ export default function GeradorOrcamento() {
                       setAbaAtiva("orcamento")
                     }}
                     onDeleteOrcamento={excluirOrcamento}
+                    reloadRef={recarregarOrcamentosRef}
                   />
                 </CardContent>
               </Card>

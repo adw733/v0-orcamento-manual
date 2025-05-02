@@ -300,8 +300,14 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white font-sans tracking-tight">ORÇAMENTO</h1>
-                <p className="text-white/80 text-sm">Nº {orcamento.numero}</p>
+                <div>
+                  <h1 className="text-xl font-bold text-white font-sans tracking-tight uppercase">
+                    ORÇAMENTO - {orcamento.numero.split(" - ")[0]}
+                  </h1>
+                  <p className="text-white/90 text-sm uppercase">
+                    {orcamento.cliente?.nome || "EMPRESA"} - {orcamento.cliente?.contato || "CONTATO"}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="text-right bg-white/10 p-2 rounded-md backdrop-blur-sm">
@@ -457,8 +463,12 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-white font-sans tracking-tight">FICHA TÉCNICA</h1>
-                  <p className="text-white/80 text-sm">{item.produto?.nome}</p>
+                  <h1 className="text-xl font-bold text-white font-sans tracking-tight uppercase">
+                    FICHA TÉCNICA - {orcamento.numero.split(" - ")[0]}
+                  </h1>
+                  <p className="text-white/90 text-sm uppercase">
+                    {orcamento.cliente?.nome || "EMPRESA"} - {orcamento.cliente?.contato || "CONTATO"}
+                  </p>
                 </div>
               </div>
               <div className="text-right bg-white/10 p-2 rounded-md backdrop-blur-sm">
