@@ -35,7 +35,7 @@ export default function Home() {
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold">Onebase</h1>
+              <h1 className="text-2xl font-bold text-white tracking-tight">ONEBASE</h1>
               <p className="text-xs opacity-80">Uniformes Industriais</p>
             </div>
           </div>

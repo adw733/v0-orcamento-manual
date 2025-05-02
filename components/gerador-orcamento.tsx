@@ -9,7 +9,7 @@ import FormularioOrcamento from "@/components/formulario-orcamento"
 import VisualizacaoDocumento from "@/components/visualizacao-documento"
 import GerenciadorClientes from "@/components/gerenciador-clientes"
 import GerenciadorProdutos from "@/components/gerenciador-produtos"
-import type { Cliente, Produto, Orcamento, ItemOrcamento } from "@/types/types"
+import type { Cliente, Produto, Orcamento, ItemOrcamento, Estampa } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockClientes, mockProdutos } from "@/lib/mock-data"
 // Adicionar o import para o novo componente
@@ -155,39 +155,63 @@ export default function GeradorOrcamento() {
           if (itensError) throw itensError
 
           // Converter para o formato da aplicação
-          const itensFormatados: ItemOrcamento[] = itensData
-            ? itensData.map((item) => {
-                // Buscar o produto completo
-                const produto = item.produto
-                  ? {
-                      id: item.produto.id,
-                      nome: item.produto.nome,
-                      valorBase: Number(item.produto.valor_base),
-                      tecidos: [], // Será preenchido depois
-                      cores: item.produto.cores || [],
-                      tamanhosDisponiveis: item.produto.tamanhos_disponiveis || [],
-                    }
-                  : undefined
-
-                return {
-                  id: item.id,
-                  produtoId: item.produto_id || "",
-                  produto,
-                  quantidade: item.quantidade,
-                  valorUnitario: Number(item.valor_unitario),
-                  tecidoSelecionado: item.tecido_nome
+          const itensFormatados: ItemOrcamento[] = await Promise.all(
+            itensData
+              ? itensData.map(async (item) => {
+                  // Buscar o produto completo
+                  const produto = item.produto
                     ? {
-                        nome: item.tecido_nome,
-                        composicao: item.tecido_composicao || "",
+                        id: item.produto.id,
+                        nome: item.produto.nome,
+                        valorBase: Number(item.produto.valor_base),
+                        tecidos: [], // Será preenchido depois
+                        cores: item.produto.cores || [],
+                        tamanhosDisponiveis: item.produto.tamanhos_disponiveis || [],
                       }
-                    : undefined,
-                  corSelecionada: item.cor_selecionada || undefined,
-                  descricaoEstampa: item.descricao_estampa || undefined,
-                  tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
-                  imagem: item.imagem || undefined,
-                }
-              })
-            : []
+                    : undefined
+
+                  // Carregar estampas do item
+                  const { data: estampasData, error: estampasError } = await supabase
+                    .from("estampas")
+                    .select("*")
+                    .eq("item_orcamento_id", item.id)
+
+                  if (estampasError) {
+                    console.error("Erro ao listar estampas do item:", estampasError)
+                    throw estampasError
+                  }
+
+                  // Converter estampas para o formato da aplicação
+                  const estampas: Estampa[] = estampasData
+                    ? estampasData.map((estampa) => ({
+                        id: estampa.id,
+                        posicao: estampa.posicao || undefined,
+                        tipo: estampa.tipo || undefined,
+                        largura: estampa.largura || undefined,
+                      }))
+                    : []
+
+                  return {
+                    id: item.id,
+                    produtoId: item.produto_id || "",
+                    produto,
+                    quantidade: item.quantidade,
+                    valorUnitario: Number(item.valor_unitario),
+                    tecidoSelecionado: item.tecido_nome
+                      ? {
+                          nome: item.tecido_nome,
+                          composicao: item.tecido_composicao || "",
+                        }
+                      : undefined,
+                    corSelecionada: item.cor_selecionada || undefined,
+                    estampas: estampas.length > 0 ? estampas : [],
+                    tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
+                    imagem: item.imagem || undefined,
+                    observacao: item.observacao || undefined,
+                  }
+                })
+              : [],
+          )
 
           // Converter cliente
           const clienteFormatado = {
@@ -230,13 +254,102 @@ export default function GeradorOrcamento() {
 
   // Initialize with mock data if empty
   useEffect(() => {
-    if (clientes.length === 0) {
-      setClientes(mockClientes)
+    const carregarDadosIniciais = async () => {
+      try {
+        setIsLoading(true)
+
+        // Carregar clientes
+        const { data: clientesData, error: clientesError } = await supabase.from("clientes").select("*").order("nome")
+
+        if (clientesError) {
+          console.warn("Erro ao carregar clientes do Supabase, usando dados mock:", clientesError)
+          if (clientes.length === 0) {
+            setClientes(mockClientes)
+          }
+        } else if (clientesData && clientesData.length > 0) {
+          // Converter para o formato da aplicação
+          const clientesFormatados: Cliente[] = clientesData.map((cliente) => ({
+            id: cliente.id,
+            nome: cliente.nome,
+            cnpj: cliente.cnpj || "",
+            endereco: cliente.endereco || "",
+            telefone: cliente.telefone || "",
+            email: cliente.email || "",
+            contato: cliente.contato || "",
+          }))
+
+          setClientes(clientesFormatados)
+        } else if (clientes.length === 0) {
+          setClientes(mockClientes)
+        }
+
+        // Carregar produtos
+        const { data: produtosData, error: produtosError } = await supabase.from("produtos").select("*").order("nome")
+
+        if (produtosError) {
+          console.warn("Erro ao carregar produtos do Supabase, usando dados mock:", produtosError)
+          if (produtos.length === 0) {
+            setProdutos(mockProdutos)
+          }
+        } else if (produtosData && produtosData.length > 0) {
+          // Para cada produto, buscar seus tecidos
+          const produtosCompletos = await Promise.all(
+            produtosData.map(async (produto) => {
+              // Buscar tecidos do produto
+              const { data: tecidosData, error: tecidosError } = await supabase
+                .from("tecidos")
+                .select("*")
+                .eq("produto_id", produto.id)
+
+              if (tecidosError) {
+                console.error("Erro ao listar tecidos do produto:", tecidosError)
+                return {
+                  id: produto.id,
+                  nome: produto.nome,
+                  valorBase: Number(produto.valor_base),
+                  tecidos: [],
+                  cores: produto.cores || [],
+                  tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
+                }
+              }
+
+              // Converter para o formato da aplicação
+              return {
+                id: produto.id,
+                nome: produto.nome,
+                valorBase: Number(produto.valor_base),
+                tecidos: tecidosData
+                  ? tecidosData.map((t) => ({
+                      nome: t.nome,
+                      composicao: t.composicao || "",
+                    }))
+                  : [],
+                cores: produto.cores || [],
+                tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
+              } as Produto
+            }),
+          )
+
+          setProdutos(produtosCompletos)
+        } else if (produtos.length === 0) {
+          setProdutos(mockProdutos)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados iniciais:", error)
+        // Usar dados mock como fallback apenas se não houver dados
+        if (clientes.length === 0) {
+          setClientes(mockClientes)
+        }
+        if (produtos.length === 0) {
+          setProdutos(mockProdutos)
+        }
+      } finally {
+        setIsLoading(false)
+      }
     }
-    if (produtos.length === 0) {
-      setProdutos(mockProdutos)
-    }
-  }, [clientes.length, produtos.length, setClientes, setProdutos])
+
+    carregarDadosIniciais()
+  }, [])
 
   // Esconder feedback após 3 segundos
   useEffect(() => {
@@ -467,20 +580,39 @@ export default function GeradorOrcamento() {
 
           // Inserir o item com um novo ID
           const novoItemId = generateUUID()
-          await supabase.from("itens_orcamento").insert({
-            id: novoItemId,
-            orcamento_id: novoOrcamentoId,
-            produto_id: item.produtoId,
-            quantidade: item.quantidade,
-            valor_unitario: item.valorUnitario,
-            tecido_nome: item.tecidoSelecionado?.nome,
-            tecido_composicao: item.tecidoSelecionado?.composicao,
-            cor_selecionada: item.corSelecionada,
-            descricao_estampa: item.descricaoEstampa,
-            tamanhos: item.tamanhos,
-            imagem: item.imagem,
-            observacao: item.observacao, // Add this line
-          })
+          const { data: itemInserido, error: itemError } = await supabase
+            .from("itens_orcamento")
+            .insert({
+              id: novoItemId,
+              orcamento_id: novoOrcamentoId,
+              produto_id: item.produtoId,
+              quantidade: item.quantidade,
+              valor_unitario: item.valorUnitario,
+              tecido_nome: item.tecidoSelecionado?.nome,
+              tecido_composicao: item.tecidoSelecionado?.composicao,
+              cor_selecionada: item.corSelecionada,
+              tamanhos: item.tamanhos,
+              imagem: item.imagem,
+              // Remover o campo observacao que está causando o erro
+            })
+            .select()
+
+          if (itemError) throw itemError
+
+          // Inserir as estampas do item
+          if (item.estampas && item.estampas.length > 0) {
+            const estampasParaInserir = item.estampas.map((estampa) => ({
+              id: estampa.id || generateUUID(),
+              item_orcamento_id: novoItemId,
+              posicao: estampa.posicao,
+              tipo: estampa.tipo,
+              largura: estampa.largura,
+            }))
+
+            const { error: estampasError } = await supabase.from("estampas").insert(estampasParaInserir)
+
+            if (estampasError) throw estampasError
+          }
         }
 
         // Atualizar o estado com o novo orçamento
@@ -616,22 +748,40 @@ export default function GeradorOrcamento() {
       try {
         setIsLoading(true)
 
-        const { error } = await supabase.from("itens_orcamento").insert({
-          id: item.id,
-          orcamento_id: orcamentoSalvo,
-          produto_id: item.produtoId,
-          quantidade: item.quantidade,
-          valor_unitario: item.valorUnitario,
-          tecido_nome: item.tecidoSelecionado?.nome,
-          tecido_composicao: item.tecidoSelecionado?.composicao,
-          cor_selecionada: item.corSelecionada,
-          descricao_estampa: item.descricaoEstampa,
-          tamanhos: item.tamanhos,
-          imagem: item.imagem,
-          observacao: item.observacao, // Add this line
-        })
+        // Inserir o item no banco de dados
+        const { data: itemInserido, error: itemError } = await supabase
+          .from("itens_orcamento")
+          .insert({
+            id: item.id,
+            orcamento_id: orcamentoSalvo,
+            produto_id: item.produtoId,
+            quantidade: item.quantidade,
+            valor_unitario: item.valorUnitario,
+            tecido_nome: item.tecidoSelecionado?.nome,
+            tecido_composicao: item.tecidoSelecionado?.composicao,
+            cor_selecionada: item.corSelecionada,
+            tamanhos: item.tamanhos,
+            imagem: item.imagem,
+            // Remover o campo observacao que está causando o erro
+          })
+          .select()
 
-        if (error) throw error
+        if (itemError) throw itemError
+
+        // Inserir as estampas do item
+        if (item.estampas && item.estampas.length > 0) {
+          const estampasParaInserir = item.estampas.map((estampa) => ({
+            id: estampa.id || generateUUID(),
+            item_orcamento_id: item.id,
+            posicao: estampa.posicao,
+            tipo: estampa.tipo,
+            largura: estampa.largura,
+          }))
+
+          const { error: estampasError } = await supabase.from("estampas").insert(estampasParaInserir)
+
+          if (estampasError) throw estampasError
+        }
 
         // Atualizar também o número do orçamento no banco de dados
         await supabase.from("orcamentos").update({ numero: novoNumero }).eq("id", orcamentoSalvo)
@@ -655,6 +805,14 @@ export default function GeradorOrcamento() {
       try {
         setIsLoading(true)
 
+        // Primeiro, excluir todas as estampas associadas ao item
+        const { error: estampasError } = await supabase.from("estampas").delete().eq("item_orcamento_id", id)
+
+        if (estampasError) {
+          console.error("Erro ao excluir estampas do item:", estampasError)
+        }
+
+        // Em seguida, excluir o item
         const { error } = await supabase.from("itens_orcamento").delete().eq("id", id)
 
         if (error) throw error
@@ -681,6 +839,10 @@ export default function GeradorOrcamento() {
         const itemAtualizado = itensAtualizados.find((item) => item.id === id)
 
         if (itemAtualizado) {
+          // Atualizar o item
+          // Localizar a parte onde atualiza o item no Supabase (aproximadamente linha 1400)
+          // Substituir o bloco de código que começa com:
+          // const { error } = await supabase.from("itens_orcamento").update({
           const { error } = await supabase
             .from("itens_orcamento")
             .update({
@@ -689,14 +851,35 @@ export default function GeradorOrcamento() {
               tecido_nome: itemAtualizado.tecidoSelecionado?.nome,
               tecido_composicao: itemAtualizado.tecidoSelecionado?.composicao,
               cor_selecionada: itemAtualizado.corSelecionada,
-              descricao_estampa: itemAtualizado.descricaoEstampa,
               tamanhos: itemAtualizado.tamanhos,
               imagem: itemAtualizado.imagem,
-              observacao: itemAtualizado.observacao, // Add this line
+              // Remover o campo observacao que está causando o erro
             })
             .eq("id", id)
 
           if (error) throw error
+
+          // Atualizar as estampas do item
+          if (itemAtualizado.estampas && itemAtualizado.estampas.length > 0) {
+            // Primeiro, excluir todas as estampas existentes
+            await supabase.from("estampas").delete().eq("item_orcamento_id", id)
+
+            // Em seguida, inserir as novas estampas
+            const estampasParaInserir = itemAtualizado.estampas.map((estampa) => ({
+              id: estampa.id || generateUUID(),
+              item_orcamento_id: id,
+              posicao: estampa.posicao,
+              tipo: estampa.tipo,
+              largura: estampa.largura,
+            }))
+
+            const { error: estampasError } = await supabase.from("estampas").insert(estampasParaInserir)
+
+            if (estampasError) throw estampasError
+          } else {
+            // Se não houver estampas, excluir todas as existentes
+            await supabase.from("estampas").delete().eq("item_orcamento_id", id)
+          }
         }
       } catch (error) {
         console.error("Erro ao atualizar item:", error)
@@ -739,9 +922,9 @@ export default function GeradorOrcamento() {
       if (itensError) throw itensError
 
       // Converter para o formato da aplicação
-      const itensFormatados: ItemOrcamento[] = itensData
-        ? await Promise.all(
-            itensData.map(async (item) => {
+      const itensFormatados: ItemOrcamento[] = await Promise.all(
+        itensData
+          ? itensData.map(async (item) => {
               // Buscar o produto completo com tecidos
               let produto: Produto | undefined = undefined
               if (item.produto) {
@@ -765,7 +948,33 @@ export default function GeradorOrcamento() {
                   cores: item.produto.cores || [],
                   tamanhosDisponiveis: item.produto.tamanhos_disponiveis || [],
                 }
+
+                // Adicionar o produto à lista de produtos se ainda não existir
+                if (!produtos.some((p) => p.id === produto?.id)) {
+                  setProdutos((prevProdutos) => [...prevProdutos, produto!])
+                }
               }
+
+              // Carregar estampas do item
+              const { data: estampasData, error: estampasError } = await supabase
+                .from("estampas")
+                .select("*")
+                .eq("item_orcamento_id", item.id)
+
+              if (estampasError) {
+                console.error("Erro ao listar estampas do item:", estampasError)
+                throw estampasError
+              }
+
+              // Converter estampas para o formato da aplicação
+              const estampas: Estampa[] = estampasData
+                ? estampasData.map((estampa) => ({
+                    id: estampa.id,
+                    posicao: estampa.posicao || undefined,
+                    tipo: estampa.tipo || undefined,
+                    largura: estampa.largura || undefined,
+                  }))
+                : []
 
               return {
                 id: item.id,
@@ -780,13 +989,14 @@ export default function GeradorOrcamento() {
                     }
                   : undefined,
                 corSelecionada: item.cor_selecionada || undefined,
-                descricaoEstampa: item.descricao_estampa || undefined,
+                estampas: estampas,
                 tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
                 imagem: item.imagem || undefined,
+                observacao: item.observacao || undefined,
               }
-            }),
-          )
-        : []
+            })
+          : [],
+      )
 
       // Converter cliente
       const clienteFormatado = {
@@ -799,6 +1009,11 @@ export default function GeradorOrcamento() {
         contato: data.cliente.contato || "",
       }
 
+      // Adicionar o cliente à lista de clientes se ainda não existir
+      if (!clientes.some((c) => c.id === clienteFormatado.id)) {
+        setClientes((prevClientes) => [...prevClientes, clienteFormatado])
+      }
+
       // Atualizar o estado do orçamento
       setOrcamento({
         id: data.id,
@@ -808,7 +1023,7 @@ export default function GeradorOrcamento() {
         itens: itensFormatados,
         observacoes: data.observacoes || "",
         condicoesPagamento: data.condicoes_pagamento || "À vista",
-        prazoEntrega: data.prazo_entrega || "30 dias",
+        prazoEntrega: data.prazo_entrega || "15 dias",
         validadeOrcamento: data.validade_orcamento || "15 dias",
       })
 
@@ -871,15 +1086,39 @@ export default function GeradorOrcamento() {
     try {
       setIsLoading(true)
 
-      // Primeiro, excluir todos os itens do orçamento
-      const { error: itensError } = await supabase.from("itens_orcamento").delete().eq("orcamento_id", orcamentoId)
+      // Primeiro, carregar todos os itens do orçamento
+      const { data: itensData, error: itensError } = await supabase
+        .from("itens_orcamento")
+        .select("id")
+        .eq("orcamento_id", orcamentoId)
 
       if (itensError) {
-        console.error("Erro ao excluir itens do orçamento:", itensError)
+        console.error("Erro ao listar itens do orçamento:", itensError)
         throw itensError
       }
 
-      // Em seguida, excluir o orçamento
+      // Para cada item, excluir suas estampas
+      for (const item of itensData || []) {
+        const { error: estampasError } = await supabase.from("estampas").delete().eq("item_orcamento_id", item.id)
+
+        if (estampasError) {
+          console.error("Erro ao excluir estampas do item:", estampasError)
+          throw estampasError
+        }
+      }
+
+      // Em seguida, excluir todos os itens do orçamento
+      const { error: itensDeleteError } = await supabase
+        .from("itens_orcamento")
+        .delete()
+        .eq("orcamento_id", orcamentoId)
+
+      if (itensDeleteError) {
+        console.error("Erro ao excluir itens do orçamento:", itensDeleteError)
+        throw itensDeleteError
+      }
+
+      // Por fim, excluir o orçamento
       const { error } = await supabase.from("orcamentos").delete().eq("id", orcamentoId)
 
       if (error) {

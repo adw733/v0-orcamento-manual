@@ -1,6 +1,14 @@
 import { supabase } from "@/lib/supabase"
 import type { Cliente, Produto, Orcamento, ItemOrcamento } from "@/types/types"
 
+// Define the Estampa type
+export interface Estampa {
+  id?: string
+  posicao?: string
+  tipo?: string
+  largura?: number
+}
+
 // Serviços para Clientes
 export const clienteService = {
   async listarTodos(): Promise<Cliente[]> {
@@ -233,6 +241,7 @@ export const produtoService = {
 
 // Serviços para Orçamentos
 export const orcamentoService = {
+  // Atualizar a função listarTodos para lidar com múltiplas artes
   async listarTodos(): Promise<Orcamento[]> {
     const { data, error } = await supabase
       .from("orcamentos")
@@ -290,6 +299,27 @@ export const orcamentoService = {
                   }
                 }
 
+                // Carregar estampas do item
+                const { data: estampasData, error: estampasError } = await supabase
+                  .from("estampas")
+                  .select("*")
+                  .eq("item_orcamento_id", item.id)
+
+                if (estampasError) {
+                  console.error("Erro ao listar estampas do item:", estampasError)
+                  throw estampasError
+                }
+
+                // Converter estampas para o formato da aplicação
+                const estampas: Estampa[] = estampasData
+                  ? estampasData.map((estampa) => ({
+                      id: estampa.id,
+                      posicao: estampa.posicao || undefined,
+                      tipo: estampa.tipo || undefined,
+                      largura: estampa.largura || undefined,
+                    }))
+                  : []
+
                 return {
                   id: item.id,
                   produtoId: item.produto_id || "",
@@ -303,7 +333,7 @@ export const orcamentoService = {
                       }
                     : undefined,
                   corSelecionada: item.cor_selecionada || undefined,
-                  descricaoEstampa: item.descricao_estampa || undefined,
+                  estampas: estampas,
                   tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
                   imagem: item.imagem || undefined,
                   observacao: item.observacao || undefined,
@@ -332,9 +362,9 @@ export const orcamentoService = {
           cliente: clienteFormatado,
           itens: itensFormatados,
           observacoes: orcamento.observacoes || "",
-          condicoesPagamento: orcamento.condicoes_pagamento || "À vista",
-          prazoEntrega: orcamento.prazo_entrega || "30 dias",
-          validadeOrcamento: orcamento.validade_orcamento || "15 dias",
+          condicoesPagamento: orcamento.condicoesPagamento || "À vista",
+          prazoEntrega: orcamento.prazoEntrega || "30 dias",
+          validadeOrcamento: orcamento.validadeOrcamento || "15 dias",
         } as Orcamento
       }),
     )
@@ -397,6 +427,27 @@ export const orcamentoService = {
               }
             }
 
+            // Carregar estampas do item
+            const { data: estampasData, error: estampasError } = await supabase
+              .from("estampas")
+              .select("*")
+              .eq("item_orcamento_id", item.id)
+
+            if (estampasError) {
+              console.error("Erro ao listar estampas do item:", estampasError)
+              throw estampasError
+            }
+
+            // Converter estampas para o formato da aplicação
+            const estampas: Estampa[] = estampasData
+              ? estampasData.map((estampa) => ({
+                  id: estampa.id,
+                  posicao: estampa.posicao || undefined,
+                  tipo: estampa.tipo || undefined,
+                  largura: estampa.largura || undefined,
+                }))
+              : []
+
             return {
               id: item.id,
               produtoId: item.produto_id || "",
@@ -410,9 +461,10 @@ export const orcamentoService = {
                   }
                 : undefined,
               corSelecionada: item.cor_selecionada || undefined,
-              descricaoEstampa: item.descricao_estampa || undefined,
+              estampas: estampas,
               tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
               imagem: item.imagem || undefined,
+              observacao: item.observacao || undefined,
             }
           }),
         )
@@ -497,7 +549,9 @@ export const orcamentoService = {
     }
   },
 
+  // Atualizar a função adicionarItem para lidar com múltiplas artes
   async adicionarItem(orcamentoId: string, item: Omit<ItemOrcamento, "id">): Promise<string> {
+    // Inserir o item principal
     const { data, error } = await supabase
       .from("itens_orcamento")
       .insert({
@@ -508,9 +562,9 @@ export const orcamentoService = {
         tecido_nome: item.tecidoSelecionado?.nome,
         tecido_composicao: item.tecidoSelecionado?.composicao,
         cor_selecionada: item.corSelecionada,
-        descricao_estampa: item.descricaoEstampa,
         tamanhos: item.tamanhos,
         imagem: item.imagem,
+        // Remover o campo observacao que está causando o erro
       })
       .select()
 
@@ -519,10 +573,31 @@ export const orcamentoService = {
       throw error
     }
 
-    return data[0].id
+    const itemId = data[0].id
+
+    // Inserir as estampas do item
+    if (item.estampas && item.estampas.length > 0) {
+      const estampasParaInserir = item.estampas.map((estampa) => ({
+        item_orcamento_id: itemId,
+        posicao: estampa.posicao,
+        tipo: estampa.tipo,
+        largura: estampa.largura,
+      }))
+
+      const { error: estampasError } = await supabase.from("estampas").insert(estampasParaInserir)
+
+      if (estampasError) {
+        console.error("Erro ao adicionar estampas:", estampasError)
+        throw estampasError
+      }
+    }
+
+    return itemId
   },
 
+  // Atualizar a função atualizarItem para lidar com múltiplas artes
   async atualizarItem(id: string, item: Partial<ItemOrcamento>): Promise<void> {
+    // Atualizar o item principal
     const { error } = await supabase
       .from("itens_orcamento")
       .update({
@@ -531,15 +606,43 @@ export const orcamentoService = {
         tecido_nome: item.tecidoSelecionado?.nome,
         tecido_composicao: item.tecidoSelecionado?.composicao,
         cor_selecionada: item.corSelecionada,
-        descricao_estampa: item.descricaoEstampa,
         tamanhos: item.tamanhos,
         imagem: item.imagem,
+        // Remover o campo observacao que está causando o erro
       })
       .eq("id", id)
 
     if (error) {
       console.error("Erro ao atualizar item:", error)
       throw error
+    }
+
+    // Atualizar as estampas do item
+    if (item.estampas) {
+      // Primeiro, remover todas as estampas existentes
+      const { error: deleteEstampasError } = await supabase.from("estampas").delete().eq("item_orcamento_id", id)
+
+      if (deleteEstampasError) {
+        console.error("Erro ao remover estampas antigas:", deleteEstampasError)
+        throw deleteEstampasError
+      }
+
+      // Inserir as novas estampas
+      if (item.estampas.length > 0) {
+        const estampasParaInserir = item.estampas.map((estampa) => ({
+          item_orcamento_id: id,
+          posicao: estampa.posicao,
+          tipo: estampa.tipo,
+          largura: estampa.largura,
+        }))
+
+        const { error: estampasError } = await supabase.from("estampas").insert(estampasParaInserir)
+
+        if (estampasError) {
+          console.error("Erro ao adicionar novas estampas:", estampasError)
+          throw estampasError
+        }
+      }
     }
   },
 

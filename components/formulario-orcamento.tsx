@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Trash2, Edit, Check, X, ImageIcon, DollarSign, Loader2 } from "lucide-react"
-import type { Cliente, Produto, Orcamento, ItemOrcamento } from "@/types/types"
+import type { Cliente, Produto, Orcamento, ItemOrcamento, Estampa } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 
 // Helper function to generate UUID
@@ -92,41 +92,171 @@ const tamanhosPadrao = {
   "13": 0,
 }
 
-// Componente isolado para o campo de descrição da estampa
-const DescricaoEstampaInput = ({
-  value,
+// Substituir o componente EstampaInput por um novo que suporta múltiplas estampas
+const EstampaInput = ({
+  estampas = [],
   onChange,
 }: {
-  value: string
-  onChange: (value: string) => void
+  estampas?: Estampa[]
+  onChange: (estampas: Estampa[]) => void
 }) => {
-  const [localValue, setLocalValue] = useState(value || "")
-
-  // Sincroniza o valor local quando o valor externo muda
-  useEffect(() => {
-    setLocalValue(value || "")
-  }, [value])
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value
-    setLocalValue(newValue)
+  // Função para gerar um ID único
+  const generateId = () => {
+    return "estampa-" + Math.random().toString(36).substr(2, 9)
   }
 
-  const handleBlur = () => {
-    onChange(localValue)
+  // Adicionar uma nova estampa
+  const adicionarEstampa = () => {
+    const novaEstampa: Estampa = {
+      id: generateId(),
+      posicao: undefined,
+      tipo: undefined,
+      largura: undefined,
+    }
+    onChange([...estampas, novaEstampa])
   }
+
+  // Remover uma estampa
+  const removerEstampa = (id: string) => {
+    onChange(estampas.filter((estampa) => estampa.id !== id))
+  }
+
+  // Atualizar uma estampa específica
+  const atualizarEstampa = (id: string, campo: string, valor: string | number) => {
+    onChange(estampas.map((estampa) => (estampa.id === id ? { ...estampa, [campo]: valor } : estampa)))
+  }
+
+  const posicoes = [
+    "Peito esquerdo",
+    "Peito direito",
+    "Costas",
+    "Bolso esquerdo",
+    "Bolso direito",
+    "Manga esquerda",
+    "Manga direita",
+  ]
+  const tipos = ["Bordado", "Silk", "DTF", "Sublimação"]
 
   return (
-    <Textarea
-      value={localValue}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      placeholder="Descreva os detalhes da estampa (posição, cores, tamanho, etc.)"
-      className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-      rows={3}
-    />
+    <div className="space-y-4">
+      {estampas.map((estampa, index) => (
+        <div key={estampa.id} className="border rounded-md p-3 bg-accent/30 relative">
+          <button
+            type="button"
+            onClick={() => removerEstampa(estampa.id)}
+            className="absolute top-2 right-2 text-gray-500 hover:text-red-500 bg-white rounded-full p-1 shadow-sm"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          <h4 className="font-medium mb-3 text-primary">Arte {index + 1}</h4>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor={`estampa-posicao-${estampa.id}`} className="text-primary mb-1.5">
+                Posição
+              </Label>
+              <Select
+                value={estampa.posicao || ""}
+                onValueChange={(value) => atualizarEstampa(estampa.id, "posicao", value)}
+              >
+                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                  <SelectValue placeholder="Selecione a posição" />
+                </SelectTrigger>
+                <SelectContent>
+                  {posicoes.map((posicao) => (
+                    <SelectItem key={posicao} value={posicao}>
+                      {posicao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor={`estampa-tipo-${estampa.id}`} className="text-primary mb-1.5">
+                Tipo
+              </Label>
+              <Select value={estampa.tipo || ""} onValueChange={(value) => atualizarEstampa(estampa.id, "tipo", value)}>
+                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tipos.map((tipo) => (
+                    <SelectItem key={tipo} value={tipo}>
+                      {tipo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor={`estampa-largura-${estampa.id}`} className="text-primary mb-1.5">
+                Largura (cm)
+              </Label>
+              <Input
+                id={`estampa-largura-${estampa.id}`}
+                type="number"
+                value={estampa.largura || ""}
+                onChange={(e) => atualizarEstampa(estampa.id, "largura", Number(e.target.value))}
+                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                placeholder="0"
+                min="0"
+                step="0.5"
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <Button
+        type="button"
+        onClick={adicionarEstampa}
+        variant="outline"
+        className="w-full mt-2 border-dashed border-2 hover:bg-accent/20"
+      >
+        <Plus className="h-4 w-4 mr-2" /> Adicionar Arte
+      </Button>
+    </div>
   )
 }
+
+// Componente isolado para o campo de descrição da estampa
+// const DescricaoEstampaInput = ({
+//   value,
+//   onChange,
+// }: {
+//   value: string
+//   onChange: (value: string) => void
+// }) => {
+//   const [localValue, setLocalValue] = useState(value || "")
+
+//   // Sincroniza o valor local quando o valor externo muda
+//   useEffect(() => {
+//     setLocalValue(value || "")
+//   }, [value])
+
+//   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+//     const newValue = e.target.value
+//     setLocalValue(newValue)
+//   }
+
+//   const handleBlur = () => {
+//     onChange(localValue)
+//   }
+
+//   return (
+//     <Textarea
+//       value={localValue}
+//       onChange={handleChange}
+//       onBlur={handleBlur}
+//       placeholder="Descreva os detalhes da estampa (posição, cores, tamanho, etc.)"
+//       className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+//       rows={3}
+//     />
+//   )
+// }
 
 // Update the renderTabelaTamanhos function to show only the sizes available for the product
 const renderTabelaTamanhos = (
@@ -197,13 +327,15 @@ export default function FormularioOrcamento({
 }: FormularioOrcamentoProps) {
   const [linhaAtiva, setLinhaAtiva] = useState<string | null>(null)
   const [editandoItem, setEditandoItem] = useState<string | null>(null)
+  // Atualizar a inicialização de novoItem
   const [novoItem, setNovoItem] = useState<Partial<ItemOrcamento>>({
     produtoId: "",
     quantidade: 0,
     valorUnitario: 0,
     tamanhos: { ...tamanhosPadrao },
     imagem: "",
-    observacao: "", // Add this line
+    observacao: "",
+    estampas: [],
   })
   const [itemEmEdicao, setItemEmEdicao] = useState<ItemOrcamento | null>(null)
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null)
@@ -213,29 +345,6 @@ export default function FormularioOrcamento({
   // Refs para os inputs de arquivo
   const novoImagemInputRef = useRef<HTMLInputElement>(null)
   const editImagemInputRef = useRef<HTMLInputElement>(null)
-
-  // Carregar clientes do Supabase ao montar o componente
-  useEffect(() => {
-    const carregarClientes = async () => {
-      if (clientes.length === 0) {
-        try {
-          setIsLoading(true)
-          const { data, error } = await supabase.from("clientes").select("*").order("nome")
-
-          if (error) {
-            console.warn("Erro ao carregar clientes do Supabase, usando dados mock:", error)
-            // Os clientes serão carregados pelo componente pai (GeradorOrcamento)
-          }
-        } catch (error) {
-          console.error("Erro ao carregar clientes:", error)
-        } finally {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    carregarClientes()
-  }, [clientes])
 
   // Mostrar tabela de tamanhos automaticamente quando um produto for selecionado
   useEffect(() => {
@@ -276,12 +385,13 @@ export default function FormularioOrcamento({
         .from("produtos")
         .select("*")
         .eq("id", produtoId)
+        .single()
 
       if (produtoError) {
         throw produtoError
       }
 
-      if (produtosData && produtosData.length > 0) {
+      if (produtosData) {
         // Buscar tecidos do produto
         const { data: tecidosData, error: tecidosError } = await supabase
           .from("tecidos")
@@ -292,17 +402,17 @@ export default function FormularioOrcamento({
 
         // Converter para o formato da aplicação
         const produto: Produto = {
-          id: produtosData[0].id,
-          nome: produtosData[0].nome,
-          valorBase: Number(produtosData[0].valor_base),
+          id: produtosData.id,
+          nome: produtosData.nome,
+          valorBase: Number(produtosData.valor_base),
           tecidos: tecidosData
             ? tecidosData.map((t) => ({
                 nome: t.nome,
                 composicao: t.composicao || "",
               }))
             : [],
-          cores: produtosData[0].cores || [],
-          tamanhosDisponiveis: produtosData[0].tamanhos_disponiveis || [],
+          cores: produtosData.cores || [],
+          tamanhosDisponiveis: produtosData.tamanhos_disponiveis || [],
         }
 
         setProdutoSelecionado(produto)
@@ -326,8 +436,30 @@ export default function FormularioOrcamento({
     } catch (error) {
       console.error("Erro ao carregar produto:", error)
       setErrorMessage(`Erro ao carregar produto: ${error instanceof Error ? error.message : "Erro desconhecido"}`)
+      setProdutoSelecionado(null)
+      setNovoItem({
+        ...novoItem,
+        produtoId: "",
+        produto: undefined,
+        valorUnitario: 0,
+      })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Substituir handleEstampaChange por handleEstampasChange
+  const handleEstampasChange = (estampas: Estampa[]) => {
+    if (editandoItem && itemEmEdicao) {
+      setItemEmEdicao({
+        ...itemEmEdicao,
+        estampas,
+      })
+    } else {
+      setNovoItem({
+        ...novoItem,
+        estampas,
+      })
     }
   }
 
@@ -354,6 +486,7 @@ export default function FormularioOrcamento({
           tamanhos: { ...tamanhosPadrao },
           imagem: "",
           observacao: "",
+          estampas: [],
         })
         setProdutoSelecionado(null)
         setLinhaAtiva(null)
@@ -485,19 +618,19 @@ export default function FormularioOrcamento({
   }
 
   // Manipuladores para descrição da estampa
-  const handleDescricaoEstampaChange = (descricao: string) => {
-    if (editandoItem && itemEmEdicao) {
-      setItemEmEdicao({
-        ...itemEmEdicao,
-        descricaoEstampa: descricao,
-      })
-    } else {
-      setNovoItem({
-        ...novoItem,
-        descricaoEstampa: descricao,
-      })
-    }
-  }
+  // const handleDescricaoEstampaChange = (descricao: string) => {
+  //   if (editandoItem && itemEmEdicao) {
+  //     setItemEmEdicao({
+  //       ...itemEmEdicao,
+  //       descricaoEstampa: descricao,
+  //     })
+  //   } else {
+  //     setNovoItem({
+  //       ...novoItem,
+  //       descricaoEstampa: descricao,
+  //     })
+  //   }
+  // }
 
   // Componente para gerenciar imagem (upload, prévia, remoção)
   const GerenciadorImagem = ({
@@ -775,13 +908,10 @@ export default function FormularioOrcamento({
                               </Select>
                             </div>
 
-                            {/* Descrição da estampa */}
+                            {/* Artes */}
                             <div>
-                              <Label className="text-primary mb-1.5">Descrição da Estampa</Label>
-                              <DescricaoEstampaInput
-                                value={itemEmEdicao?.descricaoEstampa || ""}
-                                onChange={(value) => handleDescricaoEstampaChange(value)}
-                              />
+                              <Label className="text-primary mb-1.5">Artes</Label>
+                              <EstampaInput estampas={itemEmEdicao?.estampas || []} onChange={handleEstampasChange} />
                             </div>
 
                             {/* Observação */}
@@ -934,13 +1064,10 @@ export default function FormularioOrcamento({
                           </Select>
                         </div>
 
-                        {/* Descrição da estampa */}
+                        {/* Artes */}
                         <div>
-                          <Label className="text-primary mb-1.5">Descrição da Estampa</Label>
-                          <DescricaoEstampaInput
-                            value={novoItem.descricaoEstampa || ""}
-                            onChange={(value) => handleDescricaoEstampaChange(value)}
-                          />
+                          <Label className="text-primary mb-1.5">Artes</Label>
+                          <EstampaInput estampas={novoItem.estampas || []} onChange={handleEstampasChange} />
                         </div>
 
                         {/* Observação */}

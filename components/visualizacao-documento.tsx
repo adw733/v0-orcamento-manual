@@ -71,6 +71,32 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
     .ficha-tecnica:not(:first-child) {
       margin-top: 20px;
     }
+
+    /* Configurações para garantir que a ficha técnica caiba em uma folha A4 */
+    .ficha-tecnica {
+      max-height: 297mm; /* Altura de uma folha A4 */
+      width: 210mm; /* Largura de uma folha A4 */
+      padding: 10mm; /* Margem interna */
+      box-sizing: border-box;
+      page-break-before: always !important;
+      break-before: always !important;
+    }
+    
+    /* Reduzir o tamanho da fonte para caber mais conteúdo */
+    .ficha-tecnica .pdf-content {
+      font-size: 0.9em;
+    }
+    
+    /* Ajustar o espaçamento vertical */
+    .ficha-tecnica .space-y-6 {
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    /* Garantir que a imagem não seja muito grande */
+    .ficha-tecnica .pdf-image {
+      max-height: 120mm; /* Limitar altura da imagem */
+    }
   }
   
   /* Estilos para garantir que os elementos caibam na página A4 */
@@ -159,6 +185,84 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
     min-height: 40px;
     max-height: 80px;
     overflow: hidden;
+  }
+
+  .pdf-table-compact {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8em;
+  }
+
+  .pdf-table-compact th,
+  .pdf-table-compact td {
+    padding: 4px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+
+  .pdf-table-compact tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+
+  @media print {
+    .pdf-table-compact {
+      page-break-inside: avoid;
+    }
+  }
+
+  /* Tabela unificada para especificações */
+  .specs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85em;
+  }
+
+  .specs-table th,
+  .specs-table td {
+    padding: 6px;
+    text-align: left;
+    border: 1px solid #e5e7eb;
+  }
+
+  .specs-table th {
+    background-color: #f3f4f6;
+    font-weight: 600;
+    color: #0f4c81;
+  }
+
+  .specs-table tr:nth-child(even) {
+    background-color: #f9fafb;
+  }
+
+  /* Estilos para os novos cards de especificações */
+  .spec-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .tamanho-card {
+    display: inline-block;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  @media print {
+    .grid-cols-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    
+    .grid-cols-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    
+    .flex-wrap {
+      display: flex;
+      flex-wrap: wrap;
+    }
   }
 `
 
@@ -381,81 +485,207 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pdf-grid">
-                <div className="bg-accent p-4 rounded-md">
-                  <h4 className="font-bold mb-2 text-primary">Tecido</h4>
-                  {item.tecidoSelecionado ? (
-                    <div className="text-sm">
-                      <p className="font-medium">{item.tecidoSelecionado.nome}</p>
-                      <p className="text-gray-600">{item.tecidoSelecionado.composicao}</p>
+              <div>
+                <h4 className="font-bold mb-2 text-primary">Especificações do Produto</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Card para Tecido */}
+                  <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
+                    <div className="bg-primary/10 p-2 border-b border-primary/10">
+                      <h5 className="font-medium text-primary flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="mr-2"
+                        >
+                          <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16v-3"></path>
+                          <path d="m7.5 4.27 9 5.15"></path>
+                          <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                          <line x1="12" y1="22" x2="12" y2="12"></line>
+                        </svg>
+                        Tecido
+                      </h5>
                     </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">Tecido não especificado</p>
-                  )}
-                </div>
+                    <div className="p-3 bg-white">
+                      {item.tecidoSelecionado ? (
+                        <div>
+                          <p className="font-medium text-gray-800">{item.tecidoSelecionado.nome}</p>
+                          <p className="text-sm text-gray-600">{item.tecidoSelecionado.composicao}</p>
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 italic">Não especificado</p>
+                      )}
+                    </div>
+                  </div>
 
-                <div className="bg-accent p-4 rounded-md">
-                  <h4 className="font-bold mb-2 text-primary">Cor</h4>
-                  {item.corSelecionada ? (
-                    <p className="text-sm font-medium">{item.corSelecionada}</p>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">Cor não especificada</p>
-                  )}
-                </div>
+                  {/* Card para Cor */}
+                  <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
+                    <div className="bg-primary/10 p-2 border-b border-primary/10">
+                      <h5 className="font-medium text-primary flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="mr-2"
+                        >
+                          <circle cx="13.5" cy="6.5" r="2.5"></circle>
+                          <circle cx="19" cy="17" r="2"></circle>
+                          <circle cx="9" cy="17" r="2.5"></circle>
+                          <circle cx="4.5" cy="12" r="1.5"></circle>
+                          <path d="M8 7c0-2.21 1.79-4 4-4"></path>
+                          <path d="M13.5 19c1.38 0 2.5-1.12 2.5-2.5S14.88 14 13.5 14 11 15.12 11 16.5s1.12 2.5 2.5 2.5Z"></path>
+                          <path d="M4.5 16.5c0-3.15 2.85-5.5 6-5.5"></path>
+                        </svg>
+                        Cor
+                      </h5>
+                    </div>
+                    <div className="p-3 bg-white">
+                      {item.corSelecionada ? (
+                        <div className="flex items-center">
+                          <div
+                            className="w-6 h-6 rounded-full mr-2 border border-gray-300"
+                            style={{
+                              backgroundColor: item.corSelecionada.toLowerCase().includes("azul")
+                                ? "#1e40af"
+                                : item.corSelecionada.toLowerCase().includes("verde")
+                                  ? "#15803d"
+                                  : item.corSelecionada.toLowerCase().includes("vermelho")
+                                    ? "#b91c1c"
+                                    : item.corSelecionada.toLowerCase().includes("amarelo")
+                                      ? "#eab308"
+                                      : item.corSelecionada.toLowerCase().includes("preto")
+                                        ? "#171717"
+                                        : item.corSelecionada.toLowerCase().includes("branco")
+                                          ? "#ffffff"
+                                          : item.corSelecionada.toLowerCase().includes("cinza")
+                                            ? "#6b7280"
+                                            : item.corSelecionada.toLowerCase().includes("marrom")
+                                              ? "#78350f"
+                                              : item.corSelecionada.toLowerCase().includes("laranja")
+                                                ? "#ea580c"
+                                                : item.corSelecionada.toLowerCase().includes("roxo")
+                                                  ? "#7e22ce"
+                                                  : item.corSelecionada.toLowerCase().includes("rosa")
+                                                    ? "#be185d"
+                                                    : "#9ca3af",
+                            }}
+                          ></div>
+                          <span className="font-medium text-gray-800">{item.corSelecionada}</span>
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 italic">Não especificada</p>
+                      )}
+                    </div>
+                  </div>
 
-                <div className="bg-accent p-4 rounded-md">
-                  <h4 className="font-bold mb-2 text-primary">Estampa</h4>
-                  {item.descricaoEstampa ? (
-                    <p className="text-sm">{item.descricaoEstampa}</p>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">Sem estampa</p>
-                  )}
+                  {/* Card para Artes */}
+                  <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
+                    <div className="bg-primary/10 p-2 border-b border-primary/10">
+                      <h5 className="font-medium text-primary flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="mr-2"
+                        >
+                          <path d="M12 19c.5 0 1-.1 1.4-.4l5.3-5.3c.4-.4.4-1 0-1.4l-5.3-5.3c-.4-.3-.9-.4-1.4-.4s-1 .1-1.4.4L5.3 11.9c-.4.4-.4 1 0 1.4l5.3 5.3c.4.3.9.4 1.4.4Z"></path>
+                          <path d="M7.5 10.5 12 6l4.5 4.5"></path>
+                          <path d="M7.5 13.5 12 18l4.5-4.5"></path>
+                        </svg>
+                        Artes
+                      </h5>
+                    </div>
+                    <div className="p-3 bg-white">
+                      {item.estampas && item.estampas.length > 0 ? (
+                        <div className="space-y-2">
+                          {item.estampas.map((estampa, index) => (
+                            <div key={estampa.id} className="border-b border-gray-100 pb-1 last:border-0 last:pb-0">
+                              <div className="flex items-center">
+                                <span className="bg-primary/10 text-primary text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center mr-2">
+                                  {index + 1}
+                                </span>
+                                <span className="font-medium text-gray-800 text-sm">
+                                  {estampa.posicao || "Posição não especificada"}
+                                </span>
+                              </div>
+                              <div className="text-xs ml-7 text-gray-600">
+                                {estampa.tipo}
+                                {estampa.largura ? `, ${estampa.largura} cm` : ""}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 italic">Sem artes aplicadas</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-6">
                 <h4 className="font-bold mb-2 text-primary">Quantidades por Tamanho</h4>
-                <div className="bg-accent p-3 rounded-md overflow-x-auto">
-                  <table className="w-full border-collapse text-sm pdf-table">
-                    <thead>
-                      <tr>
-                        <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tl-md">
-                          TAM.
-                        </th>
-                        {Object.entries(item.tamanhos)
-                          .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
-                          .map(([tamanho]) => (
-                            <th
-                              key={`header-${item.id}-${tamanho}`}
-                              className="border border-gray-300 p-1 text-center bg-primary text-white"
-                            >
-                              {tamanho}
-                            </th>
-                          ))}
-                        <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tr-md">
-                          TOTAL
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
-                        {Object.entries(item.tamanhos)
-                          .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
-                          .map(([tamanho, valor]) => (
-                            <td
-                              key={`${item.id}-${tamanho}`}
-                              className="border border-gray-300 p-1 text-center bg-white"
-                            >
-                              {valor}
-                            </td>
-                          ))}
-                        <td className="border border-gray-300 p-1 text-center font-medium bg-white">
-                          {item.quantidade}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm">
+                  <div className="p-3 bg-white overflow-x-auto">
+                    <table className="w-full border-collapse text-sm pdf-table">
+                      <thead>
+                        <tr>
+                          <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tl-md">
+                            TAM.
+                          </th>
+                          {Object.entries(item.tamanhos)
+                            .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
+                            .map(([tamanho]) => (
+                              <th
+                                key={`header-${item.id}-${tamanho}`}
+                                className="border border-gray-300 p-1 text-center bg-primary text-white"
+                              >
+                                {tamanho}
+                              </th>
+                            ))}
+                          <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tr-md">
+                            TOTAL
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
+                          {Object.entries(item.tamanhos)
+                            .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
+                            .map(([tamanho, valor]) => (
+                              <td
+                                key={`${item.id}-${tamanho}`}
+                                className="border border-gray-300 p-1 text-center bg-white"
+                              >
+                                {valor}
+                              </td>
+                            ))}
+                          <td className="border border-gray-300 p-1 text-center font-medium bg-white">
+                            {item.quantidade}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
