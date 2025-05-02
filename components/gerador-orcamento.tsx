@@ -1161,8 +1161,8 @@ export default function GeradorOrcamento() {
                 value="orcamentos"
                 className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm flex items-center gap-2"
               >
-                <FileText className="h-4 w-4" />
-                Orçamentos Salvos
+                <Save className="h-4 w-4" />
+                Orçamentos
               </TabsTrigger>
               <TabsTrigger
                 value="clientes"

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Trash2, Pencil, Save, X, Building, Phone, Mail, User, AlertCircle } from "lucide-react"
+import { Plus, Trash2, Pencil, Save, X, Building, Phone, Mail, User, AlertCircle, FileText } from "lucide-react"
 import type { Cliente } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockClientes } from "@/lib/mock-data"
@@ -19,6 +19,34 @@ const generateUUID = () => {
   })
 }
 
+// Function to get the next sequential code from Supabase
+const obterProximoCodigoCliente = async (): Promise<string> => {
+  try {
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("codigo")
+      .order("codigo", { ascending: false })
+      .limit(1)
+
+    if (error) {
+      console.error("Erro ao obter o último código do cliente:", error)
+      return "0001" // Retorna o código inicial se houver um erro
+    }
+
+    if (data && data.length > 0) {
+      const ultimoCodigo = data[0].codigo
+      const proximoCodigoNumerico = Number.parseInt(ultimoCodigo, 10) + 1
+      const proximoCodigoFormatado = String(proximoCodigoNumerico).padStart(4, "0")
+      return proximoCodigoFormatado
+    } else {
+      return "0001" // Retorna o código inicial se não houver clientes
+    }
+  } catch (error) {
+    console.error("Erro ao obter o próximo código do cliente:", error)
+    return "0001" // Retorna o código inicial se houver um erro
+  }
+}
+
 interface GerenciadorClientesProps {
   clientes: Cliente[]
   adicionarCliente: (cliente: Cliente) => void
@@ -26,7 +54,9 @@ interface GerenciadorClientesProps {
 }
 
 export default function GerenciadorClientes({ clientes, adicionarCliente, setClientes }: GerenciadorClientesProps) {
+  // Modificar o estado do novo cliente para incluir o código
   const [novoCliente, setNovoCliente] = useState<Partial<Cliente>>({
+    codigo: "",
     nome: "",
     cnpj: "",
     endereco: "",
@@ -57,6 +87,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
           // Converter os dados do Supabase para o formato da aplicação
           const clientesFormatados: Cliente[] = data.map((cliente) => ({
             id: cliente.id,
+            codigo: cliente.codigo || "",
             nome: cliente.nome,
             cnpj: cliente.cnpj || "",
             endereco: cliente.endereco || "",
@@ -78,6 +109,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     carregarClientes()
   }, [setClientes])
 
+  // Modificar a função handleAdicionarCliente para gerar o código
   const handleAdicionarCliente = async () => {
     if (novoCliente.nome) {
       try {
@@ -87,11 +119,15 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
         // Gerar um UUID para o novo cliente
         const clienteId = generateUUID()
 
+        // Obter o próximo código sequencial
+        const codigo = await obterProximoCodigoCliente()
+
         // Inserir no Supabase
         const { data, error } = await supabase
           .from("clientes")
           .insert({
             id: clienteId,
+            codigo,
             nome: novoCliente.nome,
             cnpj: novoCliente.cnpj || null,
             endereco: novoCliente.endereco || null,
@@ -107,6 +143,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
           // Converter para o formato da aplicação
           const novoClienteFormatado: Cliente = {
             id: data[0].id,
+            codigo: data[0].codigo || "",
             nome: data[0].nome,
             cnpj: data[0].cnpj || "",
             endereco: data[0].endereco || "",
@@ -120,6 +157,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
 
           // Limpar formulário
           setNovoCliente({
+            codigo: "",
             nome: "",
             cnpj: "",
             endereco: "",
@@ -265,11 +303,30 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
               <CardContent className="p-0">
                 {editandoId === cliente.id && clienteEditando ? (
                   <div className="p-4 space-y-4 bg-accent/50">
+                    {/* Adicionar campo de código no formulário de edição */}
                     <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`edit-codigo-${cliente.id}`} className="text-primary flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Código
+                        </Label>
+                        <Input
+                          id={`edit-codigo-${cliente.id}`}
+                          value={clienteEditando.codigo}
+                          onChange={(e) =>
+                            setClienteEditando({
+                              ...clienteEditando,
+                              codigo: e.target.value,
+                            })
+                          }
+                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          disabled={true} // Código não deve ser editável manualmente
+                        />
+                      </div>
                       <div>
                         <Label htmlFor={`edit-nome-${cliente.id}`} className="text-primary flex items-center gap-2">
                           <Building className="h-4 w-4" />
-                          Nome
+                          Nome Empresa
                         </Label>
                         <Input
                           id={`edit-nome-${cliente.id}`}
@@ -283,22 +340,23 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                           className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor={`edit-cnpj-${cliente.id}`} className="text-primary flex items-center gap-2">
-                          <span className="bg-primary text-white p-1 rounded-md text-xs">CNPJ</span>
-                        </Label>
-                        <Input
-                          id={`edit-cnpj-${cliente.id}`}
-                          value={clienteEditando.cnpj}
-                          onChange={(e) =>
-                            setClienteEditando({
-                              ...clienteEditando,
-                              cnpj: e.target.value,
-                            })
-                          }
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor={`edit-cnpj-${cliente.id}`} className="text-primary flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        CNPJ
+                      </Label>
+                      <Input
+                        id={`edit-cnpj-${cliente.id}`}
+                        value={clienteEditando.cnpj}
+                        onChange={(e) =>
+                          setClienteEditando({
+                            ...clienteEditando,
+                            cnpj: e.target.value,
+                          })
+                        }
+                        className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                      />
                     </div>
                     <div>
                       <Label htmlFor={`edit-endereco-${cliente.id}`} className="text-primary">
@@ -352,23 +410,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                         />
                       </div>
                     </div>
-                    <div>
-                      <Label htmlFor={`edit-contato-${cliente.id}`} className="text-primary flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        Contato
-                      </Label>
-                      <Input
-                        id={`edit-contato-${cliente.id}`}
-                        value={clienteEditando.contato}
-                        onChange={(e) =>
-                          setClienteEditando({
-                            ...clienteEditando,
-                            contato: e.target.value,
-                          })
-                        }
-                        className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" onClick={cancelarEdicao} className="text-gray-500 hover:text-gray-700">
                         <X className="h-4 w-4 mr-2" /> Cancelar
@@ -384,13 +425,16 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                   </div>
                 ) : (
                   <div className="p-4">
+                    {/* Modificar a exibição do cliente para mostrar o código */}
                     <div className="flex justify-between items-start">
                       <div className="flex items-start gap-3">
                         <div className="bg-primary text-white p-2 rounded-full">
                           <Building className="h-5 w-5" />
                         </div>
                         <div>
-                          <h4 className="font-medium text-gray-900">{cliente.nome}</h4>
+                          <h4 className="font-medium text-gray-900">
+                            <span className="text-primary">{cliente.codigo}</span> - {cliente.nome}
+                          </h4>
                           <p className="text-sm text-gray-500">{cliente.cnpj}</p>
                         </div>
                       </div>
@@ -444,11 +488,25 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
             Adicionar Novo Cliente
           </h4>
           <div className="space-y-4">
+            {/* Adicionar campo de código no formulário de novo cliente */}
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="codigo" className="text-primary flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Código
+                </Label>
+                <Input
+                  id="codigo"
+                  value={novoCliente.codigo}
+                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  disabled={true} // Código será gerado automaticamente
+                  placeholder="Gerado automaticamente"
+                />
+              </div>
               <div>
                 <Label htmlFor="nome" className="text-primary flex items-center gap-2">
                   <Building className="h-4 w-4" />
-                  Nome
+                  Nome Empresa
                 </Label>
                 <Input
                   id="nome"
@@ -457,17 +515,18 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                   className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                 />
               </div>
-              <div>
-                <Label htmlFor="cnpj" className="text-primary flex items-center gap-2">
-                  <span className="bg-primary text-white p-1 rounded-md text-xs">CNPJ</span>
-                </Label>
-                <Input
-                  id="cnpj"
-                  value={novoCliente.cnpj}
-                  onChange={(e) => setNovoCliente({ ...novoCliente, cnpj: e.target.value })}
-                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                />
-              </div>
+            </div>
+            <div>
+              <Label htmlFor="cnpj" className="text-primary flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                CNPJ
+              </Label>
+              <Input
+                id="cnpj"
+                value={novoCliente.cnpj}
+                onChange={(e) => setNovoCliente({ ...novoCliente, cnpj: e.target.value })}
+                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+              />
             </div>
             <div>
               <Label htmlFor="endereco" className="text-primary">
@@ -505,18 +564,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                   className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                 />
               </div>
-            </div>
-            <div>
-              <Label htmlFor="contato" className="text-primary flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Contato
-              </Label>
-              <Input
-                id="contato"
-                value={novoCliente.contato}
-                onChange={(e) => setNovoCliente({ ...novoCliente, contato: e.target.value })}
-                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-              />
             </div>
             <Button
               onClick={handleAdicionarCliente}

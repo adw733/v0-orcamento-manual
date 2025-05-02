@@ -98,38 +98,72 @@ export default function AssistenteIA({
         // Generate content with Gemini - passar clientes e produtos
         const result = await generateWithGemini(prompt, clientes, produtos)
 
-        if (result.success && result.action && result.data) {
-          // Process the action
-          const actionResult = await processGeminiAction(
-            result.action,
-            result.data,
-            clientes,
-            produtos,
-            orcamento,
-            setClientes,
-            setProdutos,
-            setOrcamento,
-          )
+        if (result.success) {
+          if (result.action === "requestInfo" && result.camposFaltantes && result.camposFaltantes.length > 0) {
+            // O Gemini está solicitando mais informações
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: `Preciso de mais informações para prosseguir. Por favor, forneça os seguintes dados: ${result.camposFaltantes.join(", ")}`,
+              },
+            ])
 
-          // Add assistant message
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: actionResult.success ? `✅ ${actionResult.message}` : `❌ ${actionResult.message}`,
-            },
-          ])
+            // Mostrar feedback
+            setFeedback({
+              visible: true,
+              success: true,
+              message: "Informações adicionais são necessárias para continuar.",
+            })
+          } else if (result.action && result.data) {
+            // Process the action
+            const actionResult = await processGeminiAction(
+              result.action,
+              result.data,
+              clientes,
+              produtos,
+              orcamento,
+              setClientes,
+              setProdutos,
+              setOrcamento,
+            )
 
-          // Show feedback
-          setFeedback({
-            visible: true,
-            success: actionResult.success,
-            message: actionResult.message,
-          })
+            // Add assistant message
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: actionResult.success ? `✅ ${actionResult.message}` : `❌ ${actionResult.message}`,
+              },
+            ])
 
-          // If it's a new orçamento and it was successful, switch to the orçamento tab
-          if (result.action === "createOrcamento" && actionResult.success) {
-            setAbaAtiva("orcamento")
+            // Show feedback
+            setFeedback({
+              visible: true,
+              success: actionResult.success,
+              message: actionResult.message,
+            })
+
+            // If it's a new orçamento and it was successful, switch to the orçamento tab
+            if (result.action === "createOrcamento" && actionResult.success) {
+              setAbaAtiva("orcamento")
+            }
+          } else {
+            // Add error message
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: `❌ ${result.message}`,
+              },
+            ])
+
+            // Show feedback
+            setFeedback({
+              visible: true,
+              success: false,
+              message: result.message,
+            })
           }
         } else {
           // Add error message

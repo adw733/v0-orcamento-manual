@@ -12,6 +12,7 @@ export type Estampa = {
 
 export type Cliente = {
   id: string
+  codigo: string // Novo campo para código sequencial
   nome: string
   cnpj: string
   endereco: string
@@ -22,6 +23,7 @@ export type Cliente = {
 
 export type Produto = {
   id: string
+  codigo: string // Novo campo para código sequencial
   nome: string
   valorBase: number
   tecidos: Tecido[]

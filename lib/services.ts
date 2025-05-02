@@ -9,7 +9,141 @@ export interface Estampa {
   largura?: number
 }
 
-// Serviços para Clientes
+// Adicionar funções para obter o próximo código sequencial
+export const obterProximoCodigoCliente = async (): Promise<string> => {
+  try {
+    // Buscar o último cliente para obter o código mais recente
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("codigo")
+      .order("codigo", { ascending: false })
+      .limit(1)
+
+    if (error) {
+      console.error("Erro ao buscar último código de cliente:", error)
+      // Se houver erro, começar do C0001
+      return "C0001"
+    }
+
+    if (data && data.length > 0 && data[0].codigo) {
+      // Extrair o número do formato "CXXXX"
+      const ultimoCodigo = data[0].codigo
+      const numeroAtual = Number.parseInt(ultimoCodigo.substring(1), 10)
+
+      if (!isNaN(numeroAtual)) {
+        // Incrementar e formatar com zeros à esquerda
+        const proximoNumero = (numeroAtual + 1).toString().padStart(4, "0")
+        return `C${proximoNumero}`
+      }
+    }
+
+    // Se não houver clientes ou o formato for inválido, começar do C0001
+    return "C0001"
+  } catch (error) {
+    console.error("Erro ao obter próximo código de cliente:", error)
+    return "C0001"
+  }
+}
+
+export const obterProximoCodigoProduto = async (): Promise<string> => {
+  try {
+    // Buscar o último produto para obter o código mais recente
+    const { data, error } = await supabase
+      .from("produtos")
+      .select("codigo")
+      .order("codigo", { ascending: false })
+      .limit(1)
+
+    if (error) {
+      console.error("Erro ao buscar último código de produto:", error)
+      // Se houver erro, começar do P0001
+      return "P0001"
+    }
+
+    if (data && data.length > 0 && data[0].codigo) {
+      // Extrair o número do formato "PXXXX"
+      const ultimoCodigo = data[0].codigo
+      const numeroAtual = Number.parseInt(ultimoCodigo.substring(1), 10)
+
+      if (!isNaN(numeroAtual)) {
+        // Incrementar e formatar com zeros à esquerda
+        const proximoNumero = (numeroAtual + 1).toString().padStart(4, "0")
+        return `P${proximoNumero}`
+      }
+    }
+
+    // Se não houver produtos ou o formato for inválido, começar do P0001
+    return "P0001"
+  } catch (error) {
+    console.error("Erro ao obter próximo código de produto:", error)
+    return "P0001"
+  }
+}
+
+// Find the obterProdutos function and modify it to handle the missing 'codigo' column
+// Replace or modify the obterProdutos function with:
+
+export const obterProdutos = async (): Promise<Produto[]> => {
+  try {
+    const { data, error } = await supabase.from("produtos").select("*").order("nome")
+
+    if (error) throw error
+
+    // Add default codigo if it doesn't exist
+    const produtosComCodigo = data.map((produto, index) => {
+      if (!produto.codigo) {
+        return {
+          ...produto,
+          codigo: `P${String(index + 1).padStart(4, "0")}`,
+        }
+      }
+      return produto
+    })
+
+    return produtosComCodigo
+  } catch (error) {
+    console.error("Erro ao obter produtos:", error)
+    return []
+  }
+}
+
+// Find the adicionarProduto function and modify it to handle the missing 'codigo' column
+// Replace or modify the adicionarProduto function with:
+
+export const adicionarProduto = async (produto: Produto): Promise<Produto | null> => {
+  try {
+    // Try to insert with codigo first
+    const { data, error } = await supabase.from("produtos").insert([produto]).select().single()
+
+    if (error) {
+      // If error is about the codigo column not existing, try without it
+      if (error.message.includes("codigo")) {
+        const { nome, descricao, preco, categoria, imagem } = produto
+        const produtoSemCodigo = { nome, descricao, preco, categoria, imagem }
+
+        const { data: dataRetry, error: errorRetry } = await supabase
+          .from("produtos")
+          .insert([produtoSemCodigo])
+          .select()
+          .single()
+
+        if (errorRetry) throw errorRetry
+
+        // Return the product with the codigo even if it's not stored in the database
+        return { ...dataRetry, codigo: produto.codigo }
+      } else {
+        throw error
+      }
+    }
+
+    return data
+  } catch (error) {
+    console.error("Erro ao adicionar produto:", error)
+    return null
+  }
+}
+
+// Modificar o serviço de cliente para incluir o código
 export const clienteService = {
   async listarTodos(): Promise<Cliente[]> {
     const { data, error } = await supabase.from("clientes").select("*").order("nome")
@@ -21,6 +155,7 @@ export const clienteService = {
 
     return data.map((cliente) => ({
       id: cliente.id,
+      codigo: cliente.codigo || "",
       nome: cliente.nome,
       cnpj: cliente.cnpj || "",
       endereco: cliente.endereco || "",
@@ -31,9 +166,13 @@ export const clienteService = {
   },
 
   async adicionar(cliente: Omit<Cliente, "id">): Promise<Cliente> {
+    // Obter o próximo código sequencial
+    const codigo = cliente.codigo || (await obterProximoCodigoCliente())
+
     const { data, error } = await supabase
       .from("clientes")
       .insert({
+        codigo,
         nome: cliente.nome,
         cnpj: cliente.cnpj || null,
         endereco: cliente.endereco || null,
@@ -50,6 +189,7 @@ export const clienteService = {
 
     return {
       id: data[0].id,
+      codigo: data[0].codigo || "",
       nome: data[0].nome,
       cnpj: data[0].cnpj || "",
       endereco: data[0].endereco || "",
@@ -63,6 +203,7 @@ export const clienteService = {
     const { error } = await supabase
       .from("clientes")
       .update({
+        codigo: cliente.codigo,
         nome: cliente.nome,
         cnpj: cliente.cnpj || null,
         endereco: cliente.endereco || null,
@@ -89,7 +230,7 @@ export const clienteService = {
   },
 }
 
-// Serviços para Produtos
+// Modificar o serviço de produto para incluir o código
 export const produtoService = {
   async listarTodos(): Promise<Produto[]> {
     // Buscar produtos
@@ -117,6 +258,7 @@ export const produtoService = {
         // Converter para o formato da aplicação
         return {
           id: produto.id,
+          codigo: produto.codigo || "",
           nome: produto.nome,
           valorBase: Number(produto.valor_base),
           tecidos: tecidosData
@@ -135,10 +277,14 @@ export const produtoService = {
   },
 
   async adicionar(produto: Omit<Produto, "id">): Promise<Produto> {
+    // Obter o próximo código sequencial
+    const codigo = produto.codigo || (await obterProximoCodigoProduto())
+
     // Inserir produto
     const { data: produtoData, error: produtoError } = await supabase
       .from("produtos")
       .insert({
+        codigo,
         nome: produto.nome,
         valor_base: produto.valorBase,
         cores: produto.cores || [],
@@ -169,6 +315,7 @@ export const produtoService = {
 
     return {
       id: produtoData[0].id,
+      codigo: produtoData[0].codigo || "",
       nome: produtoData[0].nome,
       valorBase: Number(produtoData[0].valor_base),
       tecidos: produto.tecidos || [],
@@ -182,6 +329,7 @@ export const produtoService = {
     const { error: produtoError } = await supabase
       .from("produtos")
       .update({
+        codigo: produto.codigo,
         nome: produto.nome,
         valor_base: produto.valorBase,
         cores: produto.cores,
@@ -286,6 +434,7 @@ export const orcamentoService = {
 
                   produto = {
                     id: item.produto.id,
+                    codigo: item.produto.codigo || "",
                     nome: item.produto.nome,
                     valorBase: Number(item.produto.valor_base),
                     tecidos: tecidosData
@@ -346,6 +495,7 @@ export const orcamentoService = {
         const clienteFormatado = orcamento.cliente
           ? {
               id: orcamento.cliente.id,
+              codigo: orcamento.cliente.codigo || "",
               nome: orcamento.cliente.nome,
               cnpj: orcamento.cliente.cnpj || "",
               endereco: orcamento.cliente.endereco || "",
@@ -414,6 +564,7 @@ export const orcamentoService = {
 
               produto = {
                 id: item.produto.id,
+                codigo: item.produto.codigo || "",
                 nome: item.produto.nome,
                 valorBase: Number(item.produto.valor_base),
                 tecidos: tecidosData
@@ -474,6 +625,7 @@ export const orcamentoService = {
     const clienteFormatado = data.cliente
       ? {
           id: data.cliente.id,
+          codigo: data.cliente.codigo || "",
           nome: data.cliente.nome,
           cnpj: data.cliente.cnpj || "",
           endereco: data.cliente.endereco || "",
@@ -564,7 +716,7 @@ export const orcamentoService = {
         cor_selecionada: item.corSelecionada,
         tamanhos: item.tamanhos,
         imagem: item.imagem,
-        // Remover o campo observacao que está causando o erro
+        observacao: item.observacao,
       })
       .select()
 
@@ -608,7 +760,7 @@ export const orcamentoService = {
         cor_selecionada: item.corSelecionada,
         tamanhos: item.tamanhos,
         imagem: item.imagem,
-        // Remover o campo observacao que está causando o erro
+        observacao: item.observacao,
       })
       .eq("id", id)
 

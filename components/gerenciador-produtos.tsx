@@ -5,7 +5,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Trash2, Pencil, Save, X, Package, DollarSign, Shirt, Palette, Ruler, AlertCircle } from "lucide-react"
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Save,
+  X,
+  Package,
+  DollarSign,
+  Shirt,
+  Palette,
+  Ruler,
+  AlertCircle,
+  FileText,
+} from "lucide-react"
 import type { Produto, Tecido } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockProdutos } from "@/lib/mock-data"
@@ -19,6 +32,40 @@ const generateUUID = () => {
   })
 }
 
+// Function to fetch the next sequential product code from Supabase
+const obterProximoCodigoProduto = async (): Promise<string> => {
+  try {
+    // Now that we know the column exists, we can directly query it
+    const { data, error } = await supabase
+      .from("produtos")
+      .select("codigo")
+      .order("codigo", { ascending: false })
+      .limit(1)
+
+    if (error) {
+      console.error("Erro ao obter o último código do produto:", error)
+      return "P0001" // Default code if there's an error
+    }
+
+    if (data && data.length > 0 && data[0].codigo) {
+      // Extract the numeric part from the code (remove the 'P' prefix)
+      const ultimoCodigo = data[0].codigo
+      const numeroMatch = ultimoCodigo.match(/^P?(\d+)$/)
+
+      if (numeroMatch && numeroMatch[1]) {
+        const numero = Number.parseInt(numeroMatch[1], 10) + 1
+        return "P" + String(numero).padStart(4, "0") // Format the new code
+      }
+    }
+
+    // If no valid code was found, start with P0001
+    return "P0001"
+  } catch (error) {
+    console.error("Erro ao obter o próximo código do produto:", error)
+    return "P0001" // Return a default code in case of any error
+  }
+}
+
 interface GerenciadorProdutosProps {
   produtos: Produto[]
   adicionarProduto: (produto: Produto) => void
@@ -26,7 +73,9 @@ interface GerenciadorProdutosProps {
 }
 
 export default function GerenciadorProdutos({ produtos, adicionarProduto, setProdutos }: GerenciadorProdutosProps) {
+  // Modificar o estado do novo produto para incluir o código
   const [novoProduto, setNovoProduto] = useState<Partial<Produto>>({
+    codigo: "",
     nome: "",
     valorBase: 0,
     tecidos: [],
@@ -74,6 +123,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
               // Converter para o formato da aplicação
               return {
                 id: produto.id,
+                codigo: produto.codigo || "",
                 nome: produto.nome,
                 valorBase: Number(produto.valor_base),
                 tecidos: tecidosData
@@ -101,9 +151,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     carregarProdutos()
   }, [setProdutos])
 
-  // Modifique a função handleAdicionarProduto para garantir que o ID seja gerado corretamente
-
-  // Substitua a função handleAdicionarProduto atual por esta versão atualizada:
+  // Modificar a função handleAdicionarProduto para gerar o código
   const handleAdicionarProduto = async () => {
     if (novoProduto.nome && novoProduto.valorBase) {
       try {
@@ -113,11 +161,15 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         // Gerar um UUID para o novo produto
         const produtoId = generateUUID()
 
+        // Obter o próximo código sequencial
+        const codigo = novoProduto.codigo || (await obterProximoCodigoProduto())
+
         // Inserir produto no Supabase
-        const { data: produtoData, error: produtoError } = await supabase
+        const { data: insertedData, error: produtoError } = await supabase
           .from("produtos")
           .insert({
             id: produtoId,
+            codigo,
             nome: novoProduto.nome,
             valor_base: novoProduto.valorBase,
             cores: novoProduto.cores || [],
@@ -127,13 +179,13 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
 
         if (produtoError) throw produtoError
 
-        if (produtoData && produtoData[0]) {
+        if (insertedData && insertedData[0]) {
           // Inserir tecidos do produto
           if (novoProduto.tecidos && novoProduto.tecidos.length > 0) {
             const tecidosParaInserir = novoProduto.tecidos.map((tecido) => ({
               nome: tecido.nome,
               composicao: tecido.composicao,
-              produto_id: produtoData[0].id,
+              produto_id: insertedData[0].id,
             }))
 
             const { error: tecidosError } = await supabase.from("tecidos").insert(tecidosParaInserir)
@@ -143,9 +195,10 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
 
           // Converter para o formato da aplicação
           const novoProdutoFormatado: Produto = {
-            id: produtoData[0].id,
-            nome: produtoData[0].nome,
-            valorBase: Number(produtoData[0].valor_base),
+            id: insertedData[0].id,
+            codigo: insertedData[0].codigo || codigo,
+            nome: insertedData[0].nome,
+            valorBase: Number(insertedData[0].valor_base),
             tecidos: novoProduto.tecidos || [],
             cores: novoProduto.cores || [],
             tamanhosDisponiveis: novoProduto.tamanhosDisponiveis || [],
@@ -156,6 +209,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
 
           // Limpar formulário
           setNovoProduto({
+            codigo: "",
             nome: "",
             valorBase: 0,
             tecidos: [],
@@ -175,7 +229,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     }
   }
 
-  // Modificar a função handleRemoverProduto para verificar e lidar com itens de orçamento relacionados
   const handleRemoverProduto = async (id: string) => {
     // Confirmar antes de excluir
     if (!window.confirm("Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.")) {
@@ -251,6 +304,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         const { error: produtoError } = await supabase
           .from("produtos")
           .update({
+            codigo: produtoEditando.codigo,
             nome: produtoEditando.nome,
             valor_base: produtoEditando.valorBase,
             cores: produtoEditando.cores,
@@ -415,7 +469,26 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
               <CardContent className="p-0">
                 {editandoId === produto.id && produtoEditando ? (
                   <div className="p-4 space-y-4 bg-accent/50">
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Adicionar campo de código no formulário de edição */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor={`edit-codigo-${produto.id}`} className="text-primary flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Código
+                        </Label>
+                        <Input
+                          id={`edit-codigo-${produto.id}`}
+                          value={produtoEditando.codigo}
+                          onChange={(e) =>
+                            setProdutoEditando({
+                              ...produtoEditando,
+                              codigo: e.target.value,
+                            })
+                          }
+                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          disabled={true} // Código não deve ser editável manualmente
+                        />
+                      </div>
                       <div>
                         <Label htmlFor={`edit-nome-${produto.id}`} className="text-primary flex items-center gap-2">
                           <Package className="h-4 w-4" />
@@ -635,9 +708,9 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                                 checked={(editandoId
                                   ? produtoEditando?.tamanhosDisponiveis
                                   : novoProduto.tamanhosDisponiveis || []
-                                ).some((t) => t.match(/^(3[6-9]|[4-5][0-9]|6[0-2])$/))}
+                                ).some((t) => t.match(/^(3[68]|[4-5][02468])$/))}
                                 onChange={() => {
-                                  const numericos = Array.from({ length: 27 }, (_, i) => (i + 36).toString())
+                                  const numericos = Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString())
                                   if (editandoId && produtoEditando) {
                                     setProdutoEditando({
                                       ...produtoEditando,
@@ -655,11 +728,11 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                                 htmlFor={editandoId ? `tamanho-tipo-2-edit` : `tamanho-tipo-2-novo`}
                                 className="font-medium"
                               >
-                                Numérico (36 ao 62)
+                                Numérico (36 ao 58 - pares)
                               </Label>
                             </div>
                             <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
-                              {Array.from({ length: 27 }, (_, i) => (i + 36).toString()).map((tamanho) => (
+                              {Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString()).map((tamanho) => (
                                 <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
                                   <span className="text-sm font-medium">{tamanho}</span>
                                 </div>
@@ -728,12 +801,15 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                 ) : (
                   <div className="p-4">
                     <div className="flex justify-between items-start">
+                      {/* Modificar a exibição do produto para mostrar o código */}
                       <div className="flex items-start gap-3">
                         <div className="bg-primary text-white p-2 rounded-full">
                           <Package className="h-5 w-5" />
                         </div>
                         <div>
-                          <h4 className="font-medium text-gray-900">{produto.nome}</h4>
+                          <h4 className="font-medium text-gray-900">
+                            <span className="text-primary">{produto.codigo}</span> - {produto.nome}
+                          </h4>
                           <p className="text-sm text-gray-500 flex items-center gap-1">
                             <DollarSign className="h-3 w-3" />
                             {produto.valorBase.toFixed(2)}
@@ -798,7 +874,21 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
             Adicionar Novo Produto
           </h4>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Adicionar campo de código no formulário de novo produto */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="codigo-produto" className="text-primary flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Código
+                </Label>
+                <Input
+                  id="codigo-produto"
+                  value={novoProduto.codigo}
+                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  disabled={true} // Código será gerado automaticamente
+                  placeholder="Gerado automaticamente"
+                />
+              </div>
               <div>
                 <Label htmlFor="nome-produto" className="text-primary flex items-center gap-2">
                   <Package className="h-4 w-4" />
@@ -971,11 +1061,9 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                         id={`tamanho-tipo-2-novo`}
                         name={`tamanho-tipo-novo`}
                         className="mr-2"
-                        checked={(novoProduto.tamanhosDisponiveis || []).some((t) =>
-                          t.match(/^(3[6-9]|[4-5][0-9]|6[0-2])$/),
-                        )}
+                        checked={(novoProduto.tamanhosDisponiveis || []).some((t) => t.match(/^(3[68]|[4-5][02468])$/))}
                         onChange={() => {
-                          const numericos = Array.from({ length: 27 }, (_, i) => (i + 36).toString())
+                          const numericos = Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString())
                           setNovoProduto({
                             ...novoProduto,
                             tamanhosDisponiveis: numericos,
@@ -983,11 +1071,11 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                         }}
                       />
                       <Label htmlFor={`tamanho-tipo-2-novo`} className="font-medium">
-                        Numérico (36 ao 62)
+                        Numérico (36 ao 58 - pares)
                       </Label>
                     </div>
                     <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
-                      {Array.from({ length: 27 }, (_, i) => (i + 36).toString()).map((tamanho) => (
+                      {Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString()).map((tamanho) => (
                         <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
                           <span className="text-sm font-medium">{tamanho}</span>
                         </div>

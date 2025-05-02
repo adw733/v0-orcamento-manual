@@ -114,7 +114,81 @@ async function obterProximoNumeroOrcamento(): Promise<string> {
   }
 }
 
-// Modificar a função generateWithGemini para incluir instruções sobre verificar clientes e produtos existentes
+// Function to get the next cliente code
+async function obterProximoCodigoCliente(): Promise<string> {
+  try {
+    // Buscar o último cliente para obter o código mais recente
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("codigo")
+      .order("created_at", { ascending: false })
+      .limit(1)
+
+    if (error) {
+      console.error("Erro ao buscar último código de cliente:", error)
+      // Se houver erro, começar do 0001
+      return "0001"
+    }
+
+    if (data && data.length > 0) {
+      // Extrair o código
+      const ultimoCodigo = data[0].codigo
+      // Verificar se é um número válido
+      const codigoAtual = Number.parseInt(ultimoCodigo, 10)
+
+      if (!isNaN(codigoAtual)) {
+        // Incrementar e formatar com zeros à esquerda
+        const proximoCodigo = (codigoAtual + 1).toString().padStart(4, "0")
+        return proximoCodigo
+      }
+    }
+
+    // Se não houver clientes ou o formato for inválido, começar do 0001
+    return "0001"
+  } catch (error) {
+    console.error("Erro ao obter próximo código de cliente:", error)
+    return "0001"
+  }
+}
+
+// Function to get the next produto code
+async function obterProximoCodigoProduto(): Promise<string> {
+  try {
+    // Buscar o último produto para obter o código mais recente
+    const { data, error } = await supabase
+      .from("produtos")
+      .select("codigo")
+      .order("created_at", { ascending: false })
+      .limit(1)
+
+    if (error) {
+      console.error("Erro ao buscar último código de produto:", error)
+      // Se houver erro, começar do 0001
+      return "0001"
+    }
+
+    if (data && data.length > 0) {
+      // Extrair o código
+      const ultimoCodigo = data[0].codigo
+      // Verificar se é um número válido
+      const codigoAtual = Number.parseInt(ultimoCodigo, 10)
+
+      if (!isNaN(codigoAtual)) {
+        // Incrementar e formatar com zeros à esquerda
+        const proximoCodigo = (codigoAtual + 1).toString().padStart(4, "0")
+        return proximoCodigo
+      }
+    }
+
+    // Se não houver produtos ou o formato for inválido, começar do 0001
+    return "0001"
+  } catch (error) {
+    console.error("Erro ao obter próximo código de produto:", error)
+    return "0001"
+  }
+}
+
+// Modificar o systemPrompt para incluir instruções sobre verificação de campos obrigatórios
 const systemPrompt = `
 Você é um assistente especializado em criar e editar dados para um sistema de orçamentos de uniformes industriais.
 
@@ -129,6 +203,25 @@ Analise o pedido do usuário e identifique se ele quer:
 
 IMPORTANTE: Sempre verifique se o cliente ou produto já existe antes de criar um novo. Pergunte ao usuário se deseja criar um novo quando não encontrar o solicitado.
 
+IMPORTANTE: Verifique se todas as informações obrigatórias estão presentes. Se faltar alguma informação, pergunte ao usuário antes de prosseguir.
+
+Campos obrigatórios para Cliente:
+- nome (obrigatório)
+- cnpj (obrigatório)
+- contato (obrigatório)
+
+Campos obrigatórios para Produto:
+- nome (obrigatório)
+- valorBase (obrigatório)
+- pelo menos um tecido (obrigatório)
+- pelo menos uma cor (obrigatório)
+- pelo menos um tamanho disponível (obrigatório)
+
+Campos obrigatórios para Orçamento:
+- cliente (obrigatório)
+- pelo menos um item (obrigatório)
+- para cada item: produto, quantidade, valorUnitario (obrigatórios)
+
 Responda APENAS com um JSON no seguinte formato, SEM usar blocos de código markdown:
 
 Para criar cliente:
@@ -142,7 +235,8 @@ Para criar cliente:
     "email": "contato@empresa.com",
     "contato": "Nome do Contato"
   },
-  "verificar": true
+  "verificar": true,
+  "camposFaltantes": [] // Lista de campos obrigatórios que estão faltando
 }
 
 Para criar produto:
@@ -157,7 +251,8 @@ Para criar produto:
     "cores": ["Cor 1", "Cor 2"],
     "tamanhosDisponiveis": ["P", "M", "G"]
   },
-  "verificar": true
+  "verificar": true,
+  "camposFaltantes": [] // Lista de campos obrigatórios que estão faltando
 }
 
 Para criar orçamento:
@@ -180,7 +275,8 @@ Para criar orçamento:
     "prazoEntrega": "30 dias",
     "validadeOrcamento": "15 dias"
   },
-  "verificar": true
+  "verificar": true,
+  "camposFaltantes": [] // Lista de campos obrigatórios que estão faltando
 }
 
 Para extrair informações de um orçamento:
@@ -212,7 +308,15 @@ Para extrair informações de um orçamento:
     "condicoesPagamento": "45 DIAS APÓS ENTREGA COM NF",
     "prazoEntrega": "45 DIAS APÓS CONFIRMAÇÃO",
     "observacoes": ""
-  }
+  },
+  "camposFaltantes": [] // Lista de campos obrigatórios que estão faltando
+}
+
+Se faltarem informações obrigatórias, responda com:
+{
+  "action": "requestInfo",
+  "message": "Preciso de mais informações para prosseguir.",
+  "camposFaltantes": ["nome", "cnpj"] // Lista de campos obrigatórios que estão faltando
 }
 
 Para editar, use os mesmos formatos acima, mas com a action "updateCliente", "updateProduto" ou "updateOrcamento", e inclua o ID do item a ser editado.
@@ -228,6 +332,7 @@ IMPORTANTE: Não use blocos de código markdown (\`\`\`). Retorne apenas o JSON 
 Preencha todos os campos necessários. Se alguma informação estiver faltando no pedido do usuário, crie dados fictícios plausíveis baseados no contexto.
 `
 
+// Modificar a função generateWithGemini para incluir instruções sobre verificar clientes e produtos existentes
 export async function generateWithGemini(
   prompt: string,
   clientes: Cliente[] = [],
@@ -237,6 +342,7 @@ export async function generateWithGemini(
   message: string
   data?: any
   action?: string
+  camposFaltantes?: string[]
 }> {
   try {
     const apiKey = await getGeminiApiKey()
@@ -250,12 +356,12 @@ export async function generateWithGemini(
     // Criar listas de clientes e produtos para incluir no prompt
     const clientesLista =
       clientes.length > 0
-        ? `Clientes existentes: ${clientes.map((c) => c.nome).join(", ")}`
+        ? `Clientes existentes: ${clientes.map((c) => `${c.codigo} - ${c.nome}`).join(", ")}`
         : "Não há clientes cadastrados."
 
     const produtosLista =
       produtos.length > 0
-        ? `Produtos existentes: ${produtos.map((p) => p.nome).join(", ")}`
+        ? `Produtos existentes: ${produtos.map((p) => `${p.codigo} - ${p.nome}`).join(", ")}`
         : "Não há produtos cadastrados."
 
     // Adicionar as listas ao prompt do sistema
@@ -265,6 +371,7 @@ ${clientesLista}
 ${produtosLista}
 
 Lembre-se de verificar se o cliente ou produto já existe antes de sugerir criar um novo.
+Lembre-se de verificar se todas as informações obrigatórias estão presentes.
 `
 
     // Generate content using the correct format for Gemini API
@@ -305,6 +412,7 @@ Lembre-se de verificar se o cliente ou produto já existe antes de sugerir criar
         message: "Conteúdo gerado com sucesso!",
         data: jsonResponse.data,
         action: jsonResponse.action,
+        camposFaltantes: jsonResponse.camposFaltantes || [],
       }
     } catch (parseError) {
       console.error("Erro ao parsear resposta JSON:", parseError)
@@ -462,7 +570,7 @@ IMPORTANTE: Não use blocos de código markdown (\`\`\`). Retorne apenas o JSON 
   }
 }
 
-// Modificar a função processGeminiAction para verificar a existência de clientes e produtos
+// Modificar a função processGeminiAction para verificar campos obrigatórios
 export async function processGeminiAction(
   action: string,
   data: any,
@@ -483,8 +591,29 @@ export async function processGeminiAction(
       })
     }
 
+    // Verificar se há campos obrigatórios faltando
+    if (data.camposFaltantes && data.camposFaltantes.length > 0) {
+      return {
+        success: false,
+        message: `Por favor, forneça as seguintes informações obrigatórias: ${data.camposFaltantes.join(", ")}`,
+      }
+    }
+
     switch (action) {
       case "createCliente": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.nome) camposFaltantes.push("nome")
+        if (!data.cnpj) camposFaltantes.push("cnpj")
+        if (!data.contato) camposFaltantes.push("contato")
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
         // Verificar se o cliente já existe pelo nome
         const clienteExistente = clientes.find((c) => c.nome.toLowerCase() === data.nome.toLowerCase())
 
@@ -495,9 +624,13 @@ export async function processGeminiAction(
           }
         }
 
+        // Obter o próximo código sequencial
+        const codigo = await obterProximoCodigoCliente()
+
         // Create a new client
         const novoCliente: Cliente = {
           id: generateUUID(),
+          codigo,
           nome: data.nome,
           cnpj: data.cnpj || "",
           endereco: data.endereco || "",
@@ -509,6 +642,7 @@ export async function processGeminiAction(
         // Insert into Supabase
         const { error } = await supabase.from("clientes").insert({
           id: novoCliente.id,
+          codigo: novoCliente.codigo,
           nome: novoCliente.nome,
           cnpj: novoCliente.cnpj || null,
           endereco: novoCliente.endereco || null,
@@ -522,10 +656,26 @@ export async function processGeminiAction(
         // Update local state
         setClientes([...clientes, novoCliente])
 
-        return { success: true, message: `Cliente "${novoCliente.nome}" criado com sucesso!` }
+        return { success: true, message: `Cliente "${novoCliente.nome}" (${novoCliente.codigo}) criado com sucesso!` }
       }
 
       case "createProduto": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.nome) camposFaltantes.push("nome")
+        if (!data.valorBase) camposFaltantes.push("valorBase")
+        if (!data.tecidos || data.tecidos.length === 0) camposFaltantes.push("tecidos")
+        if (!data.cores || data.cores.length === 0) camposFaltantes.push("cores")
+        if (!data.tamanhosDisponiveis || data.tamanhosDisponiveis.length === 0)
+          camposFaltantes.push("tamanhosDisponiveis")
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
         // Verificar se o produto já existe pelo nome
         const produtoExistente = produtos.find((p) => p.nome.toLowerCase() === data.nome.toLowerCase())
 
@@ -536,9 +686,13 @@ export async function processGeminiAction(
           }
         }
 
+        // Obter o próximo código sequencial
+        const codigo = await obterProximoCodigoProduto()
+
         // Create a new product
         const novoProduto: Produto = {
           id: generateUUID(),
+          codigo,
           nome: data.nome,
           valorBase: data.valorBase || 0,
           tecidos: data.tecidos || [],
@@ -549,6 +703,7 @@ export async function processGeminiAction(
         // Insert into Supabase
         const { error: produtoError } = await supabase.from("produtos").insert({
           id: novoProduto.id,
+          codigo: novoProduto.codigo,
           nome: novoProduto.nome,
           valor_base: novoProduto.valorBase,
           cores: novoProduto.cores,
@@ -573,10 +728,30 @@ export async function processGeminiAction(
         // Update local state
         setProdutos([...produtos, novoProduto])
 
-        return { success: true, message: `Produto "${novoProduto.nome}" criado com sucesso!` }
+        return { success: true, message: `Produto "${novoProduto.nome}" (${novoProduto.codigo}) criado com sucesso!` }
       }
 
       case "createOrcamento": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.cliente) camposFaltantes.push("cliente")
+        if (!data.itens || data.itens.length === 0) camposFaltantes.push("itens")
+
+        if (data.itens && data.itens.length > 0) {
+          data.itens.forEach((item: any, index: number) => {
+            if (!item.produto) camposFaltantes.push(`itens[${index}].produto`)
+            if (!item.quantidade) camposFaltantes.push(`itens[${index}].quantidade`)
+            if (!item.valorUnitario) camposFaltantes.push(`itens[${index}].valorUnitario`)
+          })
+        }
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
         // Find the client by name
         let clienteId = ""
         const cliente = clientes.find((c) => c.nome.toLowerCase() === data.cliente.toLowerCase())
@@ -685,7 +860,6 @@ export async function processGeminiAction(
         return { success: true, message: `Orçamento "${novoOrcamento.numero}" criado com sucesso!` }
       }
 
-      // Add case for extractOrcamento
       case "extractOrcamento": {
         // Check if we need to create a new client
         let cliente: Cliente | undefined
