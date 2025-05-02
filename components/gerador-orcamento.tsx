@@ -14,6 +14,8 @@ import { supabase } from "@/lib/supabase"
 import { mockClientes, mockProdutos } from "@/lib/mock-data"
 // Adicionar o import para o novo componente
 import ListaOrcamentos from "@/components/lista-orcamentos"
+// Import the AssistenteIA component at the top of the file with the other imports
+import AssistenteIA from "@/components/assistente-ia"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -36,6 +38,7 @@ export default function GeradorOrcamento() {
     condicoesPagamento: "À vista",
     prazoEntrega: "30 dias",
     validadeOrcamento: "15 dias",
+    status: "proposta", // Adicionar status padrão
   })
   const [isPrinting, setIsPrinting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -112,6 +115,7 @@ export default function GeradorOrcamento() {
         condicoesPagamento: "À vista",
         prazoEntrega: "30 dias",
         validadeOrcamento: "15 dias",
+        status: "proposta", // Adicionar status padrão
       })
       setOrcamentoSalvo(null)
       setCriandoNovoOrcamento(true)
@@ -411,6 +415,7 @@ export default function GeradorOrcamento() {
           condicoes_pagamento: orcamento.condicoesPagamento,
           prazo_entrega: orcamento.prazoEntrega,
           validade_orcamento: orcamento.validadeOrcamento,
+          status: orcamento.status || "proposta", // Adicionar status
           // Garantir que o JSON seja válido
           itens: JSON.stringify(orcamento.itens || []),
         })
@@ -570,6 +575,7 @@ export default function GeradorOrcamento() {
           condicoes_pagamento: orcamento.condicoesPagamento,
           prazo_entrega: orcamento.prazoEntrega,
           validade_orcamento: orcamento.validadeOrcamento,
+          status: orcamento.status || "proposta", // Adicionar status
           // Garantir que o JSON seja válido
           itens: JSON.stringify(orcamento.itens || []),
           updated_at: new Date().toISOString(),
@@ -900,6 +906,7 @@ export default function GeradorOrcamento() {
         condicoesPagamento: data.condicoes_pagamento || "À vista",
         prazoEntrega: data.prazo_entrega || "15 dias",
         validadeOrcamento: data.validade_orcamento || "15 dias",
+        status: data.status || "proposta",
       })
 
       setOrcamentoSalvo(data.id)
@@ -1029,6 +1036,53 @@ export default function GeradorOrcamento() {
     }
   }
 
+  // Adicionar após a função excluirOrcamento
+  const atualizarStatusOrcamento = async (orcamentoId: string, novoStatus: string) => {
+    try {
+      setIsLoading(true)
+
+      const { error } = await supabase.from("orcamentos").update({ status: novoStatus }).eq("id", orcamentoId)
+
+      if (error) {
+        console.error("Erro ao atualizar status do orçamento:", error)
+        setFeedbackSalvamento({
+          visivel: true,
+          sucesso: false,
+          mensagem: `Erro ao atualizar status: ${error.message}`,
+        })
+        return
+      }
+
+      // Se o orçamento atual for o que está sendo atualizado, atualizar o estado
+      if (orcamento.id === orcamentoId) {
+        setOrcamento({
+          ...orcamento,
+          status: novoStatus,
+        })
+      }
+
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: "Status atualizado com sucesso!",
+      })
+
+      // Recarregar a lista de orçamentos
+      if (recarregarOrcamentosRef.current) {
+        await recarregarOrcamentosRef.current()
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: false,
+        mensagem: `Erro ao atualizar status: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6 py-6">
       <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm">
@@ -1152,6 +1206,7 @@ export default function GeradorOrcamento() {
                       setAbaAtiva("orcamento")
                     }}
                     onDeleteOrcamento={excluirOrcamento}
+                    onUpdateStatus={atualizarStatusOrcamento}
                     reloadRef={recarregarOrcamentosRef}
                   />
                 </CardContent>
@@ -1190,6 +1245,15 @@ export default function GeradorOrcamento() {
           </div>
         </div>
       </div>
+      <AssistenteIA
+        clientes={clientes}
+        produtos={produtos}
+        orcamento={orcamento}
+        setClientes={setClientes}
+        setProdutos={setProdutos}
+        setOrcamento={setOrcamento}
+        setAbaAtiva={setAbaAtiva}
+      />
     </div>
   )
 }

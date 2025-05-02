@@ -55,4 +55,5 @@ export type Orcamento = {
   condicoesPagamento: string
   prazoEntrega: string
   validadeOrcamento: string
+  status?: string // Adicionar campo de status
 }

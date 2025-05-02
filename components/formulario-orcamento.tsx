@@ -30,6 +30,7 @@ interface FormularioOrcamentoProps {
   removerItem: (id: string) => void
   atualizarItem: (id: string, item: Partial<ItemOrcamento>) => void
   calcularTotal: () => number
+  handleClienteChange: (clienteId: string) => void
 }
 
 // Update the tamanhosPadrao object to include all possible sizes
@@ -100,9 +101,9 @@ const EstampaInput = ({
   estampas?: Estampa[]
   onChange: (estampas: Estampa[]) => void
 }) => {
-  // Função para gerar um ID único
+  // Função para gerar um UUID válido em vez de um ID personalizado
   const generateId = () => {
-    return "estampa-" + Math.random().toString(36).substr(2, 9)
+    return generateUUID()
   }
 
   // Adicionar uma nova estampa
@@ -143,7 +144,7 @@ const EstampaInput = ({
         <div key={estampa.id} className="border rounded-md p-3 bg-accent/30 relative">
           <button
             type="button"
-            onClick={() => removerEstampa(estampa.id)}
+            onClick={() => removerEstampa(estampa.id!)}
             className="absolute top-2 right-2 text-gray-500 hover:text-red-500 bg-white rounded-full p-1 shadow-sm"
           >
             <X className="h-4 w-4" />
@@ -158,7 +159,7 @@ const EstampaInput = ({
               </Label>
               <Select
                 value={estampa.posicao || ""}
-                onValueChange={(value) => atualizarEstampa(estampa.id, "posicao", value)}
+                onValueChange={(value) => atualizarEstampa(estampa.id!, "posicao", value)}
               >
                 <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
                   <SelectValue placeholder="Selecione a posição" />
@@ -177,7 +178,10 @@ const EstampaInput = ({
               <Label htmlFor={`estampa-tipo-${estampa.id}`} className="text-primary mb-1.5">
                 Tipo
               </Label>
-              <Select value={estampa.tipo || ""} onValueChange={(value) => atualizarEstampa(estampa.id, "tipo", value)}>
+              <Select
+                value={estampa.tipo || ""}
+                onValueChange={(value) => atualizarEstampa(estampa.id!, "tipo", value)}
+              >
                 <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
@@ -199,7 +203,7 @@ const EstampaInput = ({
                 id={`estampa-largura-${estampa.id}`}
                 type="number"
                 value={estampa.largura || ""}
-                onChange={(e) => atualizarEstampa(estampa.id, "largura", Number(e.target.value))}
+                onChange={(e) => atualizarEstampa(estampa.id!, "largura", Number(e.target.value))}
                 className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                 placeholder="0"
                 min="0"
@@ -221,42 +225,6 @@ const EstampaInput = ({
     </div>
   )
 }
-
-// Componente isolado para o campo de descrição da estampa
-// const DescricaoEstampaInput = ({
-//   value,
-//   onChange,
-// }: {
-//   value: string
-//   onChange: (value: string) => void
-// }) => {
-//   const [localValue, setLocalValue] = useState(value || "")
-
-//   // Sincroniza o valor local quando o valor externo muda
-//   useEffect(() => {
-//     setLocalValue(value || "")
-//   }, [value])
-
-//   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-//     const newValue = e.target.value
-//     setLocalValue(newValue)
-//   }
-
-//   const handleBlur = () => {
-//     onChange(localValue)
-//   }
-
-//   return (
-//     <Textarea
-//       value={localValue}
-//       onChange={handleChange}
-//       onBlur={handleBlur}
-//       placeholder="Descreva os detalhes da estampa (posição, cores, tamanho, etc.)"
-//       className="mt-1 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-//       rows={3}
-//     />
-//   )
-// }
 
 // Update the renderTabelaTamanhos function to show only the sizes available for the product
 const renderTabelaTamanhos = (
@@ -324,6 +292,7 @@ export default function FormularioOrcamento({
   removerItem,
   atualizarItem,
   calcularTotal,
+  handleClienteChange,
 }: FormularioOrcamentoProps) {
   const [linhaAtiva, setLinhaAtiva] = useState<string | null>(null)
   const [editandoItem, setEditandoItem] = useState<string | null>(null)
@@ -352,11 +321,6 @@ export default function FormularioOrcamento({
       // Produto selecionado, mostrar tabela de tamanhos
     }
   }, [novoItem.produtoId])
-
-  const handleClienteChange = (clienteId: string) => {
-    const cliente = clientes.find((c) => c.id === clienteId) || null
-    atualizarOrcamento({ cliente })
-  }
 
   const handleProdutoChange = async (produtoId: string) => {
     try {
@@ -617,21 +581,6 @@ export default function FormularioOrcamento({
     }
   }
 
-  // Manipuladores para descrição da estampa
-  // const handleDescricaoEstampaChange = (descricao: string) => {
-  //   if (editandoItem && itemEmEdicao) {
-  //     setItemEmEdicao({
-  //       ...itemEmEdicao,
-  //       descricaoEstampa: descricao,
-  //     })
-  //   } else {
-  //     setNovoItem({
-  //       ...novoItem,
-  //       descricaoEstampa: descricao,
-  //     })
-  //   }
-  // }
-
   // Componente para gerenciar imagem (upload, prévia, remoção)
   const GerenciadorImagem = ({
     imagem,
@@ -720,10 +669,26 @@ export default function FormularioOrcamento({
           </Label>
           <Input
             id="numero"
-            value={orcamento.numero}
-            onChange={(e) => atualizarOrcamento({ numero: e.target.value })}
+            value={orcamento.numero.split(" - ")[0]} // Extrair apenas o número
+            onChange={(e) => {
+              // Preservar o restante do formato ao atualizar apenas o número
+              const numeroAtual = e.target.value
+              const partes = orcamento.numero.split(" - ")
+
+              // Se tiver o formato padrão, manter a parte após o número
+              if (partes.length > 1) {
+                atualizarOrcamento({ numero: `${numeroAtual} - ${partes.slice(1).join(" - ")}` })
+              } else {
+                // Caso não tenha o formato padrão, usar apenas o número
+                atualizarOrcamento({ numero: numeroAtual })
+              }
+            }}
             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+            placeholder="Apenas o número"
           />
+          {orcamento.numero.includes(" - ") && (
+            <p className="text-xs text-gray-500 mt-1">Formato completo: {orcamento.numero}</p>
+          )}
         </div>
         <div>
           <Label htmlFor="data" className="text-primary mb-1.5">

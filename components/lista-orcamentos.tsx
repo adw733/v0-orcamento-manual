@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { FileText, Search, Calendar, Building, DollarSign, Loader2, PlusCircle, Eye, Edit, Trash2 } from "lucide-react"
+import { FileText, Search, Calendar, Building, Loader2, PlusCircle, Eye, Trash2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { Orcamento } from "@/types/types"
 
@@ -14,6 +14,7 @@ interface ListaOrcamentosProps {
   onSelectOrcamento: (orcamentoId: string) => void
   onNovoOrcamento: () => void
   onDeleteOrcamento: (orcamentoId: string) => Promise<void>
+  onUpdateStatus?: (orcamentoId: string, status: string) => Promise<void>
   reloadRef?: React.MutableRefObject<(() => Promise<void>) | null>
 }
 
@@ -22,10 +23,12 @@ export default function ListaOrcamentos({
   onNovoOrcamento,
   onDeleteOrcamento,
   reloadRef,
+  onUpdateStatus,
 }: ListaOrcamentosProps) {
   const [orcamentos, setOrcamentos] = useState<Partial<Orcamento>[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("todos")
   const [error, setError] = useState<string | null>(null)
 
   // Expor a função de recarregar para o componente pai
@@ -46,7 +49,7 @@ export default function ListaOrcamentos({
 
       const { data, error } = await supabase
         .from("orcamentos")
-        .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens, created_at, updated_at")
+        .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens, created_at, updated_at, status")
         .order("created_at", { ascending: false })
 
       if (error) {
@@ -92,6 +95,7 @@ export default function ListaOrcamentos({
           itens: Array.isArray(itensParseados) ? itensParseados : [],
           created_at: orcamento.created_at,
           updated_at: orcamento.updated_at,
+          status: orcamento.status || "proposta", // Definir "proposta" como padrão se não houver status
         }
       })
 
@@ -112,16 +116,47 @@ export default function ListaOrcamentos({
     }, 0)
   }
 
-  const filtrarOrcamentos = () => {
-    if (!searchTerm) return orcamentos
+  const atualizarStatusOrcamento = async (orcamentoId: string, novoStatus: string) => {
+    try {
+      const { error } = await supabase.from("orcamentos").update({ status: novoStatus }).eq("id", orcamentoId)
 
-    const termLower = searchTerm.toLowerCase()
-    return orcamentos.filter(
-      (orcamento) =>
-        orcamento.numero?.toLowerCase().includes(termLower) ||
-        orcamento.cliente?.nome.toLowerCase().includes(termLower) ||
-        orcamento.cliente?.cnpj.toLowerCase().includes(termLower),
-    )
+      if (error) {
+        console.error("Erro ao atualizar status:", error)
+        return
+      }
+
+      // Atualizar o status localmente
+      setOrcamentos(orcamentos.map((orc) => (orc.id === orcamentoId ? { ...orc, status: novoStatus } : orc)))
+
+      // Chamar a função de callback se existir
+      if (onUpdateStatus) {
+        await onUpdateStatus(orcamentoId, novoStatus)
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error)
+    }
+  }
+
+  const filtrarOrcamentos = () => {
+    let resultado = orcamentos
+
+    // Filtrar por termo de busca
+    if (searchTerm) {
+      const termLower = searchTerm.toLowerCase()
+      resultado = resultado.filter(
+        (orcamento) =>
+          orcamento.numero?.toLowerCase().includes(termLower) ||
+          orcamento.cliente?.nome.toLowerCase().includes(termLower) ||
+          orcamento.cliente?.cnpj.toLowerCase().includes(termLower),
+      )
+    }
+
+    // Filtrar por status
+    if (statusFilter !== "todos") {
+      resultado = resultado.filter((orcamento) => orcamento.status === statusFilter)
+    }
+
+    return resultado
   }
 
   const formatarData = (dataString?: string) => {
@@ -142,14 +177,61 @@ export default function ListaOrcamentos({
         </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Buscar por número, cliente ou CNPJ..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-        />
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar por número, cliente ou CNPJ..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={statusFilter === "todos" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("todos")}
+            className={statusFilter === "todos" ? "bg-primary text-white" : ""}
+          >
+            Todos
+          </Button>
+          <Button
+            variant={statusFilter === "proposta" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("proposta")}
+            className={
+              statusFilter === "proposta" ? "bg-blue-500 text-white" : "text-blue-500 border-blue-500 hover:bg-blue-50"
+            }
+          >
+            Proposta
+          </Button>
+          <Button
+            variant={statusFilter === "execucao" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("execucao")}
+            className={
+              statusFilter === "execucao"
+                ? "bg-amber-500 text-white"
+                : "text-amber-500 border-amber-500 hover:bg-amber-50"
+            }
+          >
+            Em Execução
+          </Button>
+          <Button
+            variant={statusFilter === "finalizado" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("finalizado")}
+            className={
+              statusFilter === "finalizado"
+                ? "bg-green-500 text-white"
+                : "text-green-500 border-green-500 hover:bg-green-50"
+            }
+          >
+            Finalizado
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -174,43 +256,59 @@ export default function ListaOrcamentos({
         ) : filtrarOrcamentos().length > 0 ? (
           filtrarOrcamentos().map((orcamento) => (
             <Card key={orcamento.id} className="overflow-hidden shadow-sm border-0 hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
+              <CardContent className="p-3">
                 <div className="flex justify-between items-start">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2">
                     <div className="bg-primary text-white p-2 rounded-full">
-                      <FileText className="h-5 w-5" />
+                      <FileText className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900">{orcamento.numero}</h4>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-gray-900">{orcamento.numero}</h4>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                         <Calendar className="h-3 w-3" />
                         <span>{formatarData(orcamento.data)}</span>
+                        <span>•</span>
+                        <Building className="h-3 w-3" />
+                        <span>{orcamento.cliente?.nome || "Cliente não especificado"}</span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-medium text-primary px-2 py-1 bg-primary/5 rounded-md">
+                      R$ {calcularTotal(orcamento).toFixed(2)}
+                    </div>
+                    <select
+                      value={orcamento.status || "proposta"}
+                      onChange={(e) => atualizarStatusOrcamento(orcamento.id!, e.target.value)}
+                      className={`text-xs font-medium px-2 py-1 rounded-full border ${
+                        orcamento.status === "proposta"
+                          ? "bg-blue-100 text-blue-700 border-blue-300"
+                          : orcamento.status === "execucao"
+                            ? "bg-amber-100 text-amber-700 border-amber-300"
+                            : orcamento.status === "finalizado"
+                              ? "bg-green-100 text-green-700 border-green-300"
+                              : "bg-gray-100 text-gray-700 border-gray-300"
+                      }`}
+                    >
+                      <option value="proposta">Proposta</option>
+                      <option value="execucao">Em Execução</option>
+                      <option value="finalizado">Finalizado</option>
+                    </select>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => orcamento.id && onSelectOrcamento(orcamento.id)}
                       className="text-primary border-primary hover:bg-primary/10"
                     >
-                      <Eye className="h-4 w-4 mr-1" /> Visualizar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => orcamento.id && onSelectOrcamento(orcamento.id)}
-                      className="text-success border-success hover:bg-success/10"
-                    >
-                      <Edit className="h-4 w-4 mr-1" /> Editar
+                      <Eye className="h-4 w-4 mr-1" /> Ver
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
                         if (orcamento.id) {
-                          // Confirmar antes de excluir
                           if (
                             window.confirm(
                               "Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.",
@@ -222,49 +320,13 @@ export default function ListaOrcamentos({
                       }}
                       className="text-destructive border-destructive hover:bg-destructive/10"
                     >
-                      <Trash2 className="h-4 w-4 mr-1" /> Excluir
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-                <div className="mt-3 text-sm grid grid-cols-1 md:grid-cols-3 gap-2 bg-accent/50 p-3 rounded-md">
-                  <div>
-                    <p className="flex items-center gap-2">
-                      <Building className="h-3 w-3 text-gray-500" />
-                      <span className="font-medium">{orcamento.cliente?.nome || "Cliente não especificado"}</span>
-                    </p>
-                    {orcamento.cliente?.cnpj && <p className="text-xs text-gray-500 ml-5">{orcamento.cliente.cnpj}</p>}
-                  </div>
-                  <div>
-                    <p className="flex items-center gap-2">
-                      <span className="text-gray-500">Data:</span>
-                      <span className="font-medium">
-                        {orcamento.updated_at
-                          ? new Date(orcamento.updated_at).toLocaleString("pt-BR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : orcamento.created_at
-                            ? new Date(orcamento.created_at).toLocaleString("pt-BR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : "Data não disponível"}
-                      </span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="flex items-center gap-2 font-medium">
-                      <DollarSign className="h-3 w-3 text-gray-500" />
-                      <span>R$ {calcularTotal(orcamento).toFixed(2)}</span>
-                    </p>
-                  </div>
-                </div>
+                {orcamento.cliente?.cnpj && (
+                  <div className="mt-1 ml-8 text-xs text-gray-500">CNPJ: {orcamento.cliente.cnpj}</div>
+                )}
               </CardContent>
             </Card>
           ))
