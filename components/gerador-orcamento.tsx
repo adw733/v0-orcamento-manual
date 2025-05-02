@@ -57,6 +57,69 @@ export default function GeradorOrcamento() {
 
   const documentoRef = useRef<HTMLDivElement>(null)
 
+  // Função para obter o próximo número de orçamento
+  const obterProximoNumeroOrcamento = async (): Promise<string> => {
+    try {
+      // Buscar o último orçamento para obter o número mais recente
+      const { data, error } = await supabase
+        .from("orcamentos")
+        .select("numero")
+        .order("created_at", { ascending: false })
+        .limit(1)
+
+      if (error) {
+        console.error("Erro ao buscar último número de orçamento:", error)
+        // Se houver erro, começar do 0140
+        return "0140"
+      }
+
+      if (data && data.length > 0) {
+        // Extrair o número do formato "XXXX - ..."
+        const ultimoNumero = data[0].numero.split(" - ")[0]
+        // Verificar se é um número válido
+        const numeroAtual = Number.parseInt(ultimoNumero, 10)
+
+        if (!isNaN(numeroAtual)) {
+          // Incrementar e formatar com zeros à esquerda
+          const proximoNumero = (numeroAtual + 1).toString().padStart(4, "0")
+          return proximoNumero
+        }
+      }
+
+      // Se não houver orçamentos ou o formato for inválido, começar do 0140
+      return "0140"
+    } catch (error) {
+      console.error("Erro ao obter próximo número de orçamento:", error)
+      return "0140"
+    }
+  }
+
+  const criarNovoOrcamento = async () => {
+    try {
+      setIsLoading(true)
+
+      // Obter o próximo número de orçamento
+      const proximoNumero = await obterProximoNumeroOrcamento()
+
+      setOrcamento({
+        numero: proximoNumero + " - ", // O restante será preenchido quando o cliente for selecionado
+        data: new Date().toISOString().split("T")[0],
+        cliente: null,
+        itens: [],
+        observacoes: "",
+        condicoesPagamento: "À vista",
+        prazoEntrega: "30 dias",
+        validadeOrcamento: "15 dias",
+      })
+      setOrcamentoSalvo(null)
+      setCriandoNovoOrcamento(true)
+    } catch (error) {
+      console.error("Erro ao criar novo orçamento:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Carregar orçamento salvo, se houver
   useEffect(() => {
     const carregarOrcamentoSalvo = async () => {
@@ -69,6 +132,7 @@ export default function GeradorOrcamento() {
 
         if (error) {
           console.warn("Erro ao carregar orçamento do Supabase:", error)
+          await criarNovoOrcamento()
           return
         }
 
@@ -78,7 +142,7 @@ export default function GeradorOrcamento() {
           // Verificar se o cliente existe
           if (!orcamentoData.cliente) {
             console.warn("Cliente não encontrado para este orçamento, criando novo orçamento")
-            criarNovoOrcamento()
+            await criarNovoOrcamento()
             return
           }
 
@@ -150,11 +214,14 @@ export default function GeradorOrcamento() {
           })
 
           setOrcamentoSalvo(orcamentoData.id)
+        } else {
+          // Se não houver orçamentos, criar um novo
+          await criarNovoOrcamento()
         }
       } catch (error) {
         console.error("Erro ao carregar orçamento:", error)
         // Em caso de erro, criar um novo orçamento
-        criarNovoOrcamento()
+        await criarNovoOrcamento()
       }
     }
 
@@ -338,9 +405,12 @@ export default function GeradorOrcamento() {
         }
       }
 
-      // Gerar um novo número de orçamento baseado na data atual
-      const novoNumero =
-        "ORC-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 1000)).padStart(3, "0")
+      // Obter o próximo número de orçamento
+      const proximoNumero = await obterProximoNumeroOrcamento()
+
+      // Formatar o número do orçamento com os dados do cliente e do primeiro item
+      const itemDescricao = orcamento.itens.length > 0 ? orcamento.itens[0].produto?.nome || "Item" : "Item"
+      const novoNumero = `${proximoNumero} - ${itemDescricao} ${orcamento.cliente.nome} ${orcamento.cliente.contato}`
 
       // Criar novo orçamento
       const { data, error } = await supabase
@@ -409,6 +479,7 @@ export default function GeradorOrcamento() {
             descricao_estampa: item.descricaoEstampa,
             tamanhos: item.tamanhos,
             imagem: item.imagem,
+            observacao: item.observacao, // Add this line
           })
         }
 
@@ -433,7 +504,7 @@ export default function GeradorOrcamento() {
       setFeedbackSalvamento({
         visivel: true,
         sucesso: false,
-        mensagem: `Erro ao salvar orçamento: ${error instanceof Error ? error.message : "Tente novamente"}`,
+        mensagem: `Erro ao salvar o orçamento: ${error instanceof Error ? error.message : "Tente novamente"}`,
       })
     } finally {
       setIsLoading(false)
@@ -525,9 +596,19 @@ export default function GeradorOrcamento() {
 
   const adicionarItem = async (item: ItemOrcamento) => {
     const itensAtualizados = [...orcamento.itens, item]
+
+    // Atualizar o número do orçamento com o nome do primeiro item
+    let novoNumero = orcamento.numero
+    if (itensAtualizados.length === 1 && orcamento.cliente) {
+      const numeroBase = orcamento.numero.split(" - ")[0]
+      const itemDescricao = item.produto?.nome || "Item"
+      novoNumero = `${numeroBase} - ${itemDescricao} ${orcamento.cliente.nome} ${orcamento.cliente.contato}`
+    }
+
     setOrcamento({
       ...orcamento,
       itens: itensAtualizados,
+      numero: novoNumero,
     })
 
     // Salvar no Supabase se houver orçamento salvo
@@ -547,9 +628,13 @@ export default function GeradorOrcamento() {
           descricao_estampa: item.descricaoEstampa,
           tamanhos: item.tamanhos,
           imagem: item.imagem,
+          observacao: item.observacao, // Add this line
         })
 
         if (error) throw error
+
+        // Atualizar também o número do orçamento no banco de dados
+        await supabase.from("orcamentos").update({ numero: novoNumero }).eq("id", orcamentoSalvo)
       } catch (error) {
         console.error("Erro ao adicionar item:", error)
       } finally {
@@ -607,6 +692,7 @@ export default function GeradorOrcamento() {
               descricao_estampa: itemAtualizado.descricaoEstampa,
               tamanhos: itemAtualizado.tamanhos,
               imagem: itemAtualizado.imagem,
+              observacao: itemAtualizado.observacao, // Add this line
             })
             .eq("id", id)
 
@@ -750,22 +836,6 @@ export default function GeradorOrcamento() {
     }
   }
 
-  // Adicionar a função para criar um novo orçamento
-  const criarNovoOrcamento = () => {
-    setOrcamento({
-      numero: "ORC-" + new Date().getFullYear() + "-" + String(Math.floor(Math.random() * 1000)).padStart(3, "0"),
-      data: new Date().toISOString().split("T")[0],
-      cliente: null,
-      itens: [],
-      observacoes: "",
-      condicoesPagamento: "À vista",
-      prazoEntrega: "30 dias",
-      validadeOrcamento: "15 dias",
-    })
-    setOrcamentoSalvo(null)
-    setCriandoNovoOrcamento(true)
-  }
-
   const handleClienteChange = (clienteId: string) => {
     const cliente = clientes.find((c) => c.id === clienteId) || null
 
@@ -781,30 +851,41 @@ export default function GeradorOrcamento() {
             console.warn("Cliente não encontrado no banco de dados, será criado ao salvar o orçamento")
           }
         })
-    }
 
-    atualizarOrcamento({ cliente })
+      // Atualizar o número do orçamento com os dados do cliente
+      const numeroBase = orcamento.numero.split(" - ")[0]
+      const itemDescricao = orcamento.itens.length > 0 ? orcamento.itens[0].produto?.nome || "Item" : "Item"
+      const novoNumero = `${numeroBase} - ${itemDescricao} ${cliente.nome} ${cliente.contato}`
+
+      atualizarOrcamento({
+        cliente,
+        numero: novoNumero,
+      })
+    } else {
+      atualizarOrcamento({ cliente })
+    }
   }
 
   // Adicionar a função para excluir um orçamento
   const excluirOrcamento = async (orcamentoId: string) => {
-    // Confirmar antes de excluir
-    if (!window.confirm("Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.")) {
-      return
-    }
-
     try {
       setIsLoading(true)
 
       // Primeiro, excluir todos os itens do orçamento
       const { error: itensError } = await supabase.from("itens_orcamento").delete().eq("orcamento_id", orcamentoId)
 
-      if (itensError) throw itensError
+      if (itensError) {
+        console.error("Erro ao excluir itens do orçamento:", itensError)
+        throw itensError
+      }
 
       // Em seguida, excluir o orçamento
       const { error } = await supabase.from("orcamentos").delete().eq("id", orcamentoId)
 
-      if (error) throw error
+      if (error) {
+        console.error("Erro ao excluir orçamento:", error)
+        throw error
+      }
 
       // Se o orçamento excluído for o atual, criar um novo
       if (orcamentoSalvo === orcamentoId) {
@@ -817,6 +898,16 @@ export default function GeradorOrcamento() {
         sucesso: true,
         mensagem: "Orçamento excluído com sucesso!",
       })
+
+      // Recarregar a lista de orçamentos
+      const { data: orcamentosAtualizados, error: orcamentosError } = await supabase
+        .from("orcamentos")
+        .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens")
+        .order("created_at", { ascending: false })
+
+      if (orcamentosError) {
+        console.error("Erro ao recarregar orçamentos:", orcamentosError)
+      }
     } catch (error) {
       console.error("Erro ao excluir orçamento:", error)
       setFeedbackSalvamento({

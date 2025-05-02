@@ -195,7 +195,18 @@ export default function ListaOrcamentos({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => orcamento.id && onDeleteOrcamento(orcamento.id)}
+                      onClick={() => {
+                        if (orcamento.id) {
+                          // Confirmar antes de excluir
+                          if (
+                            window.confirm(
+                              "Tem certeza que deseja excluir este orçamento? Esta ação não pode ser desfeita.",
+                            )
+                          ) {
+                            onDeleteOrcamento(orcamento.id)
+                          }
+                        }
+                      }}
                       className="text-destructive border-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="h-4 w-4 mr-1" /> Excluir

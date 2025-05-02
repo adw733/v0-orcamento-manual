@@ -554,39 +554,160 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                         <Ruler className="h-4 w-4" />
                         Tamanhos Disponíveis
                       </Label>
-                      <div className="mt-2 space-y-2">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Tamanho (ex: PP, P, M...)"
-                            value={novoTamanho}
-                            onChange={(e) => setNovoTamanho(e.target.value)}
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                          <Button
-                            onClick={adicionarTamanho}
-                            className="bg-primary hover:bg-primary-dark text-white"
-                            disabled={!novoTamanho}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
-                          {produtoEditando.tamanhosDisponiveis.map((tamanho, index) => (
-                            <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                              <span className="text-sm font-medium">{tamanho}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removerTamanho(index)}
-                                className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
+                      <div className="mt-2 space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="border rounded-md p-3 bg-white">
+                            <div className="flex items-center mb-2">
+                              <input
+                                type="radio"
+                                id={editandoId ? `tamanho-tipo-1-edit` : `tamanho-tipo-1-novo`}
+                                name={editandoId ? `tamanho-tipo-edit` : `tamanho-tipo-novo`}
+                                className="mr-2"
+                                checked={(editandoId
+                                  ? produtoEditando?.tamanhosDisponiveis
+                                  : novoProduto.tamanhosDisponiveis || []
+                                ).some((t) =>
+                                  ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].includes(t),
+                                )}
+                                onChange={() => {
+                                  if (editandoId && produtoEditando) {
+                                    setProdutoEditando({
+                                      ...produtoEditando,
+                                      tamanhosDisponiveis: [
+                                        "PP",
+                                        "P",
+                                        "M",
+                                        "G",
+                                        "GG",
+                                        "G1",
+                                        "G2",
+                                        "G3",
+                                        "G4",
+                                        "G5",
+                                        "G6",
+                                        "G7",
+                                      ],
+                                    })
+                                  } else {
+                                    setNovoProduto({
+                                      ...novoProduto,
+                                      tamanhosDisponiveis: [
+                                        "PP",
+                                        "P",
+                                        "M",
+                                        "G",
+                                        "GG",
+                                        "G1",
+                                        "G2",
+                                        "G3",
+                                        "G4",
+                                        "G5",
+                                        "G6",
+                                        "G7",
+                                      ],
+                                    })
+                                  }
+                                }}
+                              />
+                              <Label
+                                htmlFor={editandoId ? `tamanho-tipo-1-edit` : `tamanho-tipo-1-novo`}
+                                className="font-medium"
                               >
-                                <X className="h-3 w-3" />
-                              </Button>
+                                Padrão (PP ao G7)
+                              </Label>
                             </div>
-                          ))}
-                          {produtoEditando.tamanhosDisponiveis.length === 0 && (
-                            <p className="text-sm text-gray-500 italic p-2">Nenhum tamanho adicionado</p>
-                          )}
+                            <div className="flex flex-wrap gap-2">
+                              {["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].map((tamanho) => (
+                                <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                                  <span className="text-sm font-medium">{tamanho}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="border rounded-md p-3 bg-white">
+                            <div className="flex items-center mb-2">
+                              <input
+                                type="radio"
+                                id={editandoId ? `tamanho-tipo-2-edit` : `tamanho-tipo-2-novo`}
+                                name={editandoId ? `tamanho-tipo-edit` : `tamanho-tipo-novo`}
+                                className="mr-2"
+                                checked={(editandoId
+                                  ? produtoEditando?.tamanhosDisponiveis
+                                  : novoProduto.tamanhosDisponiveis || []
+                                ).some((t) => t.match(/^(3[6-9]|[4-5][0-9]|6[0-2])$/))}
+                                onChange={() => {
+                                  const numericos = Array.from({ length: 27 }, (_, i) => (i + 36).toString())
+                                  if (editandoId && produtoEditando) {
+                                    setProdutoEditando({
+                                      ...produtoEditando,
+                                      tamanhosDisponiveis: numericos,
+                                    })
+                                  } else {
+                                    setNovoProduto({
+                                      ...novoProduto,
+                                      tamanhosDisponiveis: numericos,
+                                    })
+                                  }
+                                }}
+                              />
+                              <Label
+                                htmlFor={editandoId ? `tamanho-tipo-2-edit` : `tamanho-tipo-2-novo`}
+                                className="font-medium"
+                              >
+                                Numérico (36 ao 62)
+                              </Label>
+                            </div>
+                            <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                              {Array.from({ length: 27 }, (_, i) => (i + 36).toString()).map((tamanho) => (
+                                <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                                  <span className="text-sm font-medium">{tamanho}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="border rounded-md p-3 bg-white">
+                            <div className="flex items-center mb-2">
+                              <input
+                                type="radio"
+                                id={editandoId ? `tamanho-tipo-3-edit` : `tamanho-tipo-3-novo`}
+                                name={editandoId ? `tamanho-tipo-edit` : `tamanho-tipo-novo`}
+                                className="mr-2"
+                                checked={(editandoId
+                                  ? produtoEditando?.tamanhosDisponiveis
+                                  : novoProduto.tamanhosDisponiveis || []
+                                ).some((t) => t.match(/^([0-9]|1[0-3])$/))}
+                                onChange={() => {
+                                  const infantis = Array.from({ length: 14 }, (_, i) => i.toString())
+                                  if (editandoId && produtoEditando) {
+                                    setProdutoEditando({
+                                      ...produtoEditando,
+                                      tamanhosDisponiveis: infantis,
+                                    })
+                                  } else {
+                                    setNovoProduto({
+                                      ...novoProduto,
+                                      tamanhosDisponiveis: infantis,
+                                    })
+                                  }
+                                }}
+                              />
+                              <Label
+                                htmlFor={editandoId ? `tamanho-tipo-3-edit` : `tamanho-tipo-3-novo`}
+                                className="font-medium"
+                              >
+                                Infantil (0 ao 13)
+                              </Label>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {Array.from({ length: 14 }, (_, i) => i.toString()).map((tamanho) => (
+                                <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                                  <span className="text-sm font-medium">{tamanho}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -811,39 +932,97 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                 <Ruler className="h-4 w-4" />
                 Tamanhos Disponíveis
               </Label>
-              <div className="mt-2 space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Tamanho (ex: PP, P, M...)"
-                    value={novoTamanho}
-                    onChange={(e) => setNovoTamanho(e.target.value)}
-                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                  <Button
-                    onClick={adicionarTamanho}
-                    className="bg-primary hover:bg-primary-dark text-white"
-                    disabled={!novoTamanho}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
-                  {(novoProduto.tamanhosDisponiveis || []).map((tamanho, index) => (
-                    <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                      <span className="text-sm font-medium">{tamanho}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removerTamanho(index)}
-                        className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
+              <div className="mt-2 space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="border rounded-md p-3 bg-white">
+                    <div className="flex items-center mb-2">
+                      <input
+                        type="radio"
+                        id={`tamanho-tipo-1-novo`}
+                        name={`tamanho-tipo-novo`}
+                        className="mr-2"
+                        checked={(novoProduto.tamanhosDisponiveis || []).some((t) =>
+                          ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].includes(t),
+                        )}
+                        onChange={() => {
+                          setNovoProduto({
+                            ...novoProduto,
+                            tamanhosDisponiveis: ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"],
+                          })
+                        }}
+                      />
+                      <Label htmlFor={`tamanho-tipo-1-novo`} className="font-medium">
+                        Padrão (PP ao G7)
+                      </Label>
                     </div>
-                  ))}
-                  {(novoProduto.tamanhosDisponiveis || []).length === 0 && (
-                    <p className="text-sm text-gray-500 italic p-2">Nenhum tamanho adicionado</p>
-                  )}
+                    <div className="flex flex-wrap gap-2">
+                      {["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].map((tamanho) => (
+                        <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                          <span className="text-sm font-medium">{tamanho}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border rounded-md p-3 bg-white">
+                    <div className="flex items-center mb-2">
+                      <input
+                        type="radio"
+                        id={`tamanho-tipo-2-novo`}
+                        name={`tamanho-tipo-novo`}
+                        className="mr-2"
+                        checked={(novoProduto.tamanhosDisponiveis || []).some((t) =>
+                          t.match(/^(3[6-9]|[4-5][0-9]|6[0-2])$/),
+                        )}
+                        onChange={() => {
+                          const numericos = Array.from({ length: 27 }, (_, i) => (i + 36).toString())
+                          setNovoProduto({
+                            ...novoProduto,
+                            tamanhosDisponiveis: numericos,
+                          })
+                        }}
+                      />
+                      <Label htmlFor={`tamanho-tipo-2-novo`} className="font-medium">
+                        Numérico (36 ao 62)
+                      </Label>
+                    </div>
+                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                      {Array.from({ length: 27 }, (_, i) => (i + 36).toString()).map((tamanho) => (
+                        <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                          <span className="text-sm font-medium">{tamanho}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border rounded-md p-3 bg-white">
+                    <div className="flex items-center mb-2">
+                      <input
+                        type="radio"
+                        id={`tamanho-tipo-3-novo`}
+                        name={`tamanho-tipo-novo`}
+                        className="mr-2"
+                        checked={(novoProduto.tamanhosDisponiveis || []).some((t) => t.match(/^([0-9]|1[0-3])$/))}
+                        onChange={() => {
+                          const infantis = Array.from({ length: 14 }, (_, i) => i.toString())
+                          setNovoProduto({
+                            ...novoProduto,
+                            tamanhosDisponiveis: infantis,
+                          })
+                        }}
+                      />
+                      <Label htmlFor={`tamanho-tipo-3-novo`} className="font-medium">
+                        Infantil (0 ao 13)
+                      </Label>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.from({ length: 14 }, (_, i) => i.toString()).map((tamanho) => (
+                        <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                          <span className="text-sm font-medium">{tamanho}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

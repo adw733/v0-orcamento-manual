@@ -32,7 +32,9 @@ interface FormularioOrcamentoProps {
   calcularTotal: () => number
 }
 
+// Update the tamanhosPadrao object to include all possible sizes
 const tamanhosPadrao = {
+  // Padrão (PP ao G7)
   PP: 0,
   P: 0,
   M: 0,
@@ -45,6 +47,49 @@ const tamanhosPadrao = {
   G5: 0,
   G6: 0,
   G7: 0,
+  // Numérico (36 ao 62)
+  "36": 0,
+  "37": 0,
+  "38": 0,
+  "39": 0,
+  "40": 0,
+  "41": 0,
+  "42": 0,
+  "43": 0,
+  "44": 0,
+  "45": 0,
+  "46": 0,
+  "47": 0,
+  "48": 0,
+  "49": 0,
+  "50": 0,
+  "51": 0,
+  "52": 0,
+  "53": 0,
+  "54": 0,
+  "55": 0,
+  "56": 0,
+  "57": 0,
+  "58": 0,
+  "59": 0,
+  "60": 0,
+  "61": 0,
+  "62": 0,
+  // Infantil (0 ao 13)
+  "0": 0,
+  "1": 0,
+  "2": 0,
+  "3": 0,
+  "4": 0,
+  "5": 0,
+  "6": 0,
+  "7": 0,
+  "8": 0,
+  "9": 0,
+  "10": 0,
+  "11": 0,
+  "12": 0,
+  "13": 0,
 }
 
 // Componente isolado para o campo de descrição da estampa
@@ -83,6 +128,63 @@ const DescricaoEstampaInput = ({
   )
 }
 
+// Update the renderTabelaTamanhos function to show only the sizes available for the product
+const renderTabelaTamanhos = (
+  tamanhos: Record<string, number>,
+  quantidade: number,
+  isEditing: boolean,
+  onChange: (tamanho: string, valor: number) => void,
+  tamanhosDisponiveis?: string[],
+) => {
+  // Filtrar apenas os tamanhos disponíveis para o produto
+  const tamanhosFiltrados = tamanhosDisponiveis
+    ? Object.fromEntries(Object.entries(tamanhos).filter(([tamanho]) => tamanhosDisponiveis.includes(tamanho)))
+    : tamanhos
+
+  return (
+    <div className="space-y-2">
+      <h4 className="font-medium text-primary">Tamanhos</h4>
+      <div className="border border-gray-200 rounded-md">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-accent">
+              <th className="border-b p-1 text-center font-medium text-xs text-primary w-[5%]">TAM.</th>
+              {Object.keys(tamanhosFiltrados).map((tamanho) => (
+                <th
+                  key={`header-${tamanho}`}
+                  className="border-b p-1 text-center font-medium text-xs text-primary w-[7%]"
+                >
+                  {tamanho}
+                </th>
+              ))}
+              <th className="border-b p-1 text-center font-medium text-xs text-primary w-[5%]">TOT.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="border-b p-1 text-center font-medium text-xs bg-accent">QTD.</td>
+              {Object.entries(tamanhosFiltrados).map(([tamanho, valor]) => (
+                <td key={`cell-${tamanho}`} className="border-b p-1 text-center">
+                  <div className="flex justify-center">
+                    <input
+                      type="number"
+                      min="0"
+                      value={valor}
+                      onChange={(e) => onChange(tamanho, Number.parseInt(e.target.value) || 0)}
+                      className="w-8 h-7 text-center text-xs border border-gray-300 rounded-md focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </td>
+              ))}
+              <td className="border-b p-1 text-center font-medium text-sm bg-accent">{quantidade}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function FormularioOrcamento({
   orcamento,
   clientes,
@@ -101,6 +203,7 @@ export default function FormularioOrcamento({
     valorUnitario: 0,
     tamanhos: { ...tamanhosPadrao },
     imagem: "",
+    observacao: "", // Add this line
   })
   const [itemEmEdicao, setItemEmEdicao] = useState<ItemOrcamento | null>(null)
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null)
@@ -250,6 +353,7 @@ export default function FormularioOrcamento({
           valorUnitario: 0,
           tamanhos: { ...tamanhosPadrao },
           imagem: "",
+          observacao: "",
         })
         setProdutoSelecionado(null)
         setLinhaAtiva(null)
@@ -393,63 +497,6 @@ export default function FormularioOrcamento({
         descricaoEstampa: descricao,
       })
     }
-  }
-
-  // Versão redimensionada da tabela de tamanhos
-  const renderTabelaTamanhos = (
-    tamanhos: Record<string, number>,
-    quantidade: number,
-    isEditing: boolean,
-    onChange: (tamanho: string, valor: number) => void,
-    tamanhosDisponiveis?: string[],
-  ) => {
-    // Filtrar apenas os tamanhos disponíveis para o produto
-    const tamanhosFiltrados = tamanhosDisponiveis
-      ? Object.fromEntries(Object.entries(tamanhos).filter(([tamanho]) => tamanhosDisponiveis.includes(tamanho)))
-      : tamanhos
-
-    return (
-      <div className="space-y-2">
-        <h4 className="font-medium text-primary">Tamanhos</h4>
-        <div className="border border-gray-200 rounded-md">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-accent">
-                <th className="border-b p-1 text-center font-medium text-xs text-primary w-[5%]">TAM.</th>
-                {Object.keys(tamanhosFiltrados).map((tamanho) => (
-                  <th
-                    key={`header-${tamanho}`}
-                    className="border-b p-1 text-center font-medium text-xs text-primary w-[7%]"
-                  >
-                    {tamanho}
-                  </th>
-                ))}
-                <th className="border-b p-1 text-center font-medium text-xs text-primary w-[5%]">TOT.</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="border-b p-1 text-center font-medium text-xs bg-accent">QTD.</td>
-                {Object.entries(tamanhosFiltrados).map(([tamanho, valor]) => (
-                  <td key={`cell-${tamanho}`} className="border-b p-1 text-center">
-                    <div className="flex justify-center">
-                      <input
-                        type="number"
-                        min="0"
-                        value={valor}
-                        onChange={(e) => onChange(tamanho, Number.parseInt(e.target.value) || 0)}
-                        className="w-8 h-7 text-center text-xs border border-gray-300 rounded-md focus:border-primary focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                  </td>
-                ))}
-                <td className="border-b p-1 text-center font-medium text-sm bg-accent">{quantidade}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
   }
 
   // Componente para gerenciar imagem (upload, prévia, remoção)
@@ -597,6 +644,7 @@ export default function FormularioOrcamento({
                   <tr className="border-t hover:bg-accent/30 transition-colors">
                     <td className="p-3">
                       <div className="font-medium">{item.produto?.nome}</div>
+                      {item.observacao && <div className="text-xs mt-1 text-gray-600 italic">{item.observacao}</div>}
                     </td>
                     <td className="p-3 text-center">
                       {editandoItem === item.id ? (
@@ -683,6 +731,71 @@ export default function FormularioOrcamento({
                           true,
                           (tamanho, valor) => handleTamanhoChange(tamanho as keyof ItemOrcamento["tamanhos"], valor),
                           item.produto?.tamanhosDisponiveis,
+                        )}
+
+                        {produtoSelecionado && (
+                          <div className="mt-4 space-y-4">
+                            {/* Tecido selection */}
+                            <div>
+                              <Label className="text-primary mb-1.5">Tecido</Label>
+                              <Select
+                                value={itemEmEdicao?.tecidoSelecionado?.nome || ""}
+                                onValueChange={(value) => handleTecidoChange(value)}
+                              >
+                                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                  <SelectValue placeholder="Selecione o tecido" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {produtoSelecionado.tecidos.map((tecido) => (
+                                    <SelectItem key={tecido.nome} value={tecido.nome}>
+                                      {tecido.nome} - {tecido.composicao}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Cor selection */}
+                            <div>
+                              <Label className="text-primary mb-1.5">Cor</Label>
+                              <Select
+                                value={itemEmEdicao?.corSelecionada || ""}
+                                onValueChange={(value) => handleCorChange(value)}
+                              >
+                                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                  <SelectValue placeholder="Selecione a cor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {produtoSelecionado.cores.map((cor) => (
+                                    <SelectItem key={cor} value={cor}>
+                                      {cor}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Descrição da estampa */}
+                            <div>
+                              <Label className="text-primary mb-1.5">Descrição da Estampa</Label>
+                              <DescricaoEstampaInput
+                                value={itemEmEdicao?.descricaoEstampa || ""}
+                                onChange={(value) => handleDescricaoEstampaChange(value)}
+                              />
+                            </div>
+
+                            {/* Observação */}
+                            <div>
+                              <Label className="text-primary mb-1.5">Observação</Label>
+                              <Textarea
+                                value={itemEmEdicao?.observacao || ""}
+                                onChange={(e) => setItemEmEdicao({ ...itemEmEdicao!, observacao: e.target.value })}
+                                placeholder="Observações adicionais sobre o item"
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                rows={2}
+                              />
+                            </div>
+                          </div>
                         )}
 
                         {/* Gerenciador de imagem para o item em edição */}
@@ -777,6 +890,71 @@ export default function FormularioOrcamento({
                       true,
                       (tamanho, valor) => handleNovoTamanhoChange(tamanho as keyof ItemOrcamento["tamanhos"], valor),
                       produtoSelecionado?.tamanhosDisponiveis,
+                    )}
+
+                    {produtoSelecionado && (
+                      <div className="mt-4 space-y-4">
+                        {/* Tecido selection */}
+                        <div>
+                          <Label className="text-primary mb-1.5">Tecido</Label>
+                          <Select
+                            value={novoItem.tecidoSelecionado?.nome || ""}
+                            onValueChange={(value) => handleTecidoChange(value)}
+                          >
+                            <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                              <SelectValue placeholder="Selecione o tecido" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {produtoSelecionado.tecidos.map((tecido) => (
+                                <SelectItem key={tecido.nome} value={tecido.nome}>
+                                  {tecido.nome} - {tecido.composicao}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Cor selection */}
+                        <div>
+                          <Label className="text-primary mb-1.5">Cor</Label>
+                          <Select
+                            value={novoItem.corSelecionada || ""}
+                            onValueChange={(value) => handleCorChange(value)}
+                          >
+                            <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                              <SelectValue placeholder="Selecione a cor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {produtoSelecionado.cores.map((cor) => (
+                                <SelectItem key={cor} value={cor}>
+                                  {cor}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Descrição da estampa */}
+                        <div>
+                          <Label className="text-primary mb-1.5">Descrição da Estampa</Label>
+                          <DescricaoEstampaInput
+                            value={novoItem.descricaoEstampa || ""}
+                            onChange={(value) => handleDescricaoEstampaChange(value)}
+                          />
+                        </div>
+
+                        {/* Observação */}
+                        <div>
+                          <Label className="text-primary mb-1.5">Observação</Label>
+                          <Textarea
+                            value={novoItem.observacao || ""}
+                            onChange={(e) => setNovoItem({ ...novoItem, observacao: e.target.value })}
+                            placeholder="Observações adicionais sobre o item"
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
                     )}
 
                     {/* Gerenciador de imagem para o novo item */}
