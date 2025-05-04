@@ -19,9 +19,12 @@ import {
   AlertCircle,
   FileText,
 } from "lucide-react"
-import type { Produto, Tecido } from "@/types/types"
+import type { Produto } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockProdutos } from "@/lib/mock-data"
+
+// Importar os serviços de materiais
+import { type Cor, type TecidoBase, corService, tecidoBaseService } from "@/lib/services-materiais"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -89,13 +92,15 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
   const [error, setError] = useState<string | null>(null)
 
   // Estados para gerenciar tecidos
-  const [novoTecido, setNovoTecido] = useState<Tecido>({ nome: "", composicao: "" })
-  const [novaCor, setNovaCor] = useState("")
   const [novoTamanho, setNovoTamanho] = useState("")
+
+  // Estados para cores e tecidos pré-cadastrados
+  const [coresCadastradas, setCoresCadastradas] = useState<Cor[]>([])
+  const [tecidosCadastrados, setTecidosCadastrados] = useState<TecidoBase[]>([])
 
   // Carregar produtos do Supabase ao montar o componente
   useEffect(() => {
-    const carregarProdutos = async () => {
+    const carregarDados = async () => {
       try {
         setIsLoading(true)
 
@@ -140,6 +145,17 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
 
           setProdutos(produtosCompletos)
         }
+
+        // Carregar cores e tecidos pré-cadastrados
+        try {
+          const coresData = await corService.listarTodas()
+          setCoresCadastradas(coresData)
+
+          const tecidosData = await tecidoBaseService.listarTodos()
+          setTecidosCadastrados(tecidosData)
+        } catch (error) {
+          console.error("Erro ao carregar cores e tecidos:", error)
+        }
       } catch (error) {
         console.error("Erro ao carregar produtos:", error)
         setProdutos(mockProdutos)
@@ -148,7 +164,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
       }
     }
 
-    carregarProdutos()
+    carregarDados()
   }, [setProdutos])
 
   // Modificar a função handleAdicionarProduto para gerar o código
@@ -216,8 +232,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
             cores: [],
             tamanhosDisponiveis: [],
           })
-          setNovoTecido({ nome: "", composicao: "" })
-          setNovaCor("")
           setNovoTamanho("")
         }
       } catch (error) {
@@ -349,24 +363,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     }
   }
 
-  // Funções para adicionar tecidos, cores e tamanhos
-  const adicionarTecido = () => {
-    if (novoTecido.nome && novoTecido.composicao) {
-      if (editandoId && produtoEditando) {
-        setProdutoEditando({
-          ...produtoEditando,
-          tecidos: [...produtoEditando.tecidos, { ...novoTecido }],
-        })
-      } else {
-        setNovoProduto({
-          ...novoProduto,
-          tecidos: [...(novoProduto.tecidos || []), { ...novoTecido }],
-        })
-      }
-      setNovoTecido({ nome: "", composicao: "" })
-    }
-  }
-
   const removerTecido = (index: number) => {
     if (editandoId && produtoEditando) {
       setProdutoEditando({
@@ -378,23 +374,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         ...novoProduto,
         tecidos: (novoProduto.tecidos || []).filter((_, i) => i !== index),
       })
-    }
-  }
-
-  const adicionarCor = () => {
-    if (novaCor) {
-      if (editandoId && produtoEditando) {
-        setProdutoEditando({
-          ...produtoEditando,
-          cores: [...produtoEditando.cores, novaCor],
-        })
-      } else {
-        setNovoProduto({
-          ...novoProduto,
-          cores: [...(novoProduto.cores || []), novaCor],
-        })
-      }
-      setNovaCor("")
     }
   }
 
@@ -533,28 +512,47 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                         Tecidos Disponíveis
                       </Label>
                       <div className="mt-2 space-y-2">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Nome do tecido"
-                            value={novoTecido.nome}
-                            onChange={(e) => setNovoTecido({ ...novoTecido, nome: e.target.value })}
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                          <Input
-                            placeholder="Composição"
-                            value={novoTecido.composicao}
-                            onChange={(e) => setNovoTecido({ ...novoTecido, composicao: e.target.value })}
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                          <Button
-                            onClick={adicionarTecido}
-                            className="bg-primary hover:bg-primary-dark text-white"
-                            disabled={!novoTecido.nome || !novoTecido.composicao}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {tecidosCadastrados.length > 0 ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            {tecidosCadastrados.map((tecido) => (
+                              <div key={tecido.id} className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id={`edit-tecido-${tecido.id}`}
+                                  className="mr-2"
+                                  checked={produtoEditando.tecidos.some((t) => t.nome === tecido.nome)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setProdutoEditando({
+                                        ...produtoEditando,
+                                        tecidos: [
+                                          ...produtoEditando.tecidos,
+                                          { nome: tecido.nome, composicao: tecido.composicao },
+                                        ],
+                                      })
+                                    } else {
+                                      setProdutoEditando({
+                                        ...produtoEditando,
+                                        tecidos: produtoEditando.tecidos.filter((t) => t.nome !== tecido.nome),
+                                      })
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor={`edit-tecido-${tecido.id}`} className="text-sm cursor-pointer">
+                                  {tecido.nome} <span className="text-xs text-gray-500">({tecido.composicao})</span>
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 italic p-2">
+                            Nenhum tecido cadastrado. Adicione tecidos na aba Materiais.
+                          </div>
+                        )}
                         <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
+                          {produtoEditando.tecidos.length === 0 && (
+                            <p className="text-sm text-gray-500 italic p-2">Nenhum tecido selecionado</p>
+                          )}
                           {produtoEditando.tecidos.map((tecido, index) => (
                             <div key={index} className="flex justify-between items-center p-2 bg-accent rounded-md">
                               <div>
@@ -571,9 +569,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                               </Button>
                             </div>
                           ))}
-                          {produtoEditando.tecidos.length === 0 && (
-                            <p className="text-sm text-gray-500 italic p-2">Nenhum tecido adicionado</p>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -585,24 +580,60 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                         Cores Disponíveis
                       </Label>
                       <div className="mt-2 space-y-2">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Nome da cor"
-                            value={novaCor}
-                            onChange={(e) => setNovaCor(e.target.value)}
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                          <Button
-                            onClick={adicionarCor}
-                            className="bg-primary hover:bg-primary-dark text-white"
-                            disabled={!novaCor}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {coresCadastradas.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-2">
+                            {coresCadastradas.map((cor) => (
+                              <div key={cor.id} className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id={`edit-cor-${cor.id}`}
+                                  className="mr-2"
+                                  checked={produtoEditando.cores.includes(cor.nome)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setProdutoEditando({
+                                        ...produtoEditando,
+                                        cores: [...produtoEditando.cores, cor.nome],
+                                      })
+                                    } else {
+                                      setProdutoEditando({
+                                        ...produtoEditando,
+                                        cores: produtoEditando.cores.filter((c) => c !== cor.nome),
+                                      })
+                                    }
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`edit-cor-${cor.id}`}
+                                  className="text-sm cursor-pointer flex items-center gap-1"
+                                >
+                                  <div
+                                    className="w-4 h-4 rounded-full border border-gray-300"
+                                    style={{ backgroundColor: cor.codigo_hex || "#000000" }}
+                                  ></div>
+                                  {cor.nome}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 italic p-2">
+                            Nenhuma cor cadastrada. Adicione cores na aba Materiais.
+                          </div>
+                        )}
                         <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
+                          {produtoEditando.cores.length === 0 && (
+                            <p className="text-sm text-gray-500 italic p-2">Nenhuma cor selecionada</p>
+                          )}
                           {produtoEditando.cores.map((cor, index) => (
                             <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                              <div
+                                className="w-3 h-3 rounded-full border border-gray-300"
+                                style={{
+                                  backgroundColor:
+                                    coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
+                                }}
+                              ></div>
                               <span className="text-sm">{cor}</span>
                               <Button
                                 variant="ghost"
@@ -614,9 +645,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                               </Button>
                             </div>
                           ))}
-                          {produtoEditando.cores.length === 0 && (
-                            <p className="text-sm text-gray-500 italic p-2">Nenhuma cor adicionada</p>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -928,28 +956,47 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                 Tecidos Disponíveis
               </Label>
               <div className="mt-2 space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nome do tecido"
-                    value={novoTecido.nome}
-                    onChange={(e) => setNovoTecido({ ...novoTecido, nome: e.target.value })}
-                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                  <Input
-                    placeholder="Composição"
-                    value={novoTecido.composicao}
-                    onChange={(e) => setNovoTecido({ ...novoTecido, composicao: e.target.value })}
-                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                  <Button
-                    onClick={adicionarTecido}
-                    className="bg-primary hover:bg-primary-dark text-white"
-                    disabled={!novoTecido.nome || !novoTecido.composicao}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                {tecidosCadastrados.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {tecidosCadastrados.map((tecido) => (
+                      <div key={tecido.id} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`tecido-${tecido.id}`}
+                          className="mr-2"
+                          checked={(novoProduto.tecidos || []).some((t) => t.nome === tecido.nome)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNovoProduto({
+                                ...novoProduto,
+                                tecidos: [
+                                  ...(novoProduto.tecidos || []),
+                                  { nome: tecido.nome, composicao: tecido.composicao },
+                                ],
+                              })
+                            } else {
+                              setNovoProduto({
+                                ...novoProduto,
+                                tecidos: (novoProduto.tecidos || []).filter((t) => t.nome !== tecido.nome),
+                              })
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`tecido-${tecido.id}`} className="text-sm cursor-pointer">
+                          {tecido.nome} <span className="text-xs text-gray-500">({tecido.composicao})</span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 italic p-2">
+                    Nenhum tecido cadastrado. Adicione tecidos na aba Materiais.
+                  </div>
+                )}
                 <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
+                  {(novoProduto.tecidos || []).length === 0 && (
+                    <p className="text-sm text-gray-500 italic p-2">Nenhum tecido selecionado</p>
+                  )}
                   {(novoProduto.tecidos || []).map((tecido, index) => (
                     <div key={index} className="flex justify-between items-center p-2 bg-accent rounded-md">
                       <div>
@@ -966,9 +1013,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                       </Button>
                     </div>
                   ))}
-                  {(novoProduto.tecidos || []).length === 0 && (
-                    <p className="text-sm text-gray-500 italic p-2">Nenhum tecido adicionado</p>
-                  )}
                 </div>
               </div>
             </div>
@@ -980,24 +1024,56 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                 Cores Disponíveis
               </Label>
               <div className="mt-2 space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nome da cor"
-                    value={novaCor}
-                    onChange={(e) => setNovaCor(e.target.value)}
-                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                  <Button
-                    onClick={adicionarCor}
-                    className="bg-primary hover:bg-primary-dark text-white"
-                    disabled={!novaCor}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                {coresCadastradas.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {coresCadastradas.map((cor) => (
+                      <div key={cor.id} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`cor-${cor.id}`}
+                          className="mr-2"
+                          checked={(novoProduto.cores || []).includes(cor.nome)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNovoProduto({
+                                ...novoProduto,
+                                cores: [...(novoProduto.cores || []), cor.nome],
+                              })
+                            } else {
+                              setNovoProduto({
+                                ...novoProduto,
+                                cores: (novoProduto.cores || []).filter((c) => c !== cor.nome),
+                              })
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`cor-${cor.id}`} className="text-sm cursor-pointer flex items-center gap-1">
+                          <div
+                            className="w-4 h-4 rounded-full border border-gray-300"
+                            style={{ backgroundColor: cor.codigo_hex || "#000000" }}
+                          ></div>
+                          {cor.nome}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 italic p-2">
+                    Nenhuma cor cadastrada. Adicione cores na aba Materiais.
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
+                  {(novoProduto.cores || []).length === 0 && (
+                    <p className="text-sm text-gray-500 italic p-2">Nenhuma cor selecionada</p>
+                  )}
                   {(novoProduto.cores || []).map((cor, index) => (
                     <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                      <div
+                        className="w-3 h-3 rounded-full border border-gray-300"
+                        style={{
+                          backgroundColor: coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
+                        }}
+                      ></div>
                       <span className="text-sm">{cor}</span>
                       <Button
                         variant="ghost"
@@ -1009,9 +1085,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                       </Button>
                     </div>
                   ))}
-                  {(novoProduto.cores || []).length === 0 && (
-                    <p className="text-sm text-gray-500 italic p-2">Nenhuma cor adicionada</p>
-                  )}
                 </div>
               </div>
             </div>

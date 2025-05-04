@@ -44,9 +44,7 @@ export default function Home() {
           </div>
         </div>
       </header>
-      <div className="container mx-auto px-4">
-        <GeradorOrcamento />
-      </div>
+      <GeradorOrcamento />
     </div>
   )
 }

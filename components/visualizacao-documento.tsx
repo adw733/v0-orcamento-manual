@@ -1,14 +1,22 @@
 "use client"
 
-import type { Orcamento } from "@/types/types"
+import type { Orcamento, DadosEmpresa } from "@/types/types"
 
 interface VisualizacaoDocumentoProps {
   orcamento: Orcamento
   calcularTotal: () => number
+  dadosEmpresa?: DadosEmpresa
 }
 
-export default function VisualizacaoDocumento({ orcamento, calcularTotal }: VisualizacaoDocumentoProps) {
+export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosEmpresa }: VisualizacaoDocumentoProps) {
   const dataFormatada = orcamento.data ? new Date(orcamento.data).toLocaleDateString("pt-BR") : ""
+
+  // Usar os dados da empresa ou valores padrão
+  const nomeEmpresa = dadosEmpresa?.nome || "ONEBASE"
+  const cnpjEmpresa = dadosEmpresa?.cnpj || "12.345.678/0001-90"
+  const emailEmpresa = dadosEmpresa?.email || "contato@onebase.com.br"
+  const telefoneEmpresa = dadosEmpresa?.telefone || "(11) 4321-1234"
+  const sloganEmpresa = dadosEmpresa?.slogan || "UNIFORMES INDUSTRIAIS"
 
   // Adicione estas propriedades CSS para garantir que as cores sejam preservadas na impressão
   const pdfStyles = `
@@ -274,31 +282,44 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
         <div className="bg-gradient-to-r from-primary to-primary-dark p-4 pdf-header w-full">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div
-                className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
-                style={{ width: "50px", height: "50px" }}
-              >
-                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M12 2L4 5v14.5c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5V5l-8-3z"
-                    fill="#0f4c81"
-                    stroke="#0f4c81"
-                    strokeWidth="1.5"
+              {dadosEmpresa?.logo_url ? (
+                <div
+                  className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
+                  style={{ width: "50px", height: "50px" }}
+                >
+                  <img
+                    src={dadosEmpresa.logo_url || "/placeholder.svg"}
+                    alt={nomeEmpresa}
+                    className="max-w-full max-h-full object-contain"
                   />
-                  <path
-                    d="M12 6.5c-1.93 0-3.5 1.57-3.5 3.5v1.5h7v-1.5c0-1.93-1.57-3.5-3.5-3.5z"
-                    fill="white"
-                    stroke="white"
-                    strokeWidth="0.5"
-                  />
-                  <path
-                    d="M12 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"
-                    fill="white"
-                    stroke="white"
-                    strokeWidth="0.5"
-                  />
-                </svg>
-              </div>
+                </div>
+              ) : (
+                <div
+                  className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
+                  style={{ width: "50px", height: "50px" }}
+                >
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M12 2L4 5v14.5c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5V5l-8-3z"
+                      fill="#0f4c81"
+                      stroke="#0f4c81"
+                      strokeWidth="1.5"
+                    />
+                    <path
+                      d="M12 6.5c-1.93 0-3.5 1.57-3.5 3.5v1.5h7v-1.5c0-1.93-1.57-3.5-3.5-3.5z"
+                      fill="white"
+                      stroke="white"
+                      strokeWidth="0.5"
+                    />
+                    <path
+                      d="M12 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"
+                      fill="white"
+                      stroke="white"
+                      strokeWidth="0.5"
+                    />
+                  </svg>
+                </div>
+              )}
               <div>
                 <div>
                   <h1 className="text-xl font-bold text-white font-sans tracking-tight uppercase">
@@ -311,10 +332,10 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
               </div>
             </div>
             <div className="text-right bg-white/10 p-2 rounded-md backdrop-blur-sm">
-              <h2 className="text-lg font-bold text-white font-sans tracking-tight">ONEBASE</h2>
-              <p className="text-white/80 text-xs">CNPJ: 12.345.678/0001-90</p>
-              <p className="text-white/80 text-xs">contato@onebase.com.br</p>
-              <p className="text-white/80 text-xs">(11) 4321-1234</p>
+              <h2 className="text-lg font-bold text-white font-sans tracking-tight">{nomeEmpresa}</h2>
+              <p className="text-white/80 text-xs">CNPJ: {cnpjEmpresa}</p>
+              <p className="text-white/80 text-xs">{emailEmpresa}</p>
+              <p className="text-white/80 text-xs">{telefoneEmpresa}</p>
             </div>
           </div>
         </div>
@@ -437,31 +458,44 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
           <div className="bg-gradient-to-r from-primary to-primary-dark p-4 pdf-header w-full">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <div
-                  className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
-                  style={{ width: "50px", height: "50px" }}
-                >
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M12 2L4 5v14.5c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5V5l-8-3z"
-                      fill="#0f4c81"
-                      stroke="#0f4c81"
-                      strokeWidth="1.5"
+                {dadosEmpresa?.logo_url ? (
+                  <div
+                    className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
+                    style={{ width: "50px", height: "50px" }}
+                  >
+                    <img
+                      src={dadosEmpresa.logo_url || "/placeholder.svg"}
+                      alt={nomeEmpresa}
+                      className="max-w-full max-h-full object-contain"
                     />
-                    <path
-                      d="M12 6.5c-1.93 0-3.5 1.57-3.5 3.5v1.5h7v-1.5c0-1.93-1.57-3.5-3.5-3.5z"
-                      fill="white"
-                      stroke="white"
-                      strokeWidth="0.5"
-                    />
-                    <path
-                      d="M12 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"
-                      fill="white"
-                      stroke="white"
-                      strokeWidth="0.5"
-                    />
-                  </svg>
-                </div>
+                  </div>
+                ) : (
+                  <div
+                    className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
+                    style={{ width: "50px", height: "50px" }}
+                  >
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M12 2L4 5v14.5c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5V5l-8-3z"
+                        fill="#0f4c81"
+                        stroke="#0f4c81"
+                        strokeWidth="1.5"
+                      />
+                      <path
+                        d="M12 6.5c-1.93 0-3.5 1.57-3.5 3.5v1.5h7v-1.5c0-1.93-1.57-3.5-3.5-3.5z"
+                        fill="white"
+                        stroke="white"
+                        strokeWidth="0.5"
+                      />
+                      <path
+                        d="M12 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"
+                        fill="white"
+                        stroke="white"
+                        strokeWidth="0.5"
+                      />
+                    </svg>
+                  </div>
+                )}
                 <div>
                   <h1 className="text-xl font-bold text-white font-sans tracking-tight uppercase">
                     FICHA TÉCNICA - {orcamento.numero.split(" - ")[0]}
@@ -472,10 +506,10 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal }: Visu
                 </div>
               </div>
               <div className="text-right bg-white/10 p-2 rounded-md backdrop-blur-sm">
-                <h2 className="text-lg font-bold text-white font-sans tracking-tight">ONEBASE</h2>
-                <p className="text-white/80 text-xs">CNPJ: 12.345.678/0001-90</p>
-                <p className="text-white/80 text-xs">contato@onebase.com.br</p>
-                <p className="text-white/80 text-xs">(11) 4321-1234</p>
+                <h2 className="text-lg font-bold text-white font-sans tracking-tight">{nomeEmpresa}</h2>
+                <p className="text-white/80 text-xs">CNPJ: {cnpjEmpresa}</p>
+                <p className="text-white/80 text-xs">{emailEmpresa}</p>
+                <p className="text-white/80 text-xs">{telefoneEmpresa}</p>
               </div>
             </div>
           </div>

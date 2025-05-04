@@ -1,3 +1,16 @@
+// Adicionar a interface DadosEmpresa
+export interface DadosEmpresa {
+  id?: string
+  nome: string
+  cnpj: string
+  email: string
+  telefone: string
+  endereco: string
+  logo_url?: string
+  site?: string
+  slogan?: string
+}
+
 export type Tecido = {
   nome: string
   composicao: string

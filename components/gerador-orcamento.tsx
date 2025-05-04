@@ -1,21 +1,25 @@
 "use client"
 
+// Modificar as importações para incluir o novo componente AppSidebar e SidebarInset
 import { useState, useRef, useEffect } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, FileText, Users, ShoppingBag, Save, Check, AlertCircle, PlusCircle } from "lucide-react"
+import { Printer, Save, Check, AlertCircle } from "lucide-react"
 import FormularioOrcamento from "@/components/formulario-orcamento"
 import VisualizacaoDocumento from "@/components/visualizacao-documento"
 import GerenciadorClientes from "@/components/gerenciador-clientes"
 import GerenciadorProdutos from "@/components/gerenciador-produtos"
-import type { Cliente, Produto, Orcamento, ItemOrcamento, Estampa } from "@/types/types"
+import type { Cliente, Produto, Orcamento, ItemOrcamento, Estampa, DadosEmpresa } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockClientes, mockProdutos } from "@/lib/mock-data"
-// Adicionar o import para o novo componente
 import ListaOrcamentos from "@/components/lista-orcamentos"
-// Import the AssistenteIA component at the top of the file with the other imports
 import AssistenteIA from "@/components/assistente-ia"
+import { AppSidebar } from "@/components/app-sidebar"
+import { SidebarInset } from "@/components/ui/sidebar"
+// Adicionar a importação do GerenciadorMateriais no início do arquivo, junto com as outras importações
+import GerenciadorMateriais from "@/components/gerenciador-materiais"
+// Adicionar a importação do GerenciadorEmpresa e DadosEmpresa
+import GerenciadorEmpresa from "@/components/gerenciador-empresa"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -57,6 +61,8 @@ export default function GeradorOrcamento() {
   })
   // Adicionar estado para controlar a aba ativa
   const [abaAtiva, setAbaAtiva] = useState("orcamento")
+  // Adicionar o estado para os dados da empresa
+  const [dadosEmpresa, setDadosEmpresa] = useState<DadosEmpresa | null>(null)
 
   const documentoRef = useRef<HTMLDivElement>(null)
 
@@ -133,9 +139,34 @@ export default function GeradorOrcamento() {
 
   // Initialize with mock data if empty
   useEffect(() => {
+    // Adicionar a função para carregar os dados da empresa
+    const carregarDadosEmpresa = async () => {
+      try {
+        const { data, error } = await supabase.from("empresa").select("*").single()
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            // Não encontrou registros
+            console.log("Nenhum dado de empresa encontrado.")
+            return
+          }
+          throw error
+        }
+
+        if (data) {
+          setDadosEmpresa(data)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados da empresa:", error)
+      }
+    }
+
     const carregarDadosIniciais = async () => {
       try {
         setIsLoading(true)
+
+        // Carregar dados da empresa
+        await carregarDadosEmpresa()
 
         // Carregar clientes
         const { data: clientesData, error: clientesError } = await supabase.from("clientes").select("*").order("nome")
@@ -1083,103 +1114,93 @@ export default function GeradorOrcamento() {
     }
   }
 
+  // Substituir o return do componente por:
   return (
-    <div className="space-y-6 py-6">
-      <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">Gerador de Orçamento e Ficha Técnica</h1>
-          <p className="text-gray-500 mt-1">Crie orçamentos profissionais para uniformes industriais</p>
-        </div>
-        <div className="flex gap-2">
-          {/* Botão para novo orçamento */}
-          <Button
-            onClick={criarNovoOrcamento}
-            disabled={isLoading}
-            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
-          >
-            <PlusCircle className="h-4 w-4" />
-            {isLoading ? "Criando..." : "Novo Orçamento"}
-          </Button>
+    <div className="flex h-[calc(100vh-4rem)]">
+      <AppSidebar
+        abaAtiva={abaAtiva}
+        setAbaAtiva={setAbaAtiva}
+        criandoNovoOrcamento={criandoNovoOrcamento}
+        criarNovoOrcamento={criarNovoOrcamento}
+      />
+      <SidebarInset className="bg-gray-100 overflow-auto">
+        <div className="p-6 space-y-6">
+          <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm">
+            <div>
+              <h1 className="text-2xl font-bold text-primary">
+                {abaAtiva === "orcamento"
+                  ? "Gerador de Orçamento"
+                  : abaAtiva === "orcamentos"
+                    ? "Orçamentos Salvos"
+                    : abaAtiva === "clientes"
+                      ? "Gerenciador de Clientes"
+                      : abaAtiva === "Gerenciador de Produtos"
+                        ? "Gerenciador de Produtos"
+                        : "Gerenciador de Empresa"}
+              </h1>
+              <p className="text-gray-500 mt-1">
+                {abaAtiva === "orcamento"
+                  ? "Crie orçamentos profissionais para uniformes industriais"
+                  : abaAtiva === "orcamentos"
+                    ? "Visualize e gerencie seus orçamentos salvos"
+                    : abaAtiva === "clientes"
+                      ? "Gerencie seus clientes"
+                      : abaAtiva === "produtos"
+                        ? "Gerencie seus produtos"
+                        : "Gerencie os dados da sua empresa"}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {abaAtiva === "orcamento" && (
+                <>
+                  <Button
+                    onClick={salvarNovoOrcamento}
+                    disabled={isLoading || !orcamento.cliente}
+                    className="flex items-center gap-2 bg-secondary hover:bg-secondary-dark text-white transition-all shadow-sm"
+                  >
+                    <Save className="h-4 w-4" />
+                    {isLoading ? "Salvando..." : "Salvar"}
+                  </Button>
 
-          {/* Botão para salvar como novo orçamento */}
-          <Button
-            onClick={salvarNovoOrcamento}
-            disabled={isLoading || !orcamento.cliente}
-            className="flex items-center gap-2 bg-secondary hover:bg-secondary-dark text-white transition-all shadow-sm"
-          >
-            <Save className="h-4 w-4" />
-            {isLoading ? "Salvando..." : "Salvar"}
-          </Button>
+                  {orcamentoSalvo && (
+                    <Button
+                      onClick={atualizarOrcamentoExistente}
+                      disabled={isLoading || !orcamento.cliente}
+                      className="flex items-center gap-2 bg-success hover:bg-success/80 text-white transition-all shadow-sm"
+                    >
+                      <Save className="h-4 w-4" />
+                      {isLoading ? "Atualizando..." : "Atualizar Orçamento"}
+                    </Button>
+                  )}
 
-          {/* Botão para atualizar orçamento existente */}
-          {orcamentoSalvo && (
-            <Button
-              onClick={atualizarOrcamentoExistente}
-              disabled={isLoading || !orcamento.cliente}
-              className="flex items-center gap-2 bg-success hover:bg-success/80 text-white transition-all shadow-sm"
+                  <Button
+                    onClick={handlePrint}
+                    disabled={isPrinting || isLoading}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
+                  >
+                    <Printer className="h-4 w-4" />
+                    {isPrinting ? "Imprimindo..." : "Imprimir"}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Feedback de salvamento */}
+          {feedbackSalvamento.visivel && (
+            <div
+              className={`p-4 rounded-md ${
+                feedbackSalvamento.sucesso ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+              } flex items-center gap-2 animate-in fade-in slide-in-from-top-5 duration-300`}
             >
-              <Save className="h-4 w-4" />
-              {isLoading ? "Atualizando..." : "Atualizar Orçamento"}
-            </Button>
+              {feedbackSalvamento.sucesso ? <Check className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+              <p>{feedbackSalvamento.mensagem}</p>
+            </div>
           )}
 
-          <Button
-            onClick={handlePrint}
-            disabled={isPrinting || isLoading}
-            className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
-          >
-            <Printer className="h-4 w-4" />
-            {isPrinting ? "Imprimindo..." : "Imprimir"}
-          </Button>
-        </div>
-      </div>
-
-      {/* Feedback de salvamento */}
-      {feedbackSalvamento.visivel && (
-        <div
-          className={`p-4 rounded-md ${
-            feedbackSalvamento.sucesso ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
-          } flex items-center gap-2 animate-in fade-in slide-in-from-top-5 duration-300`}
-        >
-          {feedbackSalvamento.sucesso ? <Check className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-          <p>{feedbackSalvamento.mensagem}</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="space-y-4 w-full overflow-hidden">
-          <Tabs defaultValue="orcamento" value={abaAtiva} onValueChange={setAbaAtiva} className="w-full">
-            <TabsList className="grid grid-cols-4 w-full mb-2 bg-accent">
-              <TabsTrigger
-                value="orcamento"
-                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                {criandoNovoOrcamento ? "Novo Orçamento" : "Orçamento"}
-              </TabsTrigger>
-              <TabsTrigger
-                value="orcamentos"
-                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm flex items-center gap-2"
-              >
-                <Save className="h-4 w-4" />
-                Orçamentos
-              </TabsTrigger>
-              <TabsTrigger
-                value="clientes"
-                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm flex items-center gap-2"
-              >
-                <Users className="h-4 w-4" />
-                Clientes
-              </TabsTrigger>
-              <TabsTrigger
-                value="produtos"
-                className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm flex items-center gap-2"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                Produtos
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="orcamento" className="space-y-4">
+          {/* Conteúdo principal baseado na aba ativa */}
+          {abaAtiva === "orcamento" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="shadow-sm border-0">
                 <CardContent className="p-6">
                   <FormularioOrcamento
@@ -1195,65 +1216,85 @@ export default function GeradorOrcamento() {
                   />
                 </CardContent>
               </Card>
-            </TabsContent>
-            <TabsContent value="orcamentos" className="space-y-4">
-              <Card className="shadow-sm border-0">
-                <CardContent className="p-6">
-                  <ListaOrcamentos
-                    onSelectOrcamento={carregarOrcamento}
-                    onNovoOrcamento={() => {
-                      criarNovoOrcamento()
-                      setAbaAtiva("orcamento")
-                    }}
-                    onDeleteOrcamento={excluirOrcamento}
-                    onUpdateStatus={atualizarStatusOrcamento}
-                    reloadRef={recarregarOrcamentosRef}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="clientes">
-              <Card className="shadow-sm border-0">
-                <CardContent className="p-6">
-                  <GerenciadorClientes
-                    clientes={clientes}
-                    adicionarCliente={adicionarCliente}
-                    setClientes={setClientes}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="produtos">
-              <Card className="shadow-sm border-0">
-                <CardContent className="p-6">
-                  <GerenciadorProdutos
-                    produtos={produtos}
-                    adicionarProduto={adicionarProduto}
-                    setProdutos={setProdutos}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
-          <div className="p-4 h-[calc(100vh-150px)] overflow-auto">
-            <div ref={documentoRef}>
-              <VisualizacaoDocumento orcamento={orcamento} calcularTotal={calcularTotal} />
+              <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                <div className="p-4 h-[calc(100vh-250px)] overflow-auto">
+                  <div ref={documentoRef}>
+                    <VisualizacaoDocumento
+                      orcamento={orcamento}
+                      calcularTotal={calcularTotal}
+                      dadosEmpresa={dadosEmpresa || undefined}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {abaAtiva === "orcamentos" && (
+            <Card className="shadow-sm border-0">
+              <CardContent className="p-6">
+                <ListaOrcamentos
+                  onSelectOrcamento={carregarOrcamento}
+                  onNovoOrcamento={() => {
+                    criarNovoOrcamento()
+                    setAbaAtiva("orcamento")
+                  }}
+                  onDeleteOrcamento={excluirOrcamento}
+                  onUpdateStatus={atualizarStatusOrcamento}
+                  reloadRef={recarregarOrcamentosRef}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {abaAtiva === "clientes" && (
+            <Card className="shadow-sm border-0">
+              <CardContent className="p-6">
+                <GerenciadorClientes
+                  clientes={clientes}
+                  adicionarCliente={adicionarCliente}
+                  setClientes={setClientes}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {abaAtiva === "produtos" && (
+            <Card className="shadow-sm border-0">
+              <CardContent className="p-6">
+                <GerenciadorProdutos
+                  produtos={produtos}
+                  adicionarProduto={adicionarProduto}
+                  setProdutos={setProdutos}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {abaAtiva === "materiais" && (
+            <Card className="shadow-sm border-0">
+              <CardContent className="p-6">
+                <GerenciadorMateriais />
+              </CardContent>
+            </Card>
+          )}
+          {abaAtiva === "empresa" && (
+            <Card className="shadow-sm border-0">
+              <CardContent className="p-6">
+                <GerenciadorEmpresa />
+              </CardContent>
+            </Card>
+          )}
         </div>
-      </div>
-      <AssistenteIA
-        clientes={clientes}
-        produtos={produtos}
-        orcamento={orcamento}
-        setClientes={setClientes}
-        setProdutos={setProdutos}
-        setOrcamento={setOrcamento}
-        setAbaAtiva={setAbaAtiva}
-      />
+        <AssistenteIA
+          clientes={clientes}
+          produtos={produtos}
+          orcamento={orcamento}
+          setClientes={setClientes}
+          setProdutos={setProdutos}
+          setOrcamento={setOrcamento}
+          setAbaAtiva={setAbaAtiva}
+        />
+      </SidebarInset>
     </div>
   )
 }
