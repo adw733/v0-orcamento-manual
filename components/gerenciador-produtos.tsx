@@ -18,6 +18,9 @@ import {
   Ruler,
   AlertCircle,
   FileText,
+  Search,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react"
 import type { Produto } from "@/types/types"
 import { supabase } from "@/lib/supabase"
@@ -98,6 +101,16 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
   const [coresCadastradas, setCoresCadastradas] = useState<Cor[]>([])
   const [tecidosCadastrados, setTecidosCadastrados] = useState<TecidoBase[]>([])
 
+  // Adicione um estado para controlar a visibilidade do formulário de novo produto:
+  const [mostrarFormulario, setMostrarFormulario] = useState(false)
+
+  // Estado para pesquisa e ordenação
+  const [termoPesquisa, setTermoPesquisa] = useState("")
+  const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" | "desc" }>({
+    campo: "codigo",
+    direcao: "asc",
+  })
+
   // Carregar produtos do Supabase ao montar o componente
   useEffect(() => {
     const carregarDados = async () => {
@@ -105,7 +118,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         setIsLoading(true)
 
         // Buscar produtos
-        const { data: produtosData, error: produtosError } = await supabase.from("produtos").select("*").order("nome")
+        const { data: produtosData, error: produtosError } = await supabase.from("produtos").select("*").order("codigo")
 
         if (produtosError) {
           console.warn("Erro ao carregar produtos do Supabase, usando dados mock:", produtosError)
@@ -233,6 +246,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
             tamanhosDisponiveis: [],
           })
           setNovoTamanho("")
+          setMostrarFormulario(false)
         }
       } catch (error) {
         console.error("Erro ao adicionar produto:", error)
@@ -422,6 +436,71 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     }
   }
 
+  // Função para alternar a ordenação
+  const alternarOrdenacao = (campo: string) => {
+    if (ordenacao.campo === campo) {
+      setOrdenacao({
+        campo,
+        direcao: ordenacao.direcao === "asc" ? "desc" : "asc",
+      })
+    } else {
+      setOrdenacao({
+        campo,
+        direcao: "asc",
+      })
+    }
+  }
+
+  // Função para filtrar e ordenar produtos
+  const produtosFiltradosEOrdenados = () => {
+    // Primeiro filtra os produtos
+    const produtosFiltrados = produtos.filter((produto) => {
+      if (!termoPesquisa) return true
+
+      const termoLowerCase = termoPesquisa.toLowerCase()
+      return (
+        produto.codigo.toLowerCase().includes(termoLowerCase) ||
+        produto.nome.toLowerCase().includes(termoLowerCase) ||
+        produto.tecidos.some((t) => t.nome.toLowerCase().includes(termoLowerCase)) ||
+        produto.cores.some((c) => c.toLowerCase().includes(termoLowerCase))
+      )
+    })
+
+    // Depois ordena os produtos filtrados
+    return produtosFiltrados.sort((a, b) => {
+      let valorA, valorB
+
+      switch (ordenacao.campo) {
+        case "codigo":
+          valorA = a.codigo
+          valorB = b.codigo
+          break
+        case "nome":
+          valorA = a.nome
+          valorB = b.nome
+          break
+        case "valorBase":
+          valorA = a.valorBase
+          valorB = b.valorBase
+          break
+        default:
+          valorA = a.codigo
+          valorB = b.codigo
+      }
+
+      if (typeof valorA === "string" && typeof valorB === "string") {
+        return ordenacao.direcao === "asc" ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA)
+      } else {
+        return ordenacao.direcao === "asc"
+          ? (valorA as number) - (valorB as number)
+          : (valorB as number) - (valorA as number)
+      }
+    })
+  }
+
+  // Obter produtos filtrados e ordenados
+  const produtosExibidos = produtosFiltradosEOrdenados()
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -439,765 +518,880 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         </div>
       )}
 
-      <div className="space-y-4">
-        {isLoading && produtos.length === 0 ? (
-          <div className="text-center py-4">Carregando produtos...</div>
-        ) : (
-          produtos.map((produto) => (
-            <Card key={produto.id} className="overflow-hidden shadow-sm border-0 hover:shadow-md transition-shadow">
-              <CardContent className="p-0">
-                {editandoId === produto.id && produtoEditando ? (
-                  <div className="p-4 space-y-4 bg-accent/50">
-                    {/* Adicionar campo de código no formulário de edição */}
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor={`edit-codigo-${produto.id}`} className="text-primary flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          Código
-                        </Label>
-                        <Input
-                          id={`edit-codigo-${produto.id}`}
-                          value={produtoEditando.codigo}
-                          onChange={(e) =>
-                            setProdutoEditando({
-                              ...produtoEditando,
-                              codigo: e.target.value,
-                            })
-                          }
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          disabled={true} // Código não deve ser editável manualmente
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`edit-nome-${produto.id}`} className="text-primary flex items-center gap-2">
-                          <Package className="h-4 w-4" />
-                          Nome
-                        </Label>
-                        <Input
-                          id={`edit-nome-${produto.id}`}
-                          value={produtoEditando.nome}
-                          onChange={(e) =>
-                            setProdutoEditando({
-                              ...produtoEditando,
-                              nome: e.target.value,
-                            })
-                          }
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`edit-valor-${produto.id}`} className="text-primary flex items-center gap-2">
-                          <DollarSign className="h-4 w-4" />
-                          Valor Base
-                        </Label>
-                        <Input
-                          id={`edit-valor-${produto.id}`}
-                          type="number"
-                          value={produtoEditando.valorBase}
-                          onChange={(e) =>
-                            setProdutoEditando({
-                              ...produtoEditando,
-                              valorBase: Number.parseFloat(e.target.value),
-                            })
-                          }
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Tecidos */}
-                    <div>
-                      <Label className="text-primary flex items-center gap-2">
-                        <Shirt className="h-4 w-4" />
-                        Tecidos Disponíveis
-                      </Label>
-                      <div className="mt-2 space-y-2">
-                        {tecidosCadastrados.length > 0 ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            {tecidosCadastrados.map((tecido) => (
-                              <div key={tecido.id} className="flex items-center">
-                                <input
-                                  type="checkbox"
-                                  id={`edit-tecido-${tecido.id}`}
-                                  className="mr-2"
-                                  checked={produtoEditando.tecidos.some((t) => t.nome === tecido.nome)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setProdutoEditando({
-                                        ...produtoEditando,
-                                        tecidos: [
-                                          ...produtoEditando.tecidos,
-                                          { nome: tecido.nome, composicao: tecido.composicao },
-                                        ],
-                                      })
-                                    } else {
-                                      setProdutoEditando({
-                                        ...produtoEditando,
-                                        tecidos: produtoEditando.tecidos.filter((t) => t.nome !== tecido.nome),
-                                      })
-                                    }
-                                  }}
-                                />
-                                <Label htmlFor={`edit-tecido-${tecido.id}`} className="text-sm cursor-pointer">
-                                  {tecido.nome} <span className="text-xs text-gray-500">({tecido.composicao})</span>
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 italic p-2">
-                            Nenhum tecido cadastrado. Adicione tecidos na aba Materiais.
-                          </div>
-                        )}
-                        <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
-                          {produtoEditando.tecidos.length === 0 && (
-                            <p className="text-sm text-gray-500 italic p-2">Nenhum tecido selecionado</p>
-                          )}
-                          {produtoEditando.tecidos.map((tecido, index) => (
-                            <div key={index} className="flex justify-between items-center p-2 bg-accent rounded-md">
-                              <div>
-                                <span className="font-medium">{tecido.nome}</span>
-                                <span className="text-xs text-gray-500 ml-2">({tecido.composicao})</span>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removerTecido(index)}
-                                className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Cores */}
-                    <div>
-                      <Label className="text-primary flex items-center gap-2">
-                        <Palette className="h-4 w-4" />
-                        Cores Disponíveis
-                      </Label>
-                      <div className="mt-2 space-y-2">
-                        {coresCadastradas.length > 0 ? (
-                          <div className="grid grid-cols-3 gap-2">
-                            {coresCadastradas.map((cor) => (
-                              <div key={cor.id} className="flex items-center">
-                                <input
-                                  type="checkbox"
-                                  id={`edit-cor-${cor.id}`}
-                                  className="mr-2"
-                                  checked={produtoEditando.cores.includes(cor.nome)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setProdutoEditando({
-                                        ...produtoEditando,
-                                        cores: [...produtoEditando.cores, cor.nome],
-                                      })
-                                    } else {
-                                      setProdutoEditando({
-                                        ...produtoEditando,
-                                        cores: produtoEditando.cores.filter((c) => c !== cor.nome),
-                                      })
-                                    }
-                                  }}
-                                />
-                                <Label
-                                  htmlFor={`edit-cor-${cor.id}`}
-                                  className="text-sm cursor-pointer flex items-center gap-1"
-                                >
-                                  <div
-                                    className="w-4 h-4 rounded-full border border-gray-300"
-                                    style={{ backgroundColor: cor.codigo_hex || "#000000" }}
-                                  ></div>
-                                  {cor.nome}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500 italic p-2">
-                            Nenhuma cor cadastrada. Adicione cores na aba Materiais.
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
-                          {produtoEditando.cores.length === 0 && (
-                            <p className="text-sm text-gray-500 italic p-2">Nenhuma cor selecionada</p>
-                          )}
-                          {produtoEditando.cores.map((cor, index) => (
-                            <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                              <div
-                                className="w-3 h-3 rounded-full border border-gray-300"
-                                style={{
-                                  backgroundColor:
-                                    coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
-                                }}
-                              ></div>
-                              <span className="text-sm">{cor}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removerCor(index)}
-                                className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Tamanhos */}
-                    <div>
-                      <Label className="text-primary flex items-center gap-2">
-                        <Ruler className="h-4 w-4" />
-                        Tamanhos Disponíveis
-                      </Label>
-                      <div className="mt-2 space-y-4">
-                        <div className="grid grid-cols-1 gap-4">
-                          <div className="border rounded-md p-3 bg-white">
-                            <div className="flex items-center mb-2">
-                              <input
-                                type="radio"
-                                id={editandoId ? `tamanho-tipo-1-edit` : `tamanho-tipo-1-novo`}
-                                name={editandoId ? `tamanho-tipo-edit` : `tamanho-tipo-novo`}
-                                className="mr-2"
-                                checked={(editandoId
-                                  ? produtoEditando?.tamanhosDisponiveis
-                                  : novoProduto.tamanhosDisponiveis || []
-                                ).some((t) =>
-                                  ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].includes(t),
-                                )}
-                                onChange={() => {
-                                  if (editandoId && produtoEditando) {
-                                    setProdutoEditando({
-                                      ...produtoEditando,
-                                      tamanhosDisponiveis: [
-                                        "PP",
-                                        "P",
-                                        "M",
-                                        "G",
-                                        "GG",
-                                        "G1",
-                                        "G2",
-                                        "G3",
-                                        "G4",
-                                        "G5",
-                                        "G6",
-                                        "G7",
-                                      ],
-                                    })
-                                  } else {
-                                    setNovoProduto({
-                                      ...novoProduto,
-                                      tamanhosDisponiveis: [
-                                        "PP",
-                                        "P",
-                                        "M",
-                                        "G",
-                                        "GG",
-                                        "G1",
-                                        "G2",
-                                        "G3",
-                                        "G4",
-                                        "G5",
-                                        "G6",
-                                        "G7",
-                                      ],
-                                    })
-                                  }
-                                }}
-                              />
-                              <Label
-                                htmlFor={editandoId ? `tamanho-tipo-1-edit` : `tamanho-tipo-1-novo`}
-                                className="font-medium"
-                              >
-                                Padrão (PP ao G7)
-                              </Label>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].map((tamanho) => (
-                                <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                                  <span className="text-sm font-medium">{tamanho}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="border rounded-md p-3 bg-white">
-                            <div className="flex items-center mb-2">
-                              <input
-                                type="radio"
-                                id={editandoId ? `tamanho-tipo-2-edit` : `tamanho-tipo-2-novo`}
-                                name={editandoId ? `tamanho-tipo-edit` : `tamanho-tipo-novo`}
-                                className="mr-2"
-                                checked={(editandoId
-                                  ? produtoEditando?.tamanhosDisponiveis
-                                  : novoProduto.tamanhosDisponiveis || []
-                                ).some((t) => t.match(/^(3[68]|[4-5][02468])$/))}
-                                onChange={() => {
-                                  const numericos = Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString())
-                                  if (editandoId && produtoEditando) {
-                                    setProdutoEditando({
-                                      ...produtoEditando,
-                                      tamanhosDisponiveis: numericos,
-                                    })
-                                  } else {
-                                    setNovoProduto({
-                                      ...novoProduto,
-                                      tamanhosDisponiveis: numericos,
-                                    })
-                                  }
-                                }}
-                              />
-                              <Label
-                                htmlFor={editandoId ? `tamanho-tipo-2-edit` : `tamanho-tipo-2-novo`}
-                                className="font-medium"
-                              >
-                                Numérico (36 ao 58 - pares)
-                              </Label>
-                            </div>
-                            <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
-                              {Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString()).map((tamanho) => (
-                                <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                                  <span className="text-sm font-medium">{tamanho}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="border rounded-md p-3 bg-white">
-                            <div className="flex items-center mb-2">
-                              <input
-                                type="radio"
-                                id={editandoId ? `tamanho-tipo-3-edit` : `tamanho-tipo-3-novo`}
-                                name={editandoId ? `tamanho-tipo-edit` : `tamanho-tipo-novo`}
-                                className="mr-2"
-                                checked={(editandoId
-                                  ? produtoEditando?.tamanhosDisponiveis
-                                  : novoProduto.tamanhosDisponiveis || []
-                                ).some((t) => t.match(/^([0-9]|1[0-3])$/))}
-                                onChange={() => {
-                                  const infantis = Array.from({ length: 14 }, (_, i) => i.toString())
-                                  if (editandoId && produtoEditando) {
-                                    setProdutoEditando({
-                                      ...produtoEditando,
-                                      tamanhosDisponiveis: infantis,
-                                    })
-                                  } else {
-                                    setNovoProduto({
-                                      ...novoProduto,
-                                      tamanhosDisponiveis: infantis,
-                                    })
-                                  }
-                                }}
-                              />
-                              <Label
-                                htmlFor={editandoId ? `tamanho-tipo-3-edit` : `tamanho-tipo-3-novo`}
-                                className="font-medium"
-                              >
-                                Infantil (0 ao 13)
-                              </Label>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {Array.from({ length: 14 }, (_, i) => i.toString()).map((tamanho) => (
-                                <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                                  <span className="text-sm font-medium">{tamanho}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={cancelarEdicao} className="text-gray-500 hover:text-gray-700">
-                        <X className="h-4 w-4 mr-2" /> Cancelar
-                      </Button>
-                      <Button
-                        onClick={salvarEdicao}
-                        className="bg-primary hover:bg-primary-dark text-white"
-                        disabled={isLoading}
-                      >
-                        <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4">
-                    <div className="flex justify-between items-start">
-                      {/* Modificar a exibição do produto para mostrar o código */}
-                      <div className="flex items-start gap-3">
-                        <div className="bg-primary text-white p-2 rounded-full">
-                          <Package className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900">
-                            <span className="text-primary">{produto.codigo}</span> - {produto.nome}
-                          </h4>
-                          <p className="text-sm text-gray-500 flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
-                            {produto.valorBase.toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => iniciarEdicao(produto)}
-                          className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
-                          disabled={isLoading}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoverProduto(produto.id)}
-                          className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                          disabled={isLoading}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-sm">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-accent/50 p-3 rounded-md">
-                        <div>
-                          <p className="font-medium text-primary text-xs mb-1">Tecidos</p>
-                          <div className="text-xs">
-                            {produto.tecidos.map((tecido, index) => (
-                              <p key={index}>
-                                {tecido.nome}: <span className="text-gray-500">{tecido.composicao}</span>
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="font-medium text-primary text-xs mb-1">Cores</p>
-                          <p className="text-xs">{produto.cores.join(", ")}</p>
-                        </div>
-                        <div>
-                          <p className="font-medium text-primary text-xs mb-1">Tamanhos</p>
-                          <p className="text-xs">{produto.tamanhosDisponiveis.join(", ")}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
-        )}
+      <div className="flex justify-between items-center gap-4 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Pesquisar produtos por código, nome, tecido ou cor..."
+            value={termoPesquisa}
+            onChange={(e) => setTermoPesquisa(e.target.value)}
+            className="pl-10 pr-4 py-2 w-full"
+          />
+        </div>
+        <Button
+          onClick={() => setMostrarFormulario(true)}
+          className="bg-primary hover:bg-primary-dark text-white transition-colors"
+        >
+          <Plus className="h-4 w-4 mr-2" /> Novo Produto
+        </Button>
       </div>
 
-      <Card className="overflow-hidden shadow-sm border-0 border-t-4 border-t-primary">
-        <CardContent className="p-4">
-          <h4 className="font-medium mb-4 text-primary flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Adicionar Novo Produto
-          </h4>
-          <div className="space-y-4">
-            {/* Adicionar campo de código no formulário de novo produto */}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="codigo-produto" className="text-primary flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Código
-                </Label>
-                <Input
-                  id="codigo-produto"
-                  value={novoProduto.codigo}
-                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                  disabled={true} // Código será gerado automaticamente
-                  placeholder="Gerado automaticamente"
-                />
-              </div>
-              <div>
-                <Label htmlFor="nome-produto" className="text-primary flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Nome
-                </Label>
-                <Input
-                  id="nome-produto"
-                  value={novoProduto.nome}
-                  onChange={(e) => setNovoProduto({ ...novoProduto, nome: e.target.value })}
-                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <Label htmlFor="valor-base" className="text-primary flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Valor Base
-                </Label>
-                <Input
-                  id="valor-base"
-                  type="number"
-                  value={novoProduto.valorBase || ""}
-                  onChange={(e) =>
-                    setNovoProduto({
-                      ...novoProduto,
-                      valorBase: Number.parseFloat(e.target.value),
-                    })
-                  }
-                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                />
-              </div>
-            </div>
+      <div className="rounded-md border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50">
+                <th
+                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                  onClick={() => alternarOrdenacao("codigo")}
+                >
+                  <div className="flex items-center">
+                    Código
+                    {ordenacao.campo === "codigo" &&
+                      (ordenacao.direcao === "asc" ? (
+                        <ChevronUp className="ml-1 h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="ml-1 h-4 w-4" />
+                      ))}
+                  </div>
+                </th>
+                <th
+                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                  onClick={() => alternarOrdenacao("nome")}
+                >
+                  <div className="flex items-center">
+                    Descrição
+                    {ordenacao.campo === "nome" &&
+                      (ordenacao.direcao === "asc" ? (
+                        <ChevronUp className="ml-1 h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="ml-1 h-4 w-4" />
+                      ))}
+                  </div>
+                </th>
+                <th
+                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                  onClick={() => alternarOrdenacao("valorBase")}
+                >
+                  <div className="flex items-center">
+                    Valor Base
+                    {ordenacao.campo === "valorBase" &&
+                      (ordenacao.direcao === "asc" ? (
+                        <ChevronUp className="ml-1 h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="ml-1 h-4 w-4" />
+                      ))}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tecidos</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cores</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tamanhos</th>
+                <th className="px-4 py-3 text-center font-medium text-muted-foreground">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && produtos.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
+                    Carregando produtos...
+                  </td>
+                </tr>
+              ) : produtosExibidos.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
+                    {termoPesquisa ? "Nenhum produto encontrado para esta pesquisa." : "Nenhum produto cadastrado."}
+                  </td>
+                </tr>
+              ) : (
+                produtosExibidos.map((produto) => (
+                  <tr key={produto.id} className="border-t hover:bg-muted/50">
+                    {editandoId === produto.id && produtoEditando ? (
+                      <td colSpan={7} className="p-4">
+                        <div className="space-y-4 bg-accent/50 p-4 rounded-md">
+                          {/* Formulário de edição */}
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <Label
+                                htmlFor={`edit-codigo-${produto.id}`}
+                                className="text-primary flex items-center gap-2"
+                              >
+                                <FileText className="h-4 w-4" />
+                                Código
+                              </Label>
+                              <Input
+                                id={`edit-codigo-${produto.id}`}
+                                value={produtoEditando.codigo}
+                                onChange={(e) =>
+                                  setProdutoEditando({
+                                    ...produtoEditando,
+                                    codigo: e.target.value,
+                                  })
+                                }
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                disabled={true} // Código não deve ser editável manualmente
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor={`edit-nome-${produto.id}`}
+                                className="text-primary flex items-center gap-2"
+                              >
+                                <Package className="h-4 w-4" />
+                                Nome
+                              </Label>
+                              <Input
+                                id={`edit-nome-${produto.id}`}
+                                value={produtoEditando.nome}
+                                onChange={(e) =>
+                                  setProdutoEditando({
+                                    ...produtoEditando,
+                                    nome: e.target.value,
+                                  })
+                                }
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor={`edit-valor-${produto.id}`}
+                                className="text-primary flex items-center gap-2"
+                              >
+                                <DollarSign className="h-4 w-4" />
+                                Valor Base
+                              </Label>
+                              <Input
+                                id={`edit-valor-${produto.id}`}
+                                type="number"
+                                value={produtoEditando.valorBase}
+                                onChange={(e) =>
+                                  setProdutoEditando({
+                                    ...produtoEditando,
+                                    valorBase: Number.parseFloat(e.target.value),
+                                  })
+                                }
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                          </div>
 
-            {/* Tecidos */}
-            <div>
-              <Label className="text-primary flex items-center gap-2">
-                <Shirt className="h-4 w-4" />
-                Tecidos Disponíveis
-              </Label>
-              <div className="mt-2 space-y-2">
-                {tecidosCadastrados.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {tecidosCadastrados.map((tecido) => (
-                      <div key={tecido.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`tecido-${tecido.id}`}
-                          className="mr-2"
-                          checked={(novoProduto.tecidos || []).some((t) => t.nome === tecido.nome)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNovoProduto({
-                                ...novoProduto,
-                                tecidos: [
-                                  ...(novoProduto.tecidos || []),
-                                  { nome: tecido.nome, composicao: tecido.composicao },
-                                ],
-                              })
-                            } else {
-                              setNovoProduto({
-                                ...novoProduto,
-                                tecidos: (novoProduto.tecidos || []).filter((t) => t.nome !== tecido.nome),
-                              })
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`tecido-${tecido.id}`} className="text-sm cursor-pointer">
-                          {tecido.nome} <span className="text-xs text-gray-500">({tecido.composicao})</span>
-                        </Label>
+                          {/* Tecidos */}
+                          <div>
+                            <Label className="text-primary flex items-center gap-2">
+                              <Shirt className="h-4 w-4" />
+                              Tecidos Disponíveis
+                            </Label>
+                            <div className="mt-2 space-y-2">
+                              {tecidosCadastrados.length > 0 ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                  {tecidosCadastrados.map((tecido) => (
+                                    <div key={tecido.id} className="flex items-center">
+                                      <input
+                                        type="checkbox"
+                                        id={`edit-tecido-${tecido.id}`}
+                                        className="mr-2"
+                                        checked={produtoEditando.tecidos.some((t) => t.nome === tecido.nome)}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setProdutoEditando({
+                                              ...produtoEditando,
+                                              tecidos: [
+                                                ...produtoEditando.tecidos,
+                                                { nome: tecido.nome, composicao: tecido.composicao },
+                                              ],
+                                            })
+                                          } else {
+                                            setProdutoEditando({
+                                              ...produtoEditando,
+                                              tecidos: produtoEditando.tecidos.filter((t) => t.nome !== tecido.nome),
+                                            })
+                                          }
+                                        }}
+                                      />
+                                      <Label htmlFor={`edit-tecido-${tecido.id}`} className="text-sm cursor-pointer">
+                                        {tecido.nome}{" "}
+                                        <span className="text-xs text-gray-500">({tecido.composicao})</span>
+                                      </Label>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500 italic p-2">
+                                  Nenhum tecido cadastrado. Adicione tecidos na aba Materiais.
+                                </div>
+                              )}
+                              <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
+                                {produtoEditando.tecidos.length === 0 && (
+                                  <p className="text-sm text-gray-500 italic p-2">Nenhum tecido selecionado</p>
+                                )}
+                                {produtoEditando.tecidos.map((tecido, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex justify-between items-center p-2 bg-accent rounded-md"
+                                  >
+                                    <div>
+                                      <span className="font-medium">{tecido.nome}</span>
+                                      <span className="text-xs text-gray-500 ml-2">({tecido.composicao})</span>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => removerTecido(index)}
+                                      className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Cores */}
+                          <div>
+                            <Label className="text-primary flex items-center gap-2">
+                              <Palette className="h-4 w-4" />
+                              Cores Disponíveis
+                            </Label>
+                            <div className="mt-2 space-y-2">
+                              {coresCadastradas.length > 0 ? (
+                                <div className="grid grid-cols-3 gap-2">
+                                  {coresCadastradas.map((cor) => (
+                                    <div key={cor.id} className="flex items-center">
+                                      <input
+                                        type="checkbox"
+                                        id={`edit-cor-${cor.id}`}
+                                        className="mr-2"
+                                        checked={produtoEditando.cores.includes(cor.nome)}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setProdutoEditando({
+                                              ...produtoEditando,
+                                              cores: [...produtoEditando.cores, cor.nome],
+                                            })
+                                          } else {
+                                            setProdutoEditando({
+                                              ...produtoEditando,
+                                              cores: produtoEditando.cores.filter((c) => c !== cor.nome),
+                                            })
+                                          }
+                                        }}
+                                      />
+                                      <Label
+                                        htmlFor={`edit-cor-${cor.id}`}
+                                        className="text-sm cursor-pointer flex items-center gap-1"
+                                      >
+                                        <div
+                                          className="w-4 h-4 rounded-full border border-gray-300"
+                                          style={{ backgroundColor: cor.codigo_hex || "#000000" }}
+                                        ></div>
+                                        {cor.nome}
+                                      </Label>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500 italic p-2">
+                                  Nenhuma cor cadastrada. Adicione cores na aba Materiais.
+                                </div>
+                              )}
+                              <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
+                                {produtoEditando.cores.length === 0 && (
+                                  <p className="text-sm text-gray-500 italic p-2">Nenhuma cor selecionada</p>
+                                )}
+                                {produtoEditando.cores.map((cor, index) => (
+                                  <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                                    <div
+                                      className="w-3 h-3 rounded-full border border-gray-300"
+                                      style={{
+                                        backgroundColor:
+                                          coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
+                                      }}
+                                    ></div>
+                                    <span className="text-sm">{cor}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => removerCor(index)}
+                                      className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Tamanhos */}
+                          <div>
+                            <Label className="text-primary flex items-center gap-2">
+                              <Ruler className="h-4 w-4" />
+                              Tamanhos Disponíveis
+                            </Label>
+                            <div className="mt-2 space-y-4">
+                              <div className="grid grid-cols-1 gap-4">
+                                <div className="border rounded-md p-3 bg-white">
+                                  <div className="flex items-center mb-2">
+                                    <input
+                                      type="radio"
+                                      id={`tamanho-tipo-1-edit`}
+                                      name={`tamanho-tipo-edit`}
+                                      className="mr-2"
+                                      checked={produtoEditando.tamanhosDisponiveis.some((t) =>
+                                        ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].includes(
+                                          t,
+                                        ),
+                                      )}
+                                      onChange={() => {
+                                        setProdutoEditando({
+                                          ...produtoEditando,
+                                          tamanhosDisponiveis: [
+                                            "PP",
+                                            "P",
+                                            "M",
+                                            "G",
+                                            "GG",
+                                            "G1",
+                                            "G2",
+                                            "G3",
+                                            "G4",
+                                            "G5",
+                                            "G6",
+                                            "G7",
+                                          ],
+                                        })
+                                      }}
+                                    />
+                                    <Label htmlFor={`tamanho-tipo-1-edit`} className="font-medium">
+                                      Padrão (PP ao G7)
+                                    </Label>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].map(
+                                      (tamanho) => (
+                                        <div
+                                          key={tamanho}
+                                          className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
+                                        >
+                                          <span className="text-sm font-medium">{tamanho}</span>
+                                        </div>
+                                      ),
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="border rounded-md p-3 bg-white">
+                                  <div className="flex items-center mb-2">
+                                    <input
+                                      type="radio"
+                                      id={`tamanho-tipo-2-edit`}
+                                      name={`tamanho-tipo-edit`}
+                                      className="mr-2"
+                                      checked={produtoEditando.tamanhosDisponiveis.some((t) =>
+                                        t.match(/^(3[68]|[4-5][02468])$/),
+                                      )}
+                                      onChange={() => {
+                                        const numericos = Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString())
+                                        setProdutoEditando({
+                                          ...produtoEditando,
+                                          tamanhosDisponiveis: numericos,
+                                        })
+                                      }}
+                                    />
+                                    <Label htmlFor={`tamanho-tipo-2-edit`} className="font-medium">
+                                      Numérico (36 ao 58 - pares)
+                                    </Label>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                                    {Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString()).map((tamanho) => (
+                                      <div
+                                        key={tamanho}
+                                        className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
+                                      >
+                                        <span className="text-sm font-medium">{tamanho}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="border rounded-md p-3 bg-white">
+                                  <div className="flex items-center mb-2">
+                                    <input
+                                      type="radio"
+                                      id={`tamanho-tipo-3-edit`}
+                                      name={`tamanho-tipo-edit`}
+                                      className="mr-2"
+                                      checked={produtoEditando.tamanhosDisponiveis.some((t) =>
+                                        t.match(/^([0-9]|1[0-3])$/),
+                                      )}
+                                      onChange={() => {
+                                        const infantis = Array.from({ length: 14 }, (_, i) => i.toString())
+                                        setProdutoEditando({
+                                          ...produtoEditando,
+                                          tamanhosDisponiveis: infantis,
+                                        })
+                                      }}
+                                    />
+                                    <Label htmlFor={`tamanho-tipo-3-edit`} className="font-medium">
+                                      Infantil (0 ao 13)
+                                    </Label>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {Array.from({ length: 14 }, (_, i) => i.toString()).map((tamanho) => (
+                                      <div
+                                        key={tamanho}
+                                        className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
+                                      >
+                                        <span className="text-sm font-medium">{tamanho}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={cancelarEdicao}
+                              className="text-gray-500 hover:text-gray-700"
+                            >
+                              <X className="h-4 w-4 mr-2" /> Cancelar
+                            </Button>
+                            <Button
+                              onClick={salvarEdicao}
+                              className="bg-primary hover:bg-primary-dark text-white"
+                              disabled={isLoading}
+                            >
+                              <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
+                            </Button>
+                          </div>
+                        </div>
+                      </td>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 align-middle">
+                          <span className="font-medium text-primary">{produto.codigo}</span>
+                        </td>
+                        <td className="px-4 py-3 align-middle">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{produto.nome}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-middle">
+                          <span className="font-medium">R$ {produto.valorBase.toFixed(2)}</span>
+                        </td>
+                        <td className="px-4 py-3 align-middle">
+                          <div className="max-w-[200px] truncate">
+                            {produto.tecidos.length > 0 ? (
+                              produto.tecidos.map((t) => t.nome).join(", ")
+                            ) : (
+                              <span className="text-gray-400 italic">Nenhum</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-middle">
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {produto.cores.length > 0 ? (
+                              produto.cores.map((cor, idx) => (
+                                <div key={idx} className="inline-flex items-center" title={cor}>
+                                  <div
+                                    className="w-3 h-3 rounded-full border border-gray-300 mr-1"
+                                    style={{
+                                      backgroundColor:
+                                        coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
+                                    }}
+                                  ></div>
+                                  {idx < 2
+                                    ? cor
+                                    : idx === 2 && produto.cores.length > 3
+                                      ? `+${produto.cores.length - 2}`
+                                      : cor}
+                                  {idx < 2 && idx < produto.cores.length - 1 ? ", " : ""}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 italic">Nenhuma</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-middle">
+                          <div className="max-w-[200px] truncate">
+                            {produto.tamanhosDisponiveis.length > 0 ? (
+                              produto.tamanhosDisponiveis.length > 5 ? (
+                                `${produto.tamanhosDisponiveis.slice(0, 5).join(", ")}... +${produto.tamanhosDisponiveis.length - 5}`
+                              ) : (
+                                produto.tamanhosDisponiveis.join(", ")
+                              )
+                            ) : (
+                              <span className="text-gray-400 italic">Nenhum</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-middle">
+                          <div className="flex justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => iniciarEdicao(produto)}
+                              className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
+                              disabled={isLoading}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoverProduto(produto.id)}
+                              className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                              disabled={isLoading}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Formulário de adição de produto */}
+      {mostrarFormulario && (
+        <Card className="overflow-hidden shadow-sm border-0 border-t-4 border-t-primary">
+          <CardContent className="p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="font-medium text-primary flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Adicionar Novo Produto
+              </h4>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMostrarFormulario(false)}
+                className="h-8 w-8 text-gray-500"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {/* Adicionar campo de código no formulário de novo produto */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="codigo-produto" className="text-primary flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Código
+                  </Label>
+                  <Input
+                    id="codigo-produto"
+                    value={novoProduto.codigo}
+                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                    disabled={true} // Código será gerado automaticamente
+                    placeholder="Gerado automaticamente"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="nome-produto" className="text-primary flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Nome
+                  </Label>
+                  <Input
+                    id="nome-produto"
+                    value={novoProduto.nome}
+                    onChange={(e) => setNovoProduto({ ...novoProduto, nome: e.target.value })}
+                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="valor-base" className="text-primary flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Valor Base
+                  </Label>
+                  <Input
+                    id="valor-base"
+                    type="number"
+                    value={novoProduto.valorBase || ""}
+                    onChange={(e) =>
+                      setNovoProduto({
+                        ...novoProduto,
+                        valorBase: Number.parseFloat(e.target.value),
+                      })
+                    }
+                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Tecidos */}
+              <div>
+                <Label className="text-primary flex items-center gap-2">
+                  <Shirt className="h-4 w-4" />
+                  Tecidos Disponíveis
+                </Label>
+                <div className="mt-2 space-y-2">
+                  {tecidosCadastrados.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {tecidosCadastrados.map((tecido) => (
+                        <div key={tecido.id} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`tecido-${tecido.id}`}
+                            className="mr-2"
+                            checked={(novoProduto.tecidos || []).some((t) => t.nome === tecido.nome)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNovoProduto({
+                                  ...novoProduto,
+                                  tecidos: [
+                                    ...(novoProduto.tecidos || []),
+                                    { nome: tecido.nome, composicao: tecido.composicao },
+                                  ],
+                                })
+                              } else {
+                                setNovoProduto({
+                                  ...novoProduto,
+                                  tecidos: (novoProduto.tecidos || []).filter((t) => t.nome !== tecido.nome),
+                                })
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`tecido-${tecido.id}`} className="text-sm cursor-pointer">
+                            {tecido.nome} <span className="text-xs text-gray-500">({tecido.composicao})</span>
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 italic p-2">
+                      Nenhum tecido cadastrado. Adicione tecidos na aba Materiais.
+                    </div>
+                  )}
+                  <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
+                    {(novoProduto.tecidos || []).length === 0 && (
+                      <p className="text-sm text-gray-500 italic p-2">Nenhum tecido selecionado</p>
+                    )}
+                    {(novoProduto.tecidos || []).map((tecido, index) => (
+                      <div key={index} className="flex justify-between items-center p-2 bg-accent rounded-md">
+                        <div>
+                          <span className="font-medium">{tecido.nome}</span>
+                          <span className="text-xs text-gray-500 ml-2">({tecido.composicao})</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removerTecido(index)}
+                          className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="text-sm text-gray-500 italic p-2">
-                    Nenhum tecido cadastrado. Adicione tecidos na aba Materiais.
-                  </div>
-                )}
-                <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
-                  {(novoProduto.tecidos || []).length === 0 && (
-                    <p className="text-sm text-gray-500 italic p-2">Nenhum tecido selecionado</p>
-                  )}
-                  {(novoProduto.tecidos || []).map((tecido, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 bg-accent rounded-md">
-                      <div>
-                        <span className="font-medium">{tecido.nome}</span>
-                        <span className="text-xs text-gray-500 ml-2">({tecido.composicao})</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removerTecido(index)}
-                        className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Cores */}
-            <div>
-              <Label className="text-primary flex items-center gap-2">
-                <Palette className="h-4 w-4" />
-                Cores Disponíveis
-              </Label>
-              <div className="mt-2 space-y-2">
-                {coresCadastradas.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {coresCadastradas.map((cor) => (
-                      <div key={cor.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`cor-${cor.id}`}
-                          className="mr-2"
-                          checked={(novoProduto.cores || []).includes(cor.nome)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNovoProduto({
-                                ...novoProduto,
-                                cores: [...(novoProduto.cores || []), cor.nome],
-                              })
-                            } else {
-                              setNovoProduto({
-                                ...novoProduto,
-                                cores: (novoProduto.cores || []).filter((c) => c !== cor.nome),
-                              })
-                            }
+              {/* Cores */}
+              <div>
+                <Label className="text-primary flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  Cores Disponíveis
+                </Label>
+                <div className="mt-2 space-y-2">
+                  {coresCadastradas.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {coresCadastradas.map((cor) => (
+                        <div key={cor.id} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`cor-${cor.id}`}
+                            className="mr-2"
+                            checked={(novoProduto.cores || []).includes(cor.nome)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNovoProduto({
+                                  ...novoProduto,
+                                  cores: [...(novoProduto.cores || []), cor.nome],
+                                })
+                              } else {
+                                setNovoProduto({
+                                  ...novoProduto,
+                                  cores: (novoProduto.cores || []).filter((c) => c !== cor.nome),
+                                })
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`cor-${cor.id}`} className="text-sm cursor-pointer flex items-center gap-1">
+                            <div
+                              className="w-4 h-4 rounded-full border border-gray-300"
+                              style={{ backgroundColor: cor.codigo_hex || "#000000" }}
+                            ></div>
+                            {cor.nome}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 italic p-2">
+                      Nenhuma cor cadastrada. Adicione cores na aba Materiais.
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
+                    {(novoProduto.cores || []).length === 0 && (
+                      <p className="text-sm text-gray-500 italic p-2">Nenhuma cor selecionada</p>
+                    )}
+                    {(novoProduto.cores || []).map((cor, index) => (
+                      <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                        <div
+                          className="w-3 h-3 rounded-full border border-gray-300"
+                          style={{
+                            backgroundColor: coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
                           }}
-                        />
-                        <Label htmlFor={`cor-${cor.id}`} className="text-sm cursor-pointer flex items-center gap-1">
-                          <div
-                            className="w-4 h-4 rounded-full border border-gray-300"
-                            style={{ backgroundColor: cor.codigo_hex || "#000000" }}
-                          ></div>
-                          {cor.nome}
-                        </Label>
+                        ></div>
+                        <span className="text-sm">{cor}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removerCor(index)}
+                          className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="text-sm text-gray-500 italic p-2">
-                    Nenhuma cor cadastrada. Adicione cores na aba Materiais.
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
-                  {(novoProduto.cores || []).length === 0 && (
-                    <p className="text-sm text-gray-500 italic p-2">Nenhuma cor selecionada</p>
-                  )}
-                  {(novoProduto.cores || []).map((cor, index) => (
-                    <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                      <div
-                        className="w-3 h-3 rounded-full border border-gray-300"
-                        style={{
-                          backgroundColor: coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
-                        }}
-                      ></div>
-                      <span className="text-sm">{cor}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removerCor(index)}
-                        className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Tamanhos */}
-            <div>
-              <Label className="text-primary flex items-center gap-2">
-                <Ruler className="h-4 w-4" />
-                Tamanhos Disponíveis
-              </Label>
-              <div className="mt-2 space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="border rounded-md p-3 bg-white">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="radio"
-                        id={`tamanho-tipo-1-novo`}
-                        name={`tamanho-tipo-novo`}
-                        className="mr-2"
-                        checked={(novoProduto.tamanhosDisponiveis || []).some((t) =>
-                          ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].includes(t),
-                        )}
-                        onChange={() => {
-                          setNovoProduto({
-                            ...novoProduto,
-                            tamanhosDisponiveis: ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"],
-                          })
-                        }}
-                      />
-                      <Label htmlFor={`tamanho-tipo-1-novo`} className="font-medium">
-                        Padrão (PP ao G7)
-                      </Label>
+              {/* Tamanhos */}
+              <div>
+                <Label className="text-primary flex items-center gap-2">
+                  <Ruler className="h-4 w-4" />
+                  Tamanhos Disponíveis
+                </Label>
+                <div className="mt-2 space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="border rounded-md p-3 bg-white">
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="radio"
+                          id={`tamanho-tipo-1-novo`}
+                          name={`tamanho-tipo-novo`}
+                          className="mr-2"
+                          checked={(novoProduto.tamanhosDisponiveis || []).some((t) =>
+                            ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].includes(t),
+                          )}
+                          onChange={() => {
+                            setNovoProduto({
+                              ...novoProduto,
+                              tamanhosDisponiveis: [
+                                "PP",
+                                "P",
+                                "M",
+                                "G",
+                                "GG",
+                                "G1",
+                                "G2",
+                                "G3",
+                                "G4",
+                                "G5",
+                                "G6",
+                                "G7",
+                              ],
+                            })
+                          }}
+                        />
+                        <Label htmlFor={`tamanho-tipo-1-novo`} className="font-medium">
+                          Padrão (PP ao G7)
+                        </Label>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].map((tamanho) => (
+                          <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                            <span className="text-sm font-medium">{tamanho}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].map((tamanho) => (
-                        <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                          <span className="text-sm font-medium">{tamanho}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  <div className="border rounded-md p-3 bg-white">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="radio"
-                        id={`tamanho-tipo-2-novo`}
-                        name={`tamanho-tipo-novo`}
-                        className="mr-2"
-                        checked={(novoProduto.tamanhosDisponiveis || []).some((t) => t.match(/^(3[68]|[4-5][02468])$/))}
-                        onChange={() => {
-                          const numericos = Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString())
-                          setNovoProduto({
-                            ...novoProduto,
-                            tamanhosDisponiveis: numericos,
-                          })
-                        }}
-                      />
-                      <Label htmlFor={`tamanho-tipo-2-novo`} className="font-medium">
-                        Numérico (36 ao 58 - pares)
-                      </Label>
+                    <div className="border rounded-md p-3 bg-white">
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="radio"
+                          id={`tamanho-tipo-2-novo`}
+                          name={`tamanho-tipo-novo`}
+                          className="mr-2"
+                          checked={(novoProduto.tamanhosDisponiveis || []).some((t) =>
+                            t.match(/^(3[68]|[4-5][02468])$/),
+                          )}
+                          onChange={() => {
+                            const numericos = Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString())
+                            setNovoProduto({
+                              ...novoProduto,
+                              tamanhosDisponiveis: numericos,
+                            })
+                          }}
+                        />
+                        <Label htmlFor={`tamanho-tipo-2-novo`} className="font-medium">
+                          Numérico (36 ao 58 - pares)
+                        </Label>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                        {Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString()).map((tamanho) => (
+                          <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                            <span className="text-sm font-medium">{tamanho}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
-                      {Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString()).map((tamanho) => (
-                        <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                          <span className="text-sm font-medium">{tamanho}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  <div className="border rounded-md p-3 bg-white">
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="radio"
-                        id={`tamanho-tipo-3-novo`}
-                        name={`tamanho-tipo-novo`}
-                        className="mr-2"
-                        checked={(novoProduto.tamanhosDisponiveis || []).some((t) => t.match(/^([0-9]|1[0-3])$/))}
-                        onChange={() => {
-                          const infantis = Array.from({ length: 14 }, (_, i) => i.toString())
-                          setNovoProduto({
-                            ...novoProduto,
-                            tamanhosDisponiveis: infantis,
-                          })
-                        }}
-                      />
-                      <Label htmlFor={`tamanho-tipo-3-novo`} className="font-medium">
-                        Infantil (0 ao 13)
-                      </Label>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from({ length: 14 }, (_, i) => i.toString()).map((tamanho) => (
-                        <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                          <span className="text-sm font-medium">{tamanho}</span>
-                        </div>
-                      ))}
+                    <div className="border rounded-md p-3 bg-white">
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="radio"
+                          id={`tamanho-tipo-3-novo`}
+                          name={`tamanho-tipo-novo`}
+                          className="mr-2"
+                          checked={(novoProduto.tamanhosDisponiveis || []).some((t) => t.match(/^([0-9]|1[0-3])$/))}
+                          onChange={() => {
+                            const infantis = Array.from({ length: 14 }, (_, i) => i.toString())
+                            setNovoProduto({
+                              ...novoProduto,
+                              tamanhosDisponiveis: infantis,
+                            })
+                          }}
+                        />
+                        <Label htmlFor={`tamanho-tipo-3-novo`} className="font-medium">
+                          Infantil (0 ao 13)
+                        </Label>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.from({ length: 14 }, (_, i) => i.toString()).map((tamanho) => (
+                          <div key={tamanho} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
+                            <span className="text-sm font-medium">{tamanho}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <Button
-              onClick={handleAdicionarProduto}
-              className="w-full bg-primary hover:bg-primary-dark text-white transition-colors"
-              disabled={isLoading || !novoProduto.nome || !novoProduto.valorBase}
-            >
-              <Plus className="h-4 w-4 mr-2" /> {isLoading ? "Adicionando..." : "Adicionar Produto"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <Button
+                onClick={handleAdicionarProduto}
+                className="w-full bg-primary hover:bg-primary-dark text-white transition-colors"
+                disabled={isLoading || !novoProduto.nome || !novoProduto.valorBase}
+              >
+                <Plus className="h-4 w-4 mr-2" /> {isLoading ? "Adicionando..." : "Adicionar Produto"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

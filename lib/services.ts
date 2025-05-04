@@ -9,7 +9,9 @@ export interface Estampa {
   largura?: number
 }
 
-// Adicionar funções para obter o próximo código sequencial
+// Modificar a função obterProximoCodigoCliente para sempre adicionar o prefixo "C"
+
+// Substituir a função obterProximoCodigoCliente atual por esta versão:
 export const obterProximoCodigoCliente = async (): Promise<string> => {
   try {
     // Buscar o último cliente para obter o código mais recente
@@ -26,15 +28,30 @@ export const obterProximoCodigoCliente = async (): Promise<string> => {
     }
 
     if (data && data.length > 0 && data[0].codigo) {
-      // Extrair o número do formato "CXXXX"
-      const ultimoCodigo = data[0].codigo
-      const numeroAtual = Number.parseInt(ultimoCodigo.substring(1), 10)
+      // Extrair apenas os dígitos do código
+      const ultimoCodigo = data[0].codigo.trim()
+      const numerosApenas = ultimoCodigo.replace(/\D/g, "")
 
-      if (!isNaN(numeroAtual)) {
-        // Incrementar e formatar com zeros à esquerda
-        const proximoNumero = (numeroAtual + 1).toString().padStart(4, "0")
-        return `C${proximoNumero}`
+      // Se não conseguirmos extrair números, começar do C0001
+      if (!numerosApenas) {
+        console.warn("Formato de código inválido encontrado:", ultimoCodigo)
+        return "C0001"
       }
+
+      // Converter para número e incrementar
+      const proximoCodigoNumerico = Number.parseInt(numerosApenas, 10) + 1
+
+      // Verificar se a conversão foi bem-sucedida
+      if (isNaN(proximoCodigoNumerico)) {
+        console.warn("Erro ao converter código para número:", ultimoCodigo)
+        return "C0001"
+      }
+
+      // Formatar com zeros à esquerda para garantir 4 dígitos e adicionar prefixo C
+      const proximoCodigoFormatado = "C" + String(proximoCodigoNumerico).padStart(4, "0")
+
+      console.log(`Último código: ${ultimoCodigo}, Próximo código: ${proximoCodigoFormatado}`)
+      return proximoCodigoFormatado
     }
 
     // Se não houver clientes ou o formato for inválido, começar do C0001

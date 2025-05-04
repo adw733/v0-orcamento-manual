@@ -1,11 +1,30 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Trash2, Pencil, Save, X, Building, Phone, Mail, User, AlertCircle, FileText } from "lucide-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Save,
+  X,
+  Building,
+  Phone,
+  Mail,
+  User,
+  AlertCircle,
+  FileText,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react"
 import type { Cliente } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { mockClientes } from "@/lib/mock-data"
@@ -13,13 +32,13 @@ import { mockClientes } from "@/lib/mock-data"
 // Helper function to generate UUID
 const generateUUID = () => {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0,
-      v = c === "x" ? r : (r & 0x3) | 0x8
+    const r = (Math.random() * 16) | 0
+    const v = c === "x" ? r : (r & 0x3) | 0x8
     return v.toString(16)
   })
 }
 
-// Function to get the next sequential code from Supabase
+// Função para obter o próximo código de cliente
 const obterProximoCodigoCliente = async (): Promise<string> => {
   try {
     const { data, error } = await supabase
@@ -30,22 +49,48 @@ const obterProximoCodigoCliente = async (): Promise<string> => {
 
     if (error) {
       console.error("Erro ao obter o último código do cliente:", error)
-      return "0001" // Retorna o código inicial se houver um erro
+      return "C0001" // Retorna o código inicial com prefixo C
     }
 
-    if (data && data.length > 0) {
-      const ultimoCodigo = data[0].codigo
-      const proximoCodigoNumerico = Number.parseInt(ultimoCodigo, 10) + 1
-      const proximoCodigoFormatado = String(proximoCodigoNumerico).padStart(4, "0")
-      return proximoCodigoFormatado
-    } else {
-      return "0001" // Retorna o código inicial se não houver clientes
+    // Se não houver dados ou o array estiver vazio
+    if (!data || data.length === 0 || !data[0].codigo) {
+      return "C0001" // Código inicial com prefixo C
     }
+
+    const ultimoCodigo = data[0].codigo.trim()
+
+    // Extrair apenas os dígitos do código
+    const numerosApenas = ultimoCodigo.replace(/\D/g, "")
+
+    // Se não conseguirmos extrair números, começar do C0001
+    if (!numerosApenas) {
+      console.warn("Formato de código inválido encontrado:", ultimoCodigo)
+      return "C0001"
+    }
+
+    // Converter para número e incrementar
+    const proximoCodigoNumerico = Number.parseInt(numerosApenas, 10) + 1
+
+    // Verificar se a conversão foi bem-sucedida
+    if (isNaN(proximoCodigoNumerico)) {
+      console.warn("Erro ao converter código para número:", ultimoCodigo)
+      return "C0001"
+    }
+
+    // Formatar com zeros à esquerda para garantir 4 dígitos e adicionar prefixo C
+    const proximoCodigoFormatado = "C" + String(proximoCodigoNumerico).padStart(4, "0")
+
+    console.log(`Último código: ${ultimoCodigo}, Próximo código: ${proximoCodigoFormatado}`)
+    return proximoCodigoFormatado
   } catch (error) {
     console.error("Erro ao obter o próximo código do cliente:", error)
-    return "0001" // Retorna o código inicial se houver um erro
+    return "C0001" // Retorna o código inicial com prefixo C
   }
 }
+
+// Tipo para ordenação
+type SortDirection = "asc" | "desc" | null
+type SortField = "codigo" | "nome" | "cnpj" | "telefone" | "email" | "contato" | null
 
 interface GerenciadorClientesProps {
   clientes: Cliente[]
@@ -54,7 +99,7 @@ interface GerenciadorClientesProps {
 }
 
 export default function GerenciadorClientes({ clientes, adicionarCliente, setClientes }: GerenciadorClientesProps) {
-  // Modificar o estado do novo cliente para incluir o código
+  // Estado para novo cliente
   const [novoCliente, setNovoCliente] = useState<Partial<Cliente>>({
     codigo: "",
     nome: "",
@@ -65,10 +110,35 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     contato: "",
   })
 
+  // Estados para gerenciamento da UI
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [filtro, setFiltro] = useState("")
+  const [mostrarFormulario, setMostrarFormulario] = useState(false)
+
+  // Estados para ordenação
+  const [sortField, setSortField] = useState<SortField>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null)
+
+  // Função para alternar ordenação
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Se já estiver ordenando por este campo, alterne a direção
+      if (sortDirection === "asc") {
+        setSortDirection("desc")
+      } else if (sortDirection === "desc") {
+        // Se já estiver em ordem descendente, remova a ordenação
+        setSortField(null)
+        setSortDirection(null)
+      }
+    } else {
+      // Se for um novo campo, comece com ascendente
+      setSortField(field)
+      setSortDirection("asc")
+    }
+  }
 
   // Carregar clientes do Supabase ao montar o componente
   useEffect(() => {
@@ -109,7 +179,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     carregarClientes()
   }, [setClientes])
 
-  // Modificar a função handleAdicionarCliente para gerar o código
+  // Adicionar cliente
   const handleAdicionarCliente = async () => {
     if (novoCliente.nome) {
       try {
@@ -121,6 +191,11 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
 
         // Obter o próximo código sequencial
         const codigo = await obterProximoCodigoCliente()
+
+        // Verificar se o código foi gerado corretamente
+        if (!codigo || codigo === "0NaN") {
+          throw new Error("Erro ao gerar código do cliente. Por favor, tente novamente.")
+        }
 
         // Inserir no Supabase
         const { data, error } = await supabase
@@ -175,6 +250,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     }
   }
 
+  // Remover cliente
   const handleRemoverCliente = async (id: string) => {
     // Confirmar antes de excluir
     if (!window.confirm("Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.")) {
@@ -232,6 +308,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     }
   }
 
+  // Funções de edição
   const iniciarEdicao = (cliente: Cliente) => {
     setEditandoId(cliente.id)
     setClienteEditando({ ...cliente })
@@ -277,6 +354,65 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     }
   }
 
+  // Filtrar e ordenar clientes
+  const clientesFiltradosEOrdenados = clientes
+    .filter(
+      (cliente) =>
+        cliente.nome.toLowerCase().includes(filtro.toLowerCase()) ||
+        cliente.codigo.toLowerCase().includes(filtro.toLowerCase()) ||
+        cliente.cnpj.toLowerCase().includes(filtro.toLowerCase()) ||
+        cliente.email.toLowerCase().includes(filtro.toLowerCase()) ||
+        cliente.telefone.toLowerCase().includes(filtro.toLowerCase()),
+    )
+    .sort((a, b) => {
+      if (!sortField || !sortDirection) return 0
+
+      // Função auxiliar para comparação de strings
+      const compareStrings = (strA: string, strB: string) => {
+        return sortDirection === "asc"
+          ? strA.localeCompare(strB, "pt-BR", { sensitivity: "base" })
+          : strB.localeCompare(strA, "pt-BR", { sensitivity: "base" })
+      }
+
+      // Ordenar com base no campo selecionado
+      switch (sortField) {
+        case "codigo":
+          return compareStrings(a.codigo, b.codigo)
+        case "nome":
+          return compareStrings(a.nome, b.nome)
+        case "cnpj":
+          return compareStrings(a.cnpj, b.cnpj)
+        case "telefone":
+          return compareStrings(a.telefone, b.telefone)
+        case "email":
+          return compareStrings(a.email, b.email)
+        case "contato":
+          return compareStrings(a.contato, b.contato)
+        default:
+          return 0
+      }
+    })
+
+  // Componente para o ícone de ordenação
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />
+    if (sortDirection === "asc") return <ArrowUp className="h-4 w-4 ml-1" />
+    return <ArrowDown className="h-4 w-4 ml-1" />
+  }
+
+  // Componente para o cabeçalho ordenável
+  const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <TableHead
+      className={`cursor-pointer hover:bg-muted/60 ${field === "cnpj" || field === "telefone" ? "hidden md:table-cell" : field === "email" || field === "contato" ? "hidden lg:table-cell" : ""}`}
+      onClick={() => toggleSort(field)}
+    >
+      <div className="flex items-center">
+        {children}
+        <SortIcon field={field} />
+      </div>
+    </TableHead>
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -294,287 +430,364 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
         </div>
       )}
 
-      <div className="space-y-4">
-        {isLoading && clientes.length === 0 ? (
-          <div className="text-center py-4">Carregando clientes...</div>
-        ) : (
-          clientes.map((cliente) => (
-            <Card key={cliente.id} className="overflow-hidden shadow-sm border-0 hover:shadow-md transition-shadow">
-              <CardContent className="p-0">
-                {editandoId === cliente.id && clienteEditando ? (
-                  <div className="p-4 space-y-4 bg-accent/50">
-                    {/* Adicionar campo de código no formulário de edição */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor={`edit-codigo-${cliente.id}`} className="text-primary flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          Código
-                        </Label>
-                        <Input
-                          id={`edit-codigo-${cliente.id}`}
-                          value={clienteEditando.codigo}
-                          onChange={(e) =>
-                            setClienteEditando({
-                              ...clienteEditando,
-                              codigo: e.target.value,
-                            })
-                          }
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          disabled={true} // Código não deve ser editável manualmente
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`edit-nome-${cliente.id}`} className="text-primary flex items-center gap-2">
-                          <Building className="h-4 w-4" />
-                          Nome Empresa
-                        </Label>
-                        <Input
-                          id={`edit-nome-${cliente.id}`}
-                          value={clienteEditando.nome}
-                          onChange={(e) =>
-                            setClienteEditando({
-                              ...clienteEditando,
-                              nome: e.target.value,
-                            })
-                          }
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor={`edit-cnpj-${cliente.id}`} className="text-primary flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        CNPJ
-                      </Label>
-                      <Input
-                        id={`edit-cnpj-${cliente.id}`}
-                        value={clienteEditando.cnpj}
-                        onChange={(e) =>
-                          setClienteEditando({
-                            ...clienteEditando,
-                            cnpj: e.target.value,
-                          })
-                        }
-                        className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`edit-endereco-${cliente.id}`} className="text-primary">
-                        Endereço
-                      </Label>
-                      <Input
-                        id={`edit-endereco-${cliente.id}`}
-                        value={clienteEditando.endereco}
-                        onChange={(e) =>
-                          setClienteEditando({
-                            ...clienteEditando,
-                            endereco: e.target.value,
-                          })
-                        }
-                        className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor={`edit-telefone-${cliente.id}`} className="text-primary flex items-center gap-2">
-                          <Phone className="h-4 w-4" />
-                          Telefone
-                        </Label>
-                        <Input
-                          id={`edit-telefone-${cliente.id}`}
-                          value={clienteEditando.telefone}
-                          onChange={(e) =>
-                            setClienteEditando({
-                              ...clienteEditando,
-                              telefone: e.target.value,
-                            })
-                          }
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`edit-email-${cliente.id}`} className="text-primary flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          Email
-                        </Label>
-                        <Input
-                          id={`edit-email-${cliente.id}`}
-                          value={clienteEditando.email}
-                          onChange={(e) =>
-                            setClienteEditando({
-                              ...clienteEditando,
-                              email: e.target.value,
-                            })
-                          }
-                          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={cancelarEdicao} className="text-gray-500 hover:text-gray-700">
-                        <X className="h-4 w-4 mr-2" /> Cancelar
-                      </Button>
-                      <Button
-                        onClick={salvarEdicao}
-                        className="bg-primary hover:bg-primary-dark text-white"
-                        disabled={isLoading}
-                      >
-                        <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4">
-                    {/* Modificar a exibição do cliente para mostrar o código */}
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-start gap-3">
-                        <div className="bg-primary text-white p-2 rounded-full">
-                          <Building className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900">
-                            <span className="text-primary">{cliente.codigo}</span> - {cliente.nome}
-                          </h4>
-                          <p className="text-sm text-gray-500">{cliente.cnpj}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => iniciarEdicao(cliente)}
-                          className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
-                          disabled={isLoading}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoverCliente(cliente.id)}
-                          className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                          disabled={isLoading}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-sm grid grid-cols-1 md:grid-cols-2 gap-2 bg-accent/50 p-3 rounded-md">
-                      <p className="flex items-center gap-2">
-                        <span className="text-gray-500">Endereço:</span> {cliente.endereco}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Phone className="h-3 w-3 text-gray-500" /> {cliente.telefone}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Mail className="h-3 w-3 text-gray-500" /> {cliente.email}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <User className="h-3 w-3 text-gray-500" /> {cliente.contato}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
-        )}
+      {/* Barra de pesquisa */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Pesquisar clientes..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          className="pl-10 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+        />
       </div>
 
-      <Card className="overflow-hidden shadow-sm border-0 border-t-4 border-t-secondary">
-        <CardContent className="p-4">
-          <h4 className="font-medium mb-4 text-secondary flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Adicionar Novo Cliente
-          </h4>
-          <div className="space-y-4">
-            {/* Adicionar campo de código no formulário de novo cliente */}
-            <div className="grid grid-cols-2 gap-4">
+      {/* Tabela de clientes com ordenação */}
+      <div className="border rounded-md shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <SortableHeader field="codigo">Código</SortableHeader>
+              <SortableHeader field="nome">Nome</SortableHeader>
+              <SortableHeader field="cnpj">CNPJ</SortableHeader>
+              <SortableHeader field="telefone">Telefone</SortableHeader>
+              <SortableHeader field="email">Email</SortableHeader>
+              <SortableHeader field="contato">Contato</SortableHeader>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && clientesFiltradosEOrdenados.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-4">
+                  Carregando clientes...
+                </TableCell>
+              </TableRow>
+            ) : clientesFiltradosEOrdenados.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-4">
+                  Nenhum cliente encontrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              clientesFiltradosEOrdenados.map((cliente) => (
+                <TableRow key={cliente.id} className="hover:bg-muted/30">
+                  {editandoId === cliente.id && clienteEditando ? (
+                    <TableCell colSpan={7}>
+                      <div className="p-4 space-y-4 bg-accent/50 rounded-md">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label
+                              htmlFor={`edit-codigo-${cliente.id}`}
+                              className="text-primary flex items-center gap-2"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Código
+                            </Label>
+                            <Input
+                              id={`edit-codigo-${cliente.id}`}
+                              value={clienteEditando.codigo}
+                              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                              disabled={true}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`edit-nome-${cliente.id}`} className="text-primary flex items-center gap-2">
+                              <Building className="h-4 w-4" />
+                              Nome Empresa
+                            </Label>
+                            <Input
+                              id={`edit-nome-${cliente.id}`}
+                              value={clienteEditando.nome}
+                              onChange={(e) =>
+                                setClienteEditando({
+                                  ...clienteEditando,
+                                  nome: e.target.value,
+                                })
+                              }
+                              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-cnpj-${cliente.id}`} className="text-primary flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            CNPJ
+                          </Label>
+                          <Input
+                            id={`edit-cnpj-${cliente.id}`}
+                            value={clienteEditando.cnpj}
+                            onChange={(e) =>
+                              setClienteEditando({
+                                ...clienteEditando,
+                                cnpj: e.target.value,
+                              })
+                            }
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-endereco-${cliente.id}`} className="text-primary">
+                            Endereço
+                          </Label>
+                          <Input
+                            id={`edit-endereco-${cliente.id}`}
+                            value={clienteEditando.endereco}
+                            onChange={(e) =>
+                              setClienteEditando({
+                                ...clienteEditando,
+                                endereco: e.target.value,
+                              })
+                            }
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label
+                              htmlFor={`edit-telefone-${cliente.id}`}
+                              className="text-primary flex items-center gap-2"
+                            >
+                              <Phone className="h-4 w-4" />
+                              Telefone
+                            </Label>
+                            <Input
+                              id={`edit-telefone-${cliente.id}`}
+                              value={clienteEditando.telefone}
+                              onChange={(e) =>
+                                setClienteEditando({
+                                  ...clienteEditando,
+                                  telefone: e.target.value,
+                                })
+                              }
+                              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                          <div>
+                            <Label
+                              htmlFor={`edit-email-${cliente.id}`}
+                              className="text-primary flex items-center gap-2"
+                            >
+                              <Mail className="h-4 w-4" />
+                              Email
+                            </Label>
+                            <Input
+                              id={`edit-email-${cliente.id}`}
+                              value={clienteEditando.email}
+                              onChange={(e) =>
+                                setClienteEditando({
+                                  ...clienteEditando,
+                                  email: e.target.value,
+                                })
+                              }
+                              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor={`edit-contato-${cliente.id}`}
+                            className="text-primary flex items-center gap-2"
+                          >
+                            <User className="h-4 w-4" />
+                            Contato
+                          </Label>
+                          <Input
+                            id={`edit-contato-${cliente.id}`}
+                            value={clienteEditando.contato}
+                            onChange={(e) =>
+                              setClienteEditando({
+                                ...clienteEditando,
+                                contato: e.target.value,
+                              })
+                            }
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={cancelarEdicao}
+                            className="text-gray-500 hover:text-gray-700"
+                          >
+                            <X className="h-4 w-4 mr-2" /> Cancelar
+                          </Button>
+                          <Button
+                            onClick={salvarEdicao}
+                            className="bg-primary hover:bg-primary-dark text-white"
+                            disabled={isLoading}
+                          >
+                            <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  ) : (
+                    <>
+                      <TableCell className="font-medium">{cliente.codigo}</TableCell>
+                      <TableCell>{cliente.nome}</TableCell>
+                      <TableCell className="hidden md:table-cell">{cliente.cnpj}</TableCell>
+                      <TableCell className="hidden md:table-cell">{cliente.telefone}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{cliente.email}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{cliente.contato}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => iniciarEdicao(cliente)}
+                            className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
+                            disabled={isLoading}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoverCliente(cliente.id)}
+                            className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                            disabled={isLoading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </>
+                  )}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Botão para mostrar/esconder o formulário */}
+      <div className="flex justify-end mt-4">
+        <Button
+          onClick={() => setMostrarFormulario(!mostrarFormulario)}
+          className="bg-secondary hover:bg-secondary-dark text-white transition-colors"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          {mostrarFormulario ? "Cancelar" : "Criar Novo Cliente"}
+        </Button>
+      </div>
+
+      {/* Formulário para adicionar novo cliente - visível apenas quando mostrarFormulario for true */}
+      {mostrarFormulario && (
+        <Card className="overflow-hidden shadow-sm border-0 border-t-4 border-t-secondary mt-4 animate-in slide-in-from-top duration-300">
+          <CardContent className="p-4">
+            <h4 className="font-medium mb-4 text-secondary flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Adicionar Novo Cliente
+            </h4>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="codigo" className="text-primary flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Código
+                  </Label>
+                  <Input
+                    id="codigo"
+                    value={novoCliente.codigo}
+                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                    disabled={true}
+                    placeholder="Gerado automaticamente"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="nome" className="text-primary flex items-center gap-2">
+                    <Building className="h-4 w-4" />
+                    Nome Empresa
+                  </Label>
+                  <Input
+                    id="nome"
+                    value={novoCliente.nome}
+                    onChange={(e) => setNovoCliente({ ...novoCliente, nome: e.target.value })}
+                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
               <div>
-                <Label htmlFor="codigo" className="text-primary flex items-center gap-2">
+                <Label htmlFor="cnpj" className="text-primary flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Código
+                  CNPJ
                 </Label>
                 <Input
-                  id="codigo"
-                  value={novoCliente.codigo}
-                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                  disabled={true} // Código será gerado automaticamente
-                  placeholder="Gerado automaticamente"
-                />
-              </div>
-              <div>
-                <Label htmlFor="nome" className="text-primary flex items-center gap-2">
-                  <Building className="h-4 w-4" />
-                  Nome Empresa
-                </Label>
-                <Input
-                  id="nome"
-                  value={novoCliente.nome}
-                  onChange={(e) => setNovoCliente({ ...novoCliente, nome: e.target.value })}
-                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="cnpj" className="text-primary flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                CNPJ
-              </Label>
-              <Input
-                id="cnpj"
-                value={novoCliente.cnpj}
-                onChange={(e) => setNovoCliente({ ...novoCliente, cnpj: e.target.value })}
-                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <Label htmlFor="endereco" className="text-primary">
-                Endereço
-              </Label>
-              <Input
-                id="endereco"
-                value={novoCliente.endereco}
-                onChange={(e) => setNovoCliente({ ...novoCliente, endereco: e.target.value })}
-                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="telefone" className="text-primary flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Telefone
-                </Label>
-                <Input
-                  id="telefone"
-                  value={novoCliente.telefone}
-                  onChange={(e) => setNovoCliente({ ...novoCliente, telefone: e.target.value })}
+                  id="cnpj"
+                  value={novoCliente.cnpj}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, cnpj: e.target.value })}
                   className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div>
-                <Label htmlFor="email" className="text-primary flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  Email
+                <Label htmlFor="endereco" className="text-primary">
+                  Endereço
                 </Label>
                 <Input
-                  id="email"
-                  value={novoCliente.email}
-                  onChange={(e) => setNovoCliente({ ...novoCliente, email: e.target.value })}
+                  id="endereco"
+                  value={novoCliente.endereco}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, endereco: e.target.value })}
                   className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="telefone" className="text-primary flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Telefone
+                  </Label>
+                  <Input
+                    id="telefone"
+                    value={novoCliente.telefone}
+                    onChange={(e) => setNovoCliente({ ...novoCliente, telefone: e.target.value })}
+                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email" className="text-primary flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    value={novoCliente.email}
+                    onChange={(e) => setNovoCliente({ ...novoCliente, email: e.target.value })}
+                    className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="contato" className="text-primary flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Contato
+                </Label>
+                <Input
+                  id="contato"
+                  value={novoCliente.contato}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, contato: e.target.value })}
+                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  placeholder="Nome do contato"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setMostrarFormulario(false)} className="flex-1">
+                  <X className="h-4 w-4 mr-2" /> Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    handleAdicionarCliente()
+                    if (!isLoading) setMostrarFormulario(false)
+                  }}
+                  className="flex-1 bg-secondary hover:bg-secondary-dark text-white transition-colors"
+                  disabled={isLoading || !novoCliente.nome}
+                >
+                  <Plus className="h-4 w-4 mr-2" /> {isLoading ? "Adicionando..." : "Adicionar Cliente"}
+                </Button>
+              </div>
             </div>
-            <Button
-              onClick={handleAdicionarCliente}
-              className="w-full bg-secondary hover:bg-secondary-dark text-white transition-colors"
-              disabled={isLoading || !novoCliente.nome}
-            >
-              <Plus className="h-4 w-4 mr-2" /> {isLoading ? "Adicionando..." : "Adicionar Cliente"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

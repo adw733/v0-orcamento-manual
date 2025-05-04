@@ -6,6 +6,7 @@ export interface Database {
       clientes: {
         Row: {
           id: string
+          codigo: string | null
           nome: string
           cnpj: string | null
           endereco: string | null
@@ -17,6 +18,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          codigo?: string | null
           nome: string
           cnpj?: string | null
           endereco?: string | null
@@ -28,6 +30,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          codigo?: string | null
           nome?: string
           cnpj?: string | null
           endereco?: string | null
@@ -41,6 +44,7 @@ export interface Database {
       produtos: {
         Row: {
           id: string
+          codigo: string | null
           nome: string
           valor_base: number
           cores: string[] | null
@@ -50,6 +54,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          codigo?: string | null
           nome: string
           valor_base: number
           cores?: string[] | null
@@ -59,6 +64,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          codigo?: string | null
           nome?: string
           valor_base?: number
           cores?: string[] | null
@@ -90,6 +96,52 @@ export interface Database {
           created_at?: string
         }
       }
+      tecidos_base: {
+        Row: {
+          id: string
+          nome: string
+          composicao: string
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          nome: string
+          composicao: string
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          nome?: string
+          composicao?: string
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
+      cores: {
+        Row: {
+          id: string
+          nome: string
+          codigo_hex: string | null
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          nome: string
+          codigo_hex?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          nome?: string
+          codigo_hex?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
       orcamentos: {
         Row: {
           id: string
@@ -103,6 +155,7 @@ export interface Database {
           created_at: string
           updated_at: string | null
           itens: Json | null
+          status: string | null
         }
         Insert: {
           id?: string
@@ -116,6 +169,7 @@ export interface Database {
           created_at?: string
           updated_at?: string | null
           itens?: Json | null
+          status?: string | null
         }
         Update: {
           id?: string
@@ -129,6 +183,7 @@ export interface Database {
           created_at?: string
           updated_at?: string | null
           itens?: Json | null
+          status?: string | null
         }
       }
       itens_orcamento: {
@@ -176,6 +231,93 @@ export interface Database {
           imagem?: string | null
           observacao?: string | null
           created_at?: string
+        }
+      }
+      estampas: {
+        Row: {
+          id: string
+          item_orcamento_id: string
+          posicao: string | null
+          tipo: string | null
+          largura: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          item_orcamento_id: string
+          posicao?: string | null
+          tipo?: string | null
+          largura?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          item_orcamento_id?: string
+          posicao?: string | null
+          tipo?: string | null
+          largura?: number | null
+          created_at?: string
+        }
+      }
+      empresa: {
+        Row: {
+          id: string
+          nome: string
+          cnpj: string | null
+          endereco: string | null
+          telefone: string | null
+          email: string | null
+          website: string | null
+          logo_url: string | null
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          nome: string
+          cnpj?: string | null
+          endereco?: string | null
+          telefone?: string | null
+          email?: string | null
+          website?: string | null
+          logo_url?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          nome?: string
+          cnpj?: string | null
+          endereco?: string | null
+          telefone?: string | null
+          email?: string | null
+          website?: string | null
+          logo_url?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
+      configuracoes: {
+        Row: {
+          id: string
+          chave: string
+          valor: Json
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          chave: string
+          valor: Json
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          chave?: string
+          valor?: Json
+          created_at?: string
+          updated_at?: string | null
         }
       }
     }

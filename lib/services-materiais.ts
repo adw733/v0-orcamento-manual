@@ -90,7 +90,7 @@ export const tecidoBaseService = {
     return data.map((tecido) => ({
       id: tecido.id,
       nome: tecido.nome,
-      composicao: tecido.composicao,
+      composicao: tecido.composicao || "",
     }))
   },
 
@@ -111,7 +111,7 @@ export const tecidoBaseService = {
     return {
       id: data[0].id,
       nome: data[0].nome,
-      composicao: data[0].composicao,
+      composicao: data[0].composicao || "",
     }
   },
 

@@ -15,6 +15,7 @@ import {
   extractTextFromPDF,
 } from "@/app/actions/gemini-actions"
 import type { Cliente, Produto, Orcamento } from "@/types/types"
+import { corService, tecidoBaseService } from "@/lib/services-materiais"
 
 interface AssistenteIAProps {
   clientes: Cliente[]
@@ -48,9 +49,36 @@ export default function AssistenteIA({
   })
   const [isFileUploadMode, setIsFileUploadMode] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [cores, setCores] = useState<any[]>([])
+  const [tecidos, setTecidos] = useState<any[]>([])
+  const [lastAction, setLastAction] = useState<{ action: string; data: any } | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Carregar cores e tecidos ao iniciar
+  useEffect(() => {
+    const carregarCores = async () => {
+      try {
+        const coresData = await corService.listarTodas()
+        setCores(coresData)
+      } catch (error) {
+        console.error("Erro ao carregar cores:", error)
+      }
+    }
+
+    const carregarTecidos = async () => {
+      try {
+        const tecidosData = await tecidoBaseService.listarTodos()
+        setTecidos(tecidosData)
+      } catch (error) {
+        console.error("Erro ao carregar tecidos:", error)
+      }
+    }
+
+    carregarCores()
+    carregarTecidos()
+  }, [])
 
   // Scroll to bottom of messages
   useEffect(() => {
@@ -89,17 +117,47 @@ export default function AssistenteIA({
       // Add user message
       setMessages((prev) => [...prev, { role: "user", content: prompt }])
 
+      // Verificar se é uma resposta para dados inventados
+      if (lastAction) {
+        await processUserResponse(prompt)
+        setPrompt("")
+        return
+      }
+
       // Clear input
       setPrompt("")
 
       setIsLoading(true)
 
       try {
-        // Generate content with Gemini - passar clientes e produtos
-        const result = await generateWithGemini(prompt, clientes, produtos)
+        // Generate content with Gemini - passar clientes, produtos, cores e tecidos
+        const result = await generateWithGemini(prompt, clientes, produtos, cores, tecidos)
 
         if (result.success) {
-          if (result.action === "requestInfo" && result.camposFaltantes && result.camposFaltantes.length > 0) {
+          // Verificar se temos dados inventados
+          if (result.action && result.data && result.data.dadosInventados && result.data.mensagemInventado) {
+            // Perguntar ao usuário se pode prosseguir com os dados inventados
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: result.data.mensagemInventado,
+              },
+            ])
+
+            // Mostrar feedback
+            setFeedback({
+              visible: true,
+              success: true,
+              message: "Confirme se posso prosseguir com os dados inventados.",
+            })
+
+            // Salvar a ação e os dados para processamento posterior
+            setLastAction({
+              action: result.action,
+              data: result.data,
+            })
+          } else if (result.action === "requestInfo" && result.camposFaltantes && result.camposFaltantes.length > 0) {
             // O Gemini está solicitando mais informações
             setMessages((prev) => [
               ...prev,
@@ -115,10 +173,19 @@ export default function AssistenteIA({
               success: true,
               message: "Informações adicionais são necessárias para continuar.",
             })
-          } else if (result.action && result.data) {
-            // Process the action
+          } else if (result.action === "autoComplete" && result.data) {
+            // O usuário pediu para preencher automaticamente
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: "Vou preencher as informações faltantes automaticamente e processar sua solicitação.",
+              },
+            ])
+
+            // Processar a ação com os dados preenchidos automaticamente
             const actionResult = await processGeminiAction(
-              result.action,
+              result.data.action,
               result.data,
               clientes,
               produtos,
@@ -126,6 +193,11 @@ export default function AssistenteIA({
               setClientes,
               setProdutos,
               setOrcamento,
+              cores,
+              tecidos,
+              setCores,
+              setTecidos,
+              false,
             )
 
             // Add assistant message
@@ -144,9 +216,47 @@ export default function AssistenteIA({
               message: actionResult.message,
             })
 
-            // If it's a new orçamento and it was successful, switch to the orçamento tab
-            if (result.action === "createOrcamento" && actionResult.success) {
-              setAbaAtiva("orcamento")
+            // Se tiver uma aba para mostrar, mudar para ela
+            if (actionResult.abaParaMostrar) {
+              setAbaAtiva(actionResult.abaParaMostrar)
+            }
+          } else if (result.action && result.data) {
+            // Process the action
+            const actionResult = await processGeminiAction(
+              result.action,
+              result.data,
+              clientes,
+              produtos,
+              orcamento,
+              setClientes,
+              setProdutos,
+              setOrcamento,
+              cores,
+              tecidos,
+              setCores,
+              setTecidos,
+              false,
+            )
+
+            // Add assistant message
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: actionResult.success ? `✅ ${actionResult.message}` : `❌ ${actionResult.message}`,
+              },
+            ])
+
+            // Show feedback
+            setFeedback({
+              visible: true,
+              success: actionResult.success,
+              message: actionResult.message,
+            })
+
+            // Se tiver uma aba para mostrar, mudar para ela
+            if (actionResult.abaParaMostrar) {
+              setAbaAtiva(actionResult.abaParaMostrar)
             }
           } else {
             // Add error message
@@ -250,7 +360,7 @@ export default function AssistenteIA({
       }
 
       // Process the file with Gemini
-      const result = await processFileWithGemini(fileContent, fileType, clientes, produtos)
+      const result = await processFileWithGemini(fileContent, fileType, clientes, produtos, cores, tecidos)
 
       if (result.success && result.action && result.data) {
         // Process the action
@@ -263,6 +373,11 @@ export default function AssistenteIA({
           setClientes,
           setProdutos,
           setOrcamento,
+          cores,
+          tecidos,
+          setCores,
+          setTecidos,
+          false,
         )
 
         // Add assistant message
@@ -283,9 +398,9 @@ export default function AssistenteIA({
           message: actionResult.message,
         })
 
-        // If it's a new orçamento and it was successful, switch to the orçamento tab
-        if (result.action === "extractOrcamento" && actionResult.success) {
-          setAbaAtiva("orcamento")
+        // Se tiver uma aba para mostrar, mudar para ela
+        if (actionResult.abaParaMostrar) {
+          setAbaAtiva(actionResult.abaParaMostrar)
         }
       } else {
         // Add error message
@@ -330,6 +445,75 @@ export default function AssistenteIA({
         fileInputRef.current.value = ""
       }
     }
+  }
+
+  // Função para processar a resposta do usuário para dados inventados
+  const processUserResponse = async (userMessage: string) => {
+    if (!lastAction) return
+
+    // Verificar se o usuário confirmou
+    const confirmationRegex = /^(sim|s|yes|y|confirmar|confirmo|pode|prosseguir|ok|concordo)/i
+    const isConfirmed = confirmationRegex.test(userMessage)
+
+    if (isConfirmed) {
+      // Processar a ação com os dados inventados
+      const actionResult = await processGeminiAction(
+        lastAction.action,
+        lastAction.data,
+        clientes,
+        produtos,
+        orcamento,
+        setClientes,
+        setProdutos,
+        setOrcamento,
+        cores,
+        tecidos,
+        setCores,
+        setTecidos,
+        false,
+      )
+
+      // Add assistant message
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: actionResult.success ? `✅ ${actionResult.message}` : `❌ ${actionResult.message}`,
+        },
+      ])
+
+      // Show feedback
+      setFeedback({
+        visible: true,
+        success: actionResult.success,
+        message: actionResult.message,
+      })
+
+      // Se tiver uma aba para mostrar, mudar para ela
+      if (actionResult.abaParaMostrar) {
+        setAbaAtiva(actionResult.abaParaMostrar)
+      }
+    } else {
+      // Usuário não confirmou
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Entendido. Não prosseguirei com os dados inventados. Por favor, forneça as informações necessárias.",
+        },
+      ])
+
+      // Show feedback
+      setFeedback({
+        visible: true,
+        success: true,
+        message: "Operação cancelada pelo usuário.",
+      })
+    }
+
+    // Limpar a última ação
+    setLastAction(null)
   }
 
   // Helper function to read file as base64
@@ -471,11 +655,11 @@ export default function AssistenteIA({
                 <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
                   <Bot className="h-12 w-12 mb-2 text-primary/50" />
                   <p className="text-sm">
-                    Olá! Sou seu assistente IA. Posso ajudar a criar clientes, produtos e orçamentos.
+                    Olá! Sou seu assistente IA. Posso ajudar a criar cores, tecidos, clientes, produtos e orçamentos.
                   </p>
                   <p className="text-xs mt-2">
-                    Exemplos: "Crie um cliente chamado Empresa ABC" ou "Faça um orçamento para 10 camisas para o cliente
-                    XYZ"
+                    Exemplos: "Crie uma cor azul marinho", "Crie um tecido malha piquet", "Crie um cliente chamado
+                    Empresa ABC" ou "Faça um orçamento para 10 camisas para o cliente XYZ"
                   </p>
                   <p className="text-xs mt-2">
                     Você também pode enviar imagens ou PDFs de orçamentos para que eu os converta para o formato do

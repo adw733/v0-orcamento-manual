@@ -188,41 +188,82 @@ async function obterProximoCodigoProduto(): Promise<string> {
   }
 }
 
-// Modificar o systemPrompt para incluir instruções sobre verificação de campos obrigatórios
+// Modificar o systemPrompt para incluir instruções sobre cores e tecidos
 const systemPrompt = `
 Você é um assistente especializado em criar e editar dados para um sistema de orçamentos de uniformes industriais.
 
 Analise o pedido do usuário e identifique se ele quer:
-1. Criar um novo cliente
-2. Criar um novo produto
-3. Criar um novo orçamento
-4. Editar um cliente existente
-5. Editar um produto existente
-6. Editar um orçamento existente
-7. Extrair informações de um orçamento em formato de texto ou imagem
+1. Criar uma nova cor
+2. Criar um novo tecido
+3. Criar um novo cliente
+4. Criar um novo produto
+5. Criar um novo orçamento
+6. Editar uma cor existente
+7. Editar um tecido existente
+8. Editar um cliente existente
+9. Editar um produto existente
+10. Editar um orçamento existente
+11. Extrair informações de um orçamento em formato de texto ou imagem
 
-IMPORTANTE: Sempre verifique se o cliente ou produto já existe antes de criar um novo. Pergunte ao usuário se deseja criar um novo quando não encontrar o solicitado.
+IMPORTANTE: Sempre verifique se o item já existe antes de criar um novo. Use o item existente quando encontrar.
 
-IMPORTANTE: Verifique se todas as informações obrigatórias estão presentes. Se faltar alguma informação, pergunte ao usuário antes de prosseguir.
+IMPORTANTE: Quando faltarem informações obrigatórias, INVENTE dados plausíveis para preencher automaticamente. Não pergunte ao usuário por cada campo faltante, apenas pergunte se pode prosseguir com os dados que você inventou.
+
+Campos obrigatórios para Cor:
+- nome (obrigatório)
+- codigo_hex (opcional, mas recomendado - invente um código de cor apropriado)
+
+Campos obrigatórios para Tecido:
+- nome (obrigatório)
+- composicao (obrigatório - invente uma composição plausível)
 
 Campos obrigatórios para Cliente:
 - nome (obrigatório)
-- cnpj (obrigatório)
-- contato (obrigatório)
+- cnpj (obrigatório - invente um CNPJ válido no formato XX.XXX.XXX/XXXX-XX)
+- contato (obrigatório - invente um nome de contato)
+- endereco (opcional - invente um endereço plausível)
+- telefone (opcional - invente um telefone no formato (XX) XXXXX-XXXX)
+- email (opcional - invente um email corporativo)
 
 Campos obrigatórios para Produto:
 - nome (obrigatório)
-- valorBase (obrigatório)
-- pelo menos um tecido (obrigatório)
-- pelo menos uma cor (obrigatório)
-- pelo menos um tamanho disponível (obrigatório)
+- valorBase (obrigatório - invente um valor plausível)
+- pelo menos um tecido (obrigatório - use um tecido existente ou invente um novo)
+- pelo menos uma cor (obrigatório - use uma cor existente ou invente uma nova)
+- pelo menos um tamanho disponível (obrigatório - use tamanhos padrão como P, M, G, GG)
 
 Campos obrigatórios para Orçamento:
-- cliente (obrigatório)
+- cliente (obrigatório - use um cliente existente)
 - pelo menos um item (obrigatório)
 - para cada item: produto, quantidade, valorUnitario (obrigatórios)
+- para cada estampa: posicao, tipo, largura (obrigatórios - invente posições como "PEITO ESQUERDO", tipos como "BORDADO" e larguras plausíveis)
+- condicoesPagamento (opcional - invente condições como "À vista", "30 dias", etc.)
+- prazoEntrega (opcional - invente prazos como "15 dias", "30 dias", etc.)
+- validadeOrcamento (opcional - invente validades como "15 dias", "30 dias", etc.)
 
 Responda APENAS com um JSON no seguinte formato, SEM usar blocos de código markdown:
+
+Para criar cor:
+{
+  "action": "createCor",
+  "data": {
+    "nome": "Azul Marinho",
+    "codigo_hex": "#000080"
+  },
+  "dadosInventados": true,
+  "mensagemInventado": "Inventei o código de cor #000080 para Azul Marinho. Posso prosseguir?"
+}
+
+Para criar tecido:
+{
+  "action": "createTecido",
+  "data": {
+    "nome": "Malha Piquet",
+    "composicao": "50% Algodão, 50% Poliéster"
+  },
+  "dadosInventados": true,
+  "mensagemInventado": "Inventei a composição '50% Algodão, 50% Poliéster' para o tecido Malha Piquet. Posso prosseguir?"
+}
 
 Para criar cliente:
 {
@@ -235,8 +276,8 @@ Para criar cliente:
     "email": "contato@empresa.com",
     "contato": "Nome do Contato"
   },
-  "verificar": true,
-  "camposFaltantes": [] // Lista de campos obrigatórios que estão faltando
+  "dadosInventados": true,
+  "mensagemInventado": "Inventei o CNPJ, endereço, telefone e email para o cliente. Posso prosseguir?"
 }
 
 Para criar produto:
@@ -251,8 +292,8 @@ Para criar produto:
     "cores": ["Cor 1", "Cor 2"],
     "tamanhosDisponiveis": ["P", "M", "G"]
   },
-  "verificar": true,
-  "camposFaltantes": [] // Lista de campos obrigatórios que estão faltando
+  "dadosInventados": true,
+  "mensagemInventado": "Inventei o valor base, tecidos, cores e tamanhos disponíveis para o produto. Posso prosseguir?"
 }
 
 Para criar orçamento:
@@ -267,7 +308,14 @@ Para criar orçamento:
         "valorUnitario": 45.90,
         "tecidoSelecionado": "Nome do Tecido",
         "corSelecionada": "Cor",
-        "tamanhos": { "P": 2, "M": 5, "G": 3 }
+        "tamanhos": { "P": 2, "M": 5, "G": 3 },
+        "estampas": [
+          {
+            "posicao": "PEITO ESQUERDO",
+            "tipo": "BORDADO",
+            "largura": 8.0
+          }
+        ]
       }
     ],
     "observacoes": "Observações",
@@ -275,9 +323,11 @@ Para criar orçamento:
     "prazoEntrega": "30 dias",
     "validadeOrcamento": "15 dias"
   },
-  "verificar": true,
-  "camposFaltantes": [] // Lista de campos obrigatórios que estão faltando
+  "dadosInventados": true,
+  "mensagemInventado": "Inventei detalhes para os itens, estampas, condições de pagamento e prazos. Posso prosseguir?"
 }
+
+Para editar, use os mesmos formatos acima, mas com a action "updateCor", "updateTecido", "updateCliente", "updateProduto" ou "updateOrcamento", e inclua o ID do item a ser editado.
 
 Para extrair informações de um orçamento:
 {
@@ -309,17 +359,18 @@ Para extrair informações de um orçamento:
     "prazoEntrega": "45 DIAS APÓS CONFIRMAÇÃO",
     "observacoes": ""
   },
-  "camposFaltantes": [] // Lista de campos obrigatórios que estão faltando
+  "dadosInventados": true,
+  "mensagemInventado": "Extraí as informações do orçamento e completei alguns detalhes. Posso prosseguir?"
 }
 
-Se faltarem informações obrigatórias, responda com:
+Se o usuário pedir para preencher automaticamente as informações faltantes, responda com:
 {
-  "action": "requestInfo",
-  "message": "Preciso de mais informações para prosseguir.",
-  "camposFaltantes": ["nome", "cnpj"] // Lista de campos obrigatórios que estão faltando
+  "action": "autoComplete",
+  "message": "Vou preencher as informações faltantes automaticamente.",
+  "data": {
+    // Dados completos com valores fictícios para os campos faltantes
+  }
 }
-
-Para editar, use os mesmos formatos acima, mas com a action "updateCliente", "updateProduto" ou "updateOrcamento", e inclua o ID do item a ser editado.
 
 Se não conseguir entender o pedido, responda com:
 {
@@ -329,14 +380,16 @@ Se não conseguir entender o pedido, responda com:
 
 IMPORTANTE: Não use blocos de código markdown (\`\`\`). Retorne apenas o JSON puro.
 
-Preencha todos os campos necessários. Se alguma informação estiver faltando no pedido do usuário, crie dados fictícios plausíveis baseados no contexto.
+Preencha todos os campos necessários automaticamente com dados plausíveis quando faltarem informações no pedido do usuário.
 `
 
-// Modificar a função generateWithGemini para incluir instruções sobre verificar clientes e produtos existentes
+// Modificar a função generateWithGemini para incluir cores e tecidos
 export async function generateWithGemini(
   prompt: string,
   clientes: Cliente[] = [],
   produtos: Produto[] = [],
+  cores: any[] = [],
+  tecidos: any[] = [],
 ): Promise<{
   success: boolean
   message: string
@@ -353,7 +406,7 @@ export async function generateWithGemini(
     // Get the model using the correct model name with free quota
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro-exp-03-25" })
 
-    // Criar listas de clientes e produtos para incluir no prompt
+    // Criar listas de clientes, produtos, cores e tecidos para incluir no prompt
     const clientesLista =
       clientes.length > 0
         ? `Clientes existentes: ${clientes.map((c) => `${c.codigo} - ${c.nome}`).join(", ")}`
@@ -364,13 +417,25 @@ export async function generateWithGemini(
         ? `Produtos existentes: ${produtos.map((p) => `${p.codigo} - ${p.nome}`).join(", ")}`
         : "Não há produtos cadastrados."
 
+    const coresLista =
+      cores.length > 0
+        ? `Cores existentes: ${cores.map((c) => `${c.nome} (${c.codigo_hex || "sem código"})`).join(", ")}`
+        : "Não há cores cadastradas."
+
+    const tecidosLista =
+      tecidos.length > 0
+        ? `Tecidos existentes: ${tecidos.map((t) => `${t.nome} (${t.composicao || "sem composição"})`).join(", ")}`
+        : "Não há tecidos cadastrados."
+
     // Adicionar as listas ao prompt do sistema
     const systemPromptCompleto = `${systemPrompt}
 
 ${clientesLista}
 ${produtosLista}
+${coresLista}
+${tecidosLista}
 
-Lembre-se de verificar se o cliente ou produto já existe antes de sugerir criar um novo.
+Lembre-se de verificar se o item já existe antes de sugerir criar um novo.
 Lembre-se de verificar se todas as informações obrigatórias estão presentes.
 `
 
@@ -430,12 +495,14 @@ Lembre-se de verificar se todas as informações obrigatórias estão presentes.
   }
 }
 
-// New function to process file uploads and extract text using Gemini Vision
+// Modificar a função processFileWithGemini para incluir cores e tecidos
 export async function processFileWithGemini(
   fileContent: string,
   fileType: string,
   clientes: Cliente[] = [],
   produtos: Produto[] = [],
+  cores: any[] = [],
+  tecidos: any[] = [],
 ): Promise<{
   success: boolean
   message: string
@@ -451,7 +518,7 @@ export async function processFileWithGemini(
     // Get the vision model
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro-exp-03-25" })
 
-    // Criar listas de clientes e produtos para incluir no prompt
+    // Criar listas de clientes, produtos, cores e tecidos para incluir no prompt
     const clientesLista =
       clientes.length > 0
         ? `Clientes existentes: ${clientes.map((c) => c.nome).join(", ")}`
@@ -461,6 +528,14 @@ export async function processFileWithGemini(
       produtos.length > 0
         ? `Produtos existentes: ${produtos.map((p) => p.nome).join(", ")}`
         : "Não há produtos cadastrados."
+
+    const coresLista =
+      cores.length > 0 ? `Cores existentes: ${cores.map((c) => c.nome).join(", ")}` : "Não há cores cadastradas."
+
+    const tecidosLista =
+      tecidos.length > 0
+        ? `Tecidos existentes: ${tecidos.map((t) => t.nome).join(", ")}`
+        : "Não há tecidos cadastrados."
 
     // Prompt específico para extração de orçamentos
     const extractionPrompt = `
@@ -477,6 +552,8 @@ Extraia todas as informações relevantes como:
 
 ${clientesLista}
 ${produtosLista}
+${coresLista}
+${tecidosLista}
 
 Responda APENAS com um JSON no seguinte formato, SEM usar blocos de código markdown:
 
@@ -570,7 +647,62 @@ IMPORTANTE: Não use blocos de código markdown (\`\`\`). Retorne apenas o JSON 
   }
 }
 
-// Modificar a função processGeminiAction para verificar campos obrigatórios
+// Adicionar funções para obter próximos códigos de cores e tecidos
+async function obterProximoCodigoCor(): Promise<string> {
+  try {
+    // Buscar a última cor para obter o código mais recente
+    const { data, error } = await supabase.from("cores").select("id").order("created_at", { ascending: false }).limit(1)
+
+    if (error) {
+      console.error("Erro ao buscar último código de cor:", error)
+      // Se houver erro, começar do 0001
+      return "COR0001"
+    }
+
+    if (data && data.length > 0) {
+      // Incrementar e formatar com zeros à esquerda
+      const proximoCodigo = `COR${(Number(data.length) + 1).toString().padStart(4, "0")}`
+      return proximoCodigo
+    }
+
+    // Se não houver cores, começar do COR0001
+    return "COR0001"
+  } catch (error) {
+    console.error("Erro ao obter próximo código de cor:", error)
+    return "COR0001"
+  }
+}
+
+async function obterProximoCodigoTecido(): Promise<string> {
+  try {
+    // Buscar o último tecido para obter o código mais recente
+    const { data, error } = await supabase
+      .from("tecidos_base")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .limit(1)
+
+    if (error) {
+      console.error("Erro ao buscar último código de tecido:", error)
+      // Se houver erro, começar do 0001
+      return "TEC0001"
+    }
+
+    if (data && data.length > 0) {
+      // Incrementar e formatar com zeros à esquerda
+      const proximoCodigo = `TEC${(Number(data.length) + 1).toString().padStart(4, "0")}`
+      return proximoCodigo
+    }
+
+    // Se não houver tecidos, começar do TEC0001
+    return "TEC0001"
+  } catch (error) {
+    console.error("Erro ao obter próximo código de tecido:", error)
+    return "TEC0001"
+  }
+}
+
+// Modificar a função processGeminiAction para incluir cores e tecidos
 export async function processGeminiAction(
   action: string,
   data: any,
@@ -580,7 +712,13 @@ export async function processGeminiAction(
   setClientes: (clientes: Cliente[]) => void,
   setProdutos: (produtos: Produto[]) => void,
   setOrcamento: (orcamento: Orcamento) => void,
-): Promise<{ success: boolean; message: string }> {
+  cores: any[] = [],
+  tecidos: any[] = [],
+  setCores: (cores: any[]) => void = () => {},
+  setTecidos: (tecidos: any[]) => void = () => {},
+  dadosInventados = false,
+  mensagemInventado = "",
+): Promise<{ success: boolean; message: string; abaParaMostrar?: string }> {
   try {
     // Generate a UUID for new items
     const generateUUID = () => {
@@ -591,15 +729,240 @@ export async function processGeminiAction(
       })
     }
 
-    // Verificar se há campos obrigatórios faltando
-    if (data.camposFaltantes && data.camposFaltantes.length > 0) {
+    // Se temos dados inventados e o usuário não confirmou, retornar a mensagem
+    if (dadosInventados && mensagemInventado) {
       return {
-        success: false,
-        message: `Por favor, forneça as seguintes informações obrigatórias: ${data.camposFaltantes.join(", ")}`,
+        success: true,
+        message: mensagemInventado,
       }
     }
 
+    // Adicionar a variável abaParaMostrar para cada ação
+    let abaParaMostrar = ""
+
     switch (action) {
+      case "createCor": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.nome) camposFaltantes.push("nome")
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
+        // Verificar se a cor já existe pelo nome
+        const corExistente = cores.find((c) => c.nome.toLowerCase() === data.nome.toLowerCase())
+
+        if (corExistente) {
+          return {
+            success: true,
+            message: `Cor "${data.nome}" já existe no sistema. Usando a cor existente.`,
+            abaParaMostrar: "materiais",
+          }
+        }
+
+        // Obter o próximo código sequencial
+        const codigo = await obterProximoCodigoCor()
+
+        // Create a new color
+        const novaCor = {
+          id: generateUUID(),
+          nome: data.nome,
+          codigo_hex: data.codigo_hex || "#000000",
+        }
+
+        // Insert into Supabase
+        const { error } = await supabase.from("cores").insert({
+          id: novaCor.id,
+          nome: novaCor.nome,
+          codigo_hex: novaCor.codigo_hex,
+        })
+
+        if (error) throw error
+
+        // Update local state
+        setCores([...cores, novaCor])
+
+        // Definir a aba para mostrar
+        abaParaMostrar = "materiais"
+
+        return {
+          success: true,
+          message: `Cor "${novaCor.nome}" criada com sucesso!`,
+          abaParaMostrar,
+        }
+      }
+
+      case "createTecido": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.nome) camposFaltantes.push("nome")
+        if (!data.composicao) camposFaltantes.push("composicao")
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
+        // Verificar se o tecido já existe pelo nome
+        const tecidoExistente = tecidos.find((t) => t.nome.toLowerCase() === data.nome.toLowerCase())
+
+        if (tecidoExistente) {
+          return {
+            success: true,
+            message: `Tecido "${data.nome}" já existe no sistema. Usando o tecido existente.`,
+            abaParaMostrar: "materiais",
+          }
+        }
+
+        // Obter o próximo código sequencial
+        const codigo = await obterProximoCodigoTecido()
+
+        // Create a new tecido
+        const novoTecido = {
+          id: generateUUID(),
+          nome: data.nome,
+          composicao: data.composicao,
+        }
+
+        // Insert into Supabase
+        const { error } = await supabase.from("tecidos_base").insert({
+          id: novoTecido.id,
+          nome: novoTecido.nome,
+          composicao: novoTecido.composicao,
+        })
+
+        if (error) throw error
+
+        // Update local state
+        setTecidos([...tecidos, novoTecido])
+
+        // Definir a aba para mostrar
+        abaParaMostrar = "materiais"
+
+        return {
+          success: true,
+          message: `Tecido "${novoTecido.nome}" criado com sucesso!`,
+          abaParaMostrar,
+        }
+      }
+
+      case "updateCor": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.id) camposFaltantes.push("id")
+        if (!data.nome) camposFaltantes.push("nome")
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
+        // Verificar se a cor existe
+        const corExistente = cores.find((c) => c.id === data.id)
+
+        if (!corExistente) {
+          return {
+            success: false,
+            message: `Cor com ID "${data.id}" não encontrada.`,
+          }
+        }
+
+        // Update the color
+        const corAtualizada = {
+          ...corExistente,
+          nome: data.nome,
+          codigo_hex: data.codigo_hex || corExistente.codigo_hex,
+        }
+
+        // Update in Supabase
+        const { error } = await supabase
+          .from("cores")
+          .update({
+            nome: corAtualizada.nome,
+            codigo_hex: corAtualizada.codigo_hex,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", corAtualizada.id)
+
+        if (error) throw error
+
+        // Update local state
+        setCores(cores.map((c) => (c.id === corAtualizada.id ? corAtualizada : c)))
+
+        // Definir a aba para mostrar
+        abaParaMostrar = "materiais"
+
+        return {
+          success: true,
+          message: `Cor "${corAtualizada.nome}" atualizada com sucesso!`,
+          abaParaMostrar,
+        }
+      }
+
+      case "updateTecido": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.id) camposFaltantes.push("id")
+        if (!data.nome) camposFaltantes.push("nome")
+        if (!data.composicao) camposFaltantes.push("composicao")
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
+        // Verificar se o tecido existe
+        const tecidoExistente = tecidos.find((t) => t.id === data.id)
+
+        if (!tecidoExistente) {
+          return {
+            success: false,
+            message: `Tecido com ID "${data.id}" não encontrado.`,
+          }
+        }
+
+        // Update the tecido
+        const tecidoAtualizado = {
+          ...tecidoExistente,
+          nome: data.nome,
+          composicao: data.composicao,
+        }
+
+        // Update in Supabase
+        const { error } = await supabase
+          .from("tecidos_base")
+          .update({
+            nome: tecidoAtualizado.nome,
+            composicao: tecidoAtualizado.composicao,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", tecidoAtualizado.id)
+
+        if (error) throw error
+
+        // Update local state
+        setTecidos(tecidos.map((t) => (t.id === tecidoAtualizado.id ? tecidoAtualizado : t)))
+
+        // Definir a aba para mostrar
+        abaParaMostrar = "materiais"
+
+        return {
+          success: true,
+          message: `Tecido "${tecidoAtualizado.nome}" atualizado com sucesso!`,
+          abaParaMostrar,
+        }
+      }
+
       case "createCliente": {
         // Verificar campos obrigatórios
         const camposFaltantes = []
@@ -621,6 +984,7 @@ export async function processGeminiAction(
           return {
             success: true,
             message: `Cliente "${data.nome}" já existe no sistema. Usando o cliente existente.`,
+            abaParaMostrar: "clientes",
           }
         }
 
@@ -656,7 +1020,79 @@ export async function processGeminiAction(
         // Update local state
         setClientes([...clientes, novoCliente])
 
-        return { success: true, message: `Cliente "${novoCliente.nome}" (${novoCliente.codigo}) criado com sucesso!` }
+        // Definir a aba para mostrar
+        abaParaMostrar = "clientes"
+
+        return {
+          success: true,
+          message: `Cliente "${novoCliente.nome}" (${novoCliente.codigo}) criado com sucesso!`,
+          abaParaMostrar,
+        }
+      }
+
+      case "updateCliente": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.id) camposFaltantes.push("id")
+        if (!data.nome) camposFaltantes.push("nome")
+        if (!data.cnpj) camposFaltantes.push("cnpj")
+        if (!data.contato) camposFaltantes.push("contato")
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
+        // Verificar se o cliente existe
+        const clienteExistente = clientes.find((c) => c.id === data.id)
+
+        if (!clienteExistente) {
+          return {
+            success: false,
+            message: `Cliente com ID "${data.id}" não encontrado.`,
+          }
+        }
+
+        // Update the client
+        const clienteAtualizado: Cliente = {
+          ...clienteExistente,
+          nome: data.nome,
+          cnpj: data.cnpj || clienteExistente.cnpj,
+          endereco: data.endereco || clienteExistente.endereco,
+          telefone: data.telefone || clienteExistente.telefone,
+          email: data.email || clienteExistente.email,
+          contato: data.contato || clienteExistente.contato,
+        }
+
+        // Update in Supabase
+        const { error } = await supabase
+          .from("clientes")
+          .update({
+            nome: clienteAtualizado.nome,
+            cnpj: clienteAtualizado.cnpj || null,
+            endereco: clienteAtualizado.endereco || null,
+            telefone: clienteAtualizado.telefone || null,
+            email: clienteAtualizado.email || null,
+            contato: clienteAtualizado.contato || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", clienteAtualizado.id)
+
+        if (error) throw error
+
+        // Update local state
+        setClientes(clientes.map((c) => (c.id === clienteAtualizado.id ? clienteAtualizado : c)))
+
+        // Definir a aba para mostrar
+        abaParaMostrar = "clientes"
+
+        return {
+          success: true,
+          message: `Cliente "${clienteAtualizado.nome}" atualizado com sucesso!`,
+          abaParaMostrar,
+        }
       }
 
       case "createProduto": {
@@ -683,6 +1119,61 @@ export async function processGeminiAction(
           return {
             success: true,
             message: `Produto "${data.nome}" já existe no sistema. Usando o produto existente.`,
+            abaParaMostrar: "produtos",
+          }
+        }
+
+        // Verificar se os tecidos existem - se não existirem, criar automaticamente
+        for (let i = 0; i < data.tecidos.length; i++) {
+          const tecido = data.tecidos[i]
+          const tecidoExistente = tecidos.find((t) => t.nome.toLowerCase() === tecido.nome.toLowerCase())
+          if (!tecidoExistente) {
+            // Criar o tecido automaticamente
+            const novoTecido = {
+              id: generateUUID(),
+              nome: tecido.nome,
+              composicao: tecido.composicao || "Composição não especificada",
+            }
+
+            // Insert into Supabase
+            const { error } = await supabase.from("tecidos_base").insert({
+              id: novoTecido.id,
+              nome: novoTecido.nome,
+              composicao: novoTecido.composicao,
+            })
+
+            if (error) throw error
+
+            // Update local state
+            tecidos.push(novoTecido)
+            setTecidos([...tecidos])
+          }
+        }
+
+        // Verificar se as cores existem - se não existirem, criar automaticamente
+        for (let i = 0; i < data.cores.length; i++) {
+          const cor = data.cores[i]
+          const corExistente = cores.find((c) => c.nome.toLowerCase() === cor.toLowerCase())
+          if (!corExistente) {
+            // Criar a cor automaticamente
+            const novaCor = {
+              id: generateUUID(),
+              nome: cor,
+              codigo_hex: "#000000", // Cor padrão
+            }
+
+            // Insert into Supabase
+            const { error } = await supabase.from("cores").insert({
+              id: novaCor.id,
+              nome: novaCor.nome,
+              codigo_hex: novaCor.codigo_hex,
+            })
+
+            if (error) throw error
+
+            // Update local state
+            cores.push(novaCor)
+            setCores([...cores])
           }
         }
 
@@ -728,7 +1219,154 @@ export async function processGeminiAction(
         // Update local state
         setProdutos([...produtos, novoProduto])
 
-        return { success: true, message: `Produto "${novoProduto.nome}" (${novoProduto.codigo}) criado com sucesso!` }
+        // Definir a aba para mostrar
+        abaParaMostrar = "produtos"
+
+        return {
+          success: true,
+          message: `Produto "${novoProduto.nome}" (${novoProduto.codigo}) criado com sucesso!`,
+          abaParaMostrar,
+        }
+      }
+
+      case "updateProduto": {
+        // Verificar campos obrigatórios
+        const camposFaltantes = []
+        if (!data.id) camposFaltantes.push("id")
+        if (!data.nome) camposFaltantes.push("nome")
+        if (!data.valorBase) camposFaltantes.push("valorBase")
+        if (!data.tecidos || data.tecidos.length === 0) camposFaltantes.push("tecidos")
+        if (!data.cores || data.cores.length === 0) camposFaltantes.push("cores")
+        if (!data.tamanhosDisponiveis || data.tamanhosDisponiveis.length === 0)
+          camposFaltantes.push("tamanhosDisponiveis")
+
+        if (camposFaltantes.length > 0) {
+          return {
+            success: false,
+            message: `Por favor, forneça as seguintes informações obrigatórias: ${camposFaltantes.join(", ")}`,
+          }
+        }
+
+        // Verificar se o produto existe
+        const produtoExistente = produtos.find((p) => p.id === data.id)
+
+        if (!produtoExistente) {
+          return {
+            success: false,
+            message: `Produto com ID "${data.id}" não encontrado.`,
+          }
+        }
+
+        // Verificar se os tecidos existem - se não existirem, criar automaticamente
+        for (let i = 0; i < data.tecidos.length; i++) {
+          const tecido = data.tecidos[i]
+          const tecidoExistente = tecidos.find((t) => t.nome.toLowerCase() === tecido.nome.toLowerCase())
+          if (!tecidoExistente) {
+            // Criar o tecido automaticamente
+            const novoTecido = {
+              id: generateUUID(),
+              nome: tecido.nome,
+              composicao: tecido.composicao || "Composição não especificada",
+            }
+
+            // Insert into Supabase
+            const { error } = await supabase.from("tecidos_base").insert({
+              id: novoTecido.id,
+              nome: novoTecido.nome,
+              composicao: novoTecido.composicao,
+            })
+
+            if (error) throw error
+
+            // Update local state
+            tecidos.push(novoTecido)
+            setTecidos([...tecidos])
+          }
+        }
+
+        // Verificar se as cores existem - se não existirem, criar automaticamente
+        for (let i = 0; i < data.cores.length; i++) {
+          const cor = data.cores[i]
+          const corExistente = cores.find((c) => c.nome.toLowerCase() === cor.toLowerCase())
+          if (!corExistente) {
+            // Criar a cor automaticamente
+            const novaCor = {
+              id: generateUUID(),
+              nome: cor,
+              codigo_hex: "#000000", // Cor padrão
+            }
+
+            // Insert into Supabase
+            const { error } = await supabase.from("cores").insert({
+              id: novaCor.id,
+              nome: novaCor.nome,
+              codigo_hex: novaCor.codigo_hex,
+            })
+
+            if (error) throw error
+
+            // Update local state
+            cores.push(novaCor)
+            setCores([...cores])
+          }
+        }
+
+        // Update the product
+        const produtoAtualizado: Produto = {
+          ...produtoExistente,
+          nome: data.nome,
+          valorBase: data.valorBase || produtoExistente.valorBase,
+          tecidos: data.tecidos || produtoExistente.tecidos,
+          cores: data.cores || produtoExistente.cores,
+          tamanhosDisponiveis: data.tamanhosDisponiveis || produtoExistente.tamanhosDisponiveis,
+        }
+
+        // Update in Supabase
+        const { error: produtoError } = await supabase
+          .from("produtos")
+          .update({
+            nome: produtoAtualizado.nome,
+            valor_base: produtoAtualizado.valorBase,
+            cores: produtoAtualizado.cores,
+            tamanhos_disponiveis: produtoAtualizado.tamanhosDisponiveis,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", produtoAtualizado.id)
+
+        if (produtoError) throw produtoError
+
+        // Remove old tecidos
+        const { error: deleteTecidosError } = await supabase
+          .from("tecidos")
+          .delete()
+          .eq("produto_id", produtoAtualizado.id)
+
+        if (deleteTecidosError) throw deleteTecidosError
+
+        // Insert new tecidos
+        if (produtoAtualizado.tecidos && produtoAtualizado.tecidos.length > 0) {
+          const tecidosParaInserir = produtoAtualizado.tecidos.map((tecido) => ({
+            nome: tecido.nome,
+            composicao: tecido.composicao,
+            produto_id: produtoAtualizado.id,
+          }))
+
+          const { error: tecidosError } = await supabase.from("tecidos").insert(tecidosParaInserir)
+
+          if (tecidosError) throw tecidosError
+        }
+
+        // Update local state
+        setProdutos(produtos.map((p) => (p.id === produtoAtualizado.id ? produtoAtualizado : p)))
+
+        // Definir a aba para mostrar
+        abaParaMostrar = "produtos"
+
+        return {
+          success: true,
+          message: `Produto "${produtoAtualizado.nome}" atualizado com sucesso!`,
+          abaParaMostrar,
+        }
       }
 
       case "createOrcamento": {
@@ -742,6 +1380,15 @@ export async function processGeminiAction(
             if (!item.produto) camposFaltantes.push(`itens[${index}].produto`)
             if (!item.quantidade) camposFaltantes.push(`itens[${index}].quantidade`)
             if (!item.valorUnitario) camposFaltantes.push(`itens[${index}].valorUnitario`)
+
+            // Verificar estampas
+            if (item.estampas && item.estampas.length > 0) {
+              item.estampas.forEach((estampa: any, estampaIndex: number) => {
+                if (!estampa.posicao) camposFaltantes.push(`itens[${index}].estampas[${estampaIndex}].posicao`)
+                if (!estampa.tipo) camposFaltantes.push(`itens[${index}].estampas[${estampaIndex}].tipo`)
+                if (!estampa.largura) camposFaltantes.push(`itens[${index}].estampas[${estampaIndex}].largura`)
+              })
+            }
           })
         }
 
@@ -757,14 +1404,39 @@ export async function processGeminiAction(
         const cliente = clientes.find((c) => c.nome.toLowerCase() === data.cliente.toLowerCase())
 
         if (!cliente) {
-          // Perguntar se deseja criar um novo cliente
-          return {
-            success: false,
-            message: `Cliente "${data.cliente}" não encontrado. Deseja criar um novo cliente com este nome? Responda com "Sim, criar cliente" ou forneça o nome de um cliente existente.`,
+          // Criar um novo cliente automaticamente
+          const novoCliente: Cliente = {
+            id: generateUUID(),
+            codigo: await obterProximoCodigoCliente(),
+            nome: data.cliente,
+            cnpj: "00.000.000/0000-00", // CNPJ fictício
+            endereco: "Endereço não especificado",
+            telefone: "(00) 0000-0000",
+            email: `contato@${data.cliente.toLowerCase().replace(/\s+/g, "")}.com.br`,
+            contato: "Contato não especificado",
           }
-        }
 
-        clienteId = cliente.id
+          // Insert into Supabase
+          const { error } = await supabase.from("clientes").insert({
+            id: novoCliente.id,
+            codigo: novoCliente.codigo,
+            nome: novoCliente.nome,
+            cnpj: novoCliente.cnpj || null,
+            endereco: novoCliente.endereco || null,
+            telefone: novoCliente.telefone || null,
+            email: novoCliente.email || null,
+            contato: novoCliente.contato || null,
+          })
+
+          if (error) throw error
+
+          // Update local state
+          setClientes([...clientes, novoCliente])
+
+          clienteId = novoCliente.id
+        } else {
+          clienteId = cliente.id
+        }
 
         // Process items
         const itens: ItemOrcamento[] = []
@@ -774,44 +1446,181 @@ export async function processGeminiAction(
           const produto = produtos.find((p) => p.nome.toLowerCase() === itemData.produto.toLowerCase())
 
           if (!produto) {
-            // Perguntar se deseja criar um novo produto
-            return {
-              success: false,
-              message: `Produto "${itemData.produto}" não encontrado. Deseja criar um novo produto com este nome? Responda com "Sim, criar produto" ou forneça o nome de um produto existente.`,
+            // Criar um novo produto automaticamente
+            const novoProduto: Produto = {
+              id: generateUUID(),
+              codigo: await obterProximoCodigoProduto(),
+              nome: itemData.produto,
+              valorBase: itemData.valorUnitario || 50.0, // Valor base padrão
+              tecidos: [
+                { nome: itemData.tecidoSelecionado || "Tecido padrão", composicao: "Composição não especificada" },
+              ],
+              cores: [itemData.corSelecionada || "Cor padrão"],
+              tamanhosDisponiveis: Object.keys(itemData.tamanhos || { P: 0, M: 0, G: 0 }),
             }
-          }
 
-          // Create the item
-          const item: ItemOrcamento = {
-            id: generateUUID(),
-            produtoId: produto.id,
-            produto: produto,
-            quantidade: itemData.quantidade || 0,
-            valorUnitario: itemData.valorUnitario || produto.valorBase,
-            tecidoSelecionado: itemData.tecidoSelecionado
-              ? { nome: itemData.tecidoSelecionado, composicao: "" }
-              : undefined,
-            corSelecionada: itemData.corSelecionada,
-            tamanhos: itemData.tamanhos || {},
-            estampas: [], // Inicializar com array vazio
-          }
+            // Insert into Supabase
+            const { error: produtoError } = await supabase.from("produtos").insert({
+              id: novoProduto.id,
+              codigo: novoProduto.codigo,
+              nome: novoProduto.nome,
+              valor_base: novoProduto.valorBase,
+              cores: novoProduto.cores,
+              tamanhos_disponiveis: novoProduto.tamanhosDisponiveis,
+            })
 
-          itens.push(item)
+            if (produtoError) throw produtoError
+
+            // Insert tecidos
+            if (novoProduto.tecidos && novoProduto.tecidos.length > 0) {
+              const tecidosParaInserir = novoProduto.tecidos.map((tecido) => ({
+                nome: tecido.nome,
+                composicao: tecido.composicao,
+                produto_id: novoProduto.id,
+              }))
+
+              const { error: tecidosError } = await supabase.from("tecidos").insert(tecidosParaInserir)
+
+              if (tecidosError) throw tecidosError
+            }
+
+            // Update local state
+            setProdutos([...produtos, novoProduto])
+
+            // Create the item
+            const item: ItemOrcamento = {
+              id: generateUUID(),
+              produtoId: novoProduto.id,
+              produto: novoProduto,
+              quantidade: itemData.quantidade || 1,
+              valorUnitario: itemData.valorUnitario || novoProduto.valorBase,
+              tecidoSelecionado: itemData.tecidoSelecionado
+                ? { nome: itemData.tecidoSelecionado, composicao: "Composição não especificada" }
+                : { nome: novoProduto.tecidos[0].nome, composicao: novoProduto.tecidos[0].composicao },
+              corSelecionada: itemData.corSelecionada || novoProduto.cores[0],
+              tamanhos: itemData.tamanhos || { P: 0, M: 0, G: 0 },
+              estampas: itemData.estampas || [], // Incluir estampas
+            }
+
+            itens.push(item)
+          } else {
+            // Verificar se o tecido existe para o produto
+            let tecidoSelecionado = undefined
+            if (itemData.tecidoSelecionado) {
+              const tecidoExiste = produto.tecidos.some(
+                (t) => t.nome.toLowerCase() === itemData.tecidoSelecionado.toLowerCase(),
+              )
+
+              if (!tecidoExiste) {
+                // Usar o primeiro tecido disponível
+                tecidoSelecionado =
+                  produto.tecidos.length > 0
+                    ? { nome: produto.tecidos[0].nome, composicao: produto.tecidos[0].composicao }
+                    : undefined
+              } else {
+                tecidoSelecionado = {
+                  nome: itemData.tecidoSelecionado,
+                  composicao:
+                    produto.tecidos.find((t) => t.nome.toLowerCase() === itemData.tecidoSelecionado.toLowerCase())
+                      ?.composicao || "",
+                }
+              }
+            } else if (produto.tecidos.length > 0) {
+              // Se não foi especificado, usar o primeiro tecido disponível
+              tecidoSelecionado = {
+                nome: produto.tecidos[0].nome,
+                composicao: produto.tecidos[0].composicao,
+              }
+            }
+
+            // Verificar se a cor existe para o produto
+            let corSelecionada = itemData.corSelecionada
+            if (itemData.corSelecionada) {
+              const corExiste = produto.cores.some((c) => c.toLowerCase() === itemData.corSelecionada.toLowerCase())
+
+              if (!corExiste && produto.cores.length > 0) {
+                // Usar a primeira cor disponível
+                corSelecionada = produto.cores[0]
+              }
+            } else if (produto.cores.length > 0) {
+              // Se não foi especificado, usar a primeira cor disponível
+              corSelecionada = produto.cores[0]
+            }
+
+            // Verificar se os tamanhos existem para o produto
+            let tamanhos = itemData.tamanhos || {}
+            if (Object.keys(tamanhos).length === 0 && produto.tamanhosDisponiveis.length > 0) {
+              // Se não foram especificados tamanhos, criar um objeto com todos os tamanhos disponíveis
+              tamanhos = produto.tamanhosDisponiveis.reduce(
+                (acc, tamanho) => {
+                  acc[tamanho] = 0
+                  return acc
+                },
+                {} as Record<string, number>,
+              )
+
+              // Distribuir a quantidade total entre os tamanhos
+              const quantidadeTotal = itemData.quantidade || 1
+              const quantidadePorTamanho = Math.floor(quantidadeTotal / produto.tamanhosDisponiveis.length)
+              const resto = quantidadeTotal % produto.tamanhosDisponiveis.length
+
+              produto.tamanhosDisponiveis.forEach((tamanho, index) => {
+                tamanhos[tamanho] = quantidadePorTamanho + (index < resto ? 1 : 0)
+              })
+            } else {
+              // Verificar se os tamanhos especificados existem
+              for (const tamanho in tamanhos) {
+                const tamanhoExiste = produto.tamanhosDisponiveis.some((t) => t.toLowerCase() === tamanho.toLowerCase())
+
+                if (!tamanhoExiste) {
+                  // Remover o tamanho que não existe
+                  delete tamanhos[tamanho]
+                }
+              }
+
+              // Se todos os tamanhos foram removidos, usar os tamanhos disponíveis
+              if (Object.keys(tamanhos).length === 0 && produto.tamanhosDisponiveis.length > 0) {
+                const quantidadeTotal = itemData.quantidade || 1
+                const quantidadePorTamanho = Math.floor(quantidadeTotal / produto.tamanhosDisponiveis.length)
+                const resto = quantidadeTotal % produto.tamanhosDisponiveis.length
+
+                produto.tamanhosDisponiveis.forEach((tamanho, index) => {
+                  tamanhos[tamanho] = quantidadePorTamanho + (index < resto ? 1 : 0)
+                })
+              }
+            }
+
+            // Create the item
+            const item: ItemOrcamento = {
+              id: generateUUID(),
+              produtoId: produto.id,
+              produto: produto,
+              quantidade: itemData.quantidade || 1,
+              valorUnitario: itemData.valorUnitario || produto.valorBase,
+              tecidoSelecionado: tecidoSelecionado,
+              corSelecionada: corSelecionada,
+              tamanhos: tamanhos,
+              estampas: itemData.estampas || [], // Incluir estampas
+            }
+
+            itens.push(item)
+          }
         }
 
         // Obter o próximo número de orçamento usando a mesma função do processo manual
         const proximoNumero = await obterProximoNumeroOrcamento()
 
         // Formatar o número do orçamento com os dados do cliente e do primeiro item
+        const clienteObj = cliente || clientes.find((c) => c.id === clienteId)
         const itemDescricao = itens.length > 0 ? itens[0].produto?.nome || "Item" : "Item"
-        const novoNumero = `${proximoNumero} - ${itemDescricao} - ${cliente.nome} - ${cliente.contato}`
+        const novoNumero = `${proximoNumero} - ${itemDescricao} - ${clienteObj?.nome} - ${clienteObj?.contato}`
 
         // Create the new orçamento with the correct sequential number
         const novoOrcamento: Orcamento = {
           id: generateUUID(),
           numero: novoNumero,
           data: new Date().toISOString().split("T")[0],
-          cliente: cliente,
+          cliente: clienteObj!,
           itens: itens,
           observacoes: data.observacoes || "",
           condicoesPagamento: data.condicoesPagamento || "À vista",
@@ -852,13 +1661,37 @@ export async function processGeminiAction(
           })
 
           if (itemError) throw itemError
+
+          // Inserir estampas
+          if (item.estampas && item.estampas.length > 0) {
+            const estampasParaInserir = item.estampas.map((estampa) => ({
+              id: estampa.id || generateUUID(),
+              item_orcamento_id: item.id,
+              posicao: estampa.posicao,
+              tipo: estampa.tipo,
+              largura: estampa.largura,
+            }))
+
+            const { error: estampasError } = await supabase.from("estampas").insert(estampasParaInserir)
+
+            if (estampasError) throw estampasError
+          }
         }
 
         // Update local state
         setOrcamento(novoOrcamento)
 
-        return { success: true, message: `Orçamento "${novoOrcamento.numero}" criado com sucesso!` }
+        // Definir a aba para mostrar
+        abaParaMostrar = "orcamento"
+
+        return {
+          success: true,
+          message: `Orçamento "${novoOrcamento.numero}" criado com sucesso!`,
+          abaParaMostrar,
+        }
       }
+
+      // Adicionar os outros casos (updateOrcamento, extractOrcamento, etc.) com a mesma lógica de abaParaMostrar
 
       case "extractOrcamento": {
         // Check if we need to create a new client
@@ -876,22 +1709,24 @@ export async function processGeminiAction(
             // Create a new client
             cliente = {
               id: generateUUID(),
+              codigo: await obterProximoCodigoCliente(),
               nome: data.cliente.nome,
-              cnpj: "",
-              endereco: "",
-              telefone: "",
-              email: "",
-              contato: data.cliente.contato || "",
+              cnpj: "00.000.000/0000-00", // CNPJ fictício
+              endereco: "Endereço não especificado",
+              telefone: "(00) 0000-0000",
+              email: `contato@${data.cliente.nome.toLowerCase().replace(/\s+/g, "")}.com.br`,
+              contato: data.cliente.contato || "Contato não especificado",
             }
 
             // Insert into Supabase
             const { error } = await supabase.from("clientes").insert({
               id: cliente.id,
+              codigo: cliente.codigo,
               nome: cliente.nome,
-              cnpj: null,
-              endereco: null,
-              telefone: null,
-              email: null,
+              cnpj: cliente.cnpj || null,
+              endereco: cliente.endereco || null,
+              telefone: cliente.telefone || null,
+              email: cliente.email || null,
               contato: cliente.contato || null,
             })
 
@@ -923,19 +1758,23 @@ export async function processGeminiAction(
               )
 
               if (!produto) {
-                // Create a new product
+                // Criar um novo produto automaticamente
                 produto = {
                   id: generateUUID(),
+                  codigo: await obterProximoCodigoProduto(),
                   nome: itemData.produto,
-                  valorBase: itemData.valorUnitario || 0,
-                  tecidos: itemData.tecidoSelecionado ? [{ nome: itemData.tecidoSelecionado, composicao: "" }] : [],
-                  cores: itemData.corSelecionada ? [itemData.corSelecionada] : [],
-                  tamanhosDisponiveis: itemData.tamanhos ? Object.keys(itemData.tamanhos) : [],
+                  valorBase: itemData.valorUnitario || 50.0, // Valor base padrão
+                  tecidos: itemData.tecidoSelecionado
+                    ? [{ nome: itemData.tecidoSelecionado, composicao: "Composição não especificada" }]
+                    : [{ nome: "Tecido padrão", composicao: "Composição não especificada" }],
+                  cores: itemData.corSelecionada ? [itemData.corSelecionada] : ["Cor padrão"],
+                  tamanhosDisponiveis: itemData.tamanhos ? Object.keys(itemData.tamanhos) : ["P", "M", "G"],
                 }
 
                 // Insert into Supabase
                 const { error: produtoError } = await supabase.from("produtos").insert({
                   id: produto.id,
+                  codigo: produto.codigo,
                   nome: produto.nome,
                   valor_base: produto.valorBase,
                   cores: produto.cores,
@@ -966,12 +1805,14 @@ export async function processGeminiAction(
                 id: generateUUID(),
                 produtoId: produto.id,
                 produto: produto,
-                quantidade: itemData.quantidade || 0,
+                quantidade: itemData.quantidade || 1,
                 valorUnitario: itemData.valorUnitario || produto.valorBase,
                 tecidoSelecionado: itemData.tecidoSelecionado
-                  ? { nome: itemData.tecidoSelecionado, composicao: "" }
-                  : undefined,
-                corSelecionada: itemData.corSelecionada,
+                  ? { nome: itemData.tecidoSelecionado, composicao: "Composição não especificada" }
+                  : produto.tecidos.length > 0
+                    ? { nome: produto.tecidos[0].nome, composicao: produto.tecidos[0].composicao }
+                    : undefined,
+                corSelecionada: itemData.corSelecionada || (produto.cores.length > 0 ? produto.cores[0] : undefined),
                 tamanhos: itemData.tamanhos || {},
                 estampas: itemData.estampas || [],
               }
@@ -1056,13 +1897,34 @@ export async function processGeminiAction(
         // Update local state
         setOrcamento(novoOrcamento)
 
+        // Definir a aba para mostrar
+        abaParaMostrar = "orcamento"
+
         return {
           success: true,
           message: `Orçamento extraído e criado com sucesso! Número: ${novoOrcamento.numero}`,
+          abaParaMostrar,
         }
       }
 
-      // Add other cases for updating as needed
+      case "autoComplete": {
+        // Preencher automaticamente as informações faltantes
+        return processGeminiAction(
+          data.action,
+          data.data,
+          clientes,
+          produtos,
+          orcamento,
+          setClientes,
+          setProdutos,
+          setOrcamento,
+          cores,
+          tecidos,
+          setCores,
+          setTecidos,
+          false,
+        )
+      }
 
       default:
         return { success: false, message: "Ação não reconhecida." }
