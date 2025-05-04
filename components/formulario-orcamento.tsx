@@ -213,7 +213,7 @@ const EstampaInput = ({
   )
 }
 
-// Update the renderTabelaTamanhos function to show only the sizes available for the product
+// Modifique a função renderTabelaTamanhos para preservar a ordem original dos tamanhos
 const renderTabelaTamanhos = (
   tamanhos: Record<string, number>,
   quantidade: number,
@@ -221,10 +221,17 @@ const renderTabelaTamanhos = (
   onChange: (tamanho: string, valor: number) => void,
   tamanhosDisponiveis?: string[],
 ) => {
-  // Filtrar apenas os tamanhos disponíveis para o produto
-  const tamanhosFiltrados = tamanhosDisponiveis
-    ? Object.fromEntries(Object.entries(tamanhos).filter(([tamanho]) => tamanhosDisponiveis.includes(tamanho)))
-    : tamanhos
+  // Criar um objeto que mantém apenas os tamanhos disponíveis, mas preserva a ordem original
+  const tamanhosFiltrados: Record<string, number> = {}
+
+  // Percorrer os tamanhos na ordem original do tamanhosPadrao
+  Object.keys(tamanhosPadrao).forEach((tamanho) => {
+    // Se não houver lista de tamanhos disponíveis OU o tamanho estiver na lista de disponíveis
+    if (!tamanhosDisponiveis || tamanhosDisponiveis.includes(tamanho)) {
+      // Adicionar o tamanho ao objeto filtrado, mantendo seu valor atual
+      tamanhosFiltrados[tamanho] = tamanhos[tamanho] || 0
+    }
+  })
 
   return (
     <div className="space-y-2">

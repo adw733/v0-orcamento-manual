@@ -11,6 +11,53 @@ interface VisualizacaoDocumentoProps {
 export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosEmpresa }: VisualizacaoDocumentoProps) {
   const dataFormatada = orcamento.data ? new Date(orcamento.data).toLocaleDateString("pt-BR") : ""
 
+  // Definição da ordem padrão dos tamanhos
+  const tamanhosPadrao = {
+    // Padrão (PP ao G7)
+    PP: 0,
+    P: 0,
+    M: 0,
+    G: 0,
+    GG: 0,
+    G1: 0,
+    G2: 0,
+    G3: 0,
+    G4: 0,
+    G5: 0,
+    G6: 0,
+    G7: 0,
+    // Numérico (36 ao 62) - apenas tamanhos pares
+    "36": 0,
+    "38": 0,
+    "40": 0,
+    "42": 0,
+    "44": 0,
+    "46": 0,
+    "48": 0,
+    "50": 0,
+    "52": 0,
+    "54": 0,
+    "56": 0,
+    "58": 0,
+    "60": 0,
+    "62": 0,
+    // Infantil (0 ao 13)
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0,
+    "13": 0,
+  }
+
   // Usar os dados da empresa ou valores padrão
   const nomeEmpresa = dadosEmpresa?.nome || "ONEBASE"
   const cnpjEmpresa = dadosEmpresa?.cnpj || "12.345.678/0001-90"
@@ -695,9 +742,9 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                           <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tl-md">
                             TAM.
                           </th>
-                          {Object.entries(item.tamanhos)
-                            .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
-                            .map(([tamanho]) => (
+                          {Object.keys(tamanhosPadrao)
+                            .filter((tamanho) => item.tamanhos[tamanho] > 0) // Filtrar tamanhos com quantidade > 0
+                            .map((tamanho) => (
                               <th
                                 key={`header-${item.id}-${tamanho}`}
                                 className="border border-gray-300 p-1 text-center bg-primary text-white"
@@ -713,14 +760,14 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                       <tbody>
                         <tr>
                           <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
-                          {Object.entries(item.tamanhos)
-                            .filter(([_, valor]) => valor > 0) // Mostrar apenas tamanhos com quantidade > 0
-                            .map(([tamanho, valor]) => (
+                          {Object.keys(tamanhosPadrao)
+                            .filter((tamanho) => item.tamanhos[tamanho] > 0) // Filtrar tamanhos com quantidade > 0
+                            .map((tamanho) => (
                               <td
                                 key={`${item.id}-${tamanho}`}
                                 className="border border-gray-300 p-1 text-center bg-white"
                               >
-                                {valor}
+                                {item.tamanhos[tamanho]}
                               </td>
                             ))}
                           <td className="border border-gray-300 p-1 text-center font-medium bg-white">
