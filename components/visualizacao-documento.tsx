@@ -136,22 +136,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
       page-break-before: always !important;
       break-before: always !important;
     }
-    
-    /* Reduzir o tamanho da fonte para caber mais conteúdo */
-    .ficha-tecnica .pdf-content {
-      font-size: 0.9em;
-    }
-    
-    /* Ajustar o espaçamento vertical */
-    .ficha-tecnica .space-y-6 {
-      margin-top: 0.5rem;
-      margin-bottom: 0.5rem;
-    }
-    
-    /* Garantir que a imagem não seja muito grande */
-    .ficha-tecnica .pdf-image {
-      max-height: 120mm; /* Limitar altura da imagem */
-    }
   }
   
   /* Estilos para garantir que os elementos caibam na página A4 */
@@ -319,10 +303,27 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
       flex-wrap: wrap;
     }
   }
+  
+  /* Estilos específicos para geração de PDF */
+  .pdf-container {
+    width: 210mm;
+    box-sizing: border-box;
+    padding: 10mm;
+    background-color: white;
+  }
+  
+  .pdf-page {
+    page-break-after: always;
+    width: 100%;
+  }
+  
+  .pdf-page:last-child {
+    page-break-after: auto;
+  }
 `
 
   return (
-    <div className="flex flex-col gap-8 p-4 font-sans text-gray-800">
+    <div className="flex flex-col gap-8 p-4 font-sans text-gray-800 pdf-container">
       <style>{pdfStyles}</style>
       {/* Orçamento */}
       <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm page-break-inside-avoid pdf-section">
@@ -459,9 +460,25 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
               <tfoot className="bg-accent font-medium">
                 <tr>
                   <td colSpan={3} className="p-3 text-right border-t-2 border-primary">
+                    Valor dos Produtos:
+                  </td>
+                  <td className="p-3 text-right border-t-2 border-primary">R$ {calcularTotal().toFixed(2)}</td>
+                </tr>
+                {orcamento.valorFrete !== undefined && orcamento.valorFrete > 0 && (
+                  <tr>
+                    <td colSpan={3} className="p-3 text-right">
+                      Valor do Frete:
+                    </td>
+                    <td className="p-3 text-right">R$ {orcamento.valorFrete.toFixed(2)}</td>
+                  </tr>
+                )}
+                <tr>
+                  <td colSpan={3} className="p-3 text-right border-t-2 border-primary">
                     TOTAL:
                   </td>
-                  <td className="p-3 text-right border-t-2 border-primary text-lg">R$ {calcularTotal().toFixed(2)}</td>
+                  <td className="p-3 text-right border-t-2 border-primary text-lg">
+                    R$ {(calcularTotal() + (orcamento.valorFrete || 0)).toFixed(2)}
+                  </td>
                 </tr>
               </tfoot>
             </table>

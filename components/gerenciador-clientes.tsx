@@ -21,9 +21,8 @@ import {
   AlertCircle,
   FileText,
   Search,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react"
 import type { Cliente } from "@/types/types"
 import { supabase } from "@/lib/supabase"
@@ -395,9 +394,9 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
 
   // Componente para o ícone de ordenação
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />
-    if (sortDirection === "asc") return <ArrowUp className="h-4 w-4 ml-1" />
-    return <ArrowDown className="h-4 w-4 ml-1" />
+    if (sortField !== field) return null
+    if (sortDirection === "asc") return <ChevronUp className="ml-1 h-4 w-4" />
+    return <ChevronDown className="ml-1 h-4 w-4" />
   }
 
   // Componente para o cabeçalho ordenável
@@ -431,14 +430,22 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
       )}
 
       {/* Barra de pesquisa */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Pesquisar clientes..."
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-          className="pl-10 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-        />
+      <div className="flex justify-between items-center gap-4 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Pesquisar clientes..."
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+            className="pl-10 pr-4 py-2 w-full"
+          />
+        </div>
+        <Button
+          onClick={() => setMostrarFormulario(true)}
+          className="bg-primary hover:bg-primary-dark text-white transition-colors"
+        >
+          <Plus className="h-4 w-4 mr-2" /> Novo Cliente
+        </Button>
       </div>
 
       {/* Tabela de clientes com ordenação */}
@@ -661,15 +668,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
       </div>
 
       {/* Botão para mostrar/esconder o formulário */}
-      <div className="flex justify-end mt-4">
-        <Button
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-secondary hover:bg-secondary-dark text-white transition-colors"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {mostrarFormulario ? "Cancelar" : "Criar Novo Cliente"}
-        </Button>
-      </div>
 
       {/* Formulário para adicionar novo cliente - visível apenas quando mostrarFormulario for true */}
       {mostrarFormulario && (

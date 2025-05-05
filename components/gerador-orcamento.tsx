@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, Save, Check, AlertCircle } from "lucide-react"
+import { Printer, Save, Check, AlertCircle, FileDown } from "lucide-react" // Adicionar FileDown
 import FormularioOrcamento from "@/components/formulario-orcamento"
 import VisualizacaoDocumento from "@/components/visualizacao-documento"
 import GerenciadorClientes from "@/components/gerenciador-clientes"
@@ -43,6 +43,7 @@ export default function GeradorOrcamento() {
     prazoEntrega: "30 dias",
     validadeOrcamento: "15 dias",
     status: "proposta", // Adicionar status padrão
+    valorFrete: 0, // Inicializar o valor do frete
   })
   const [isPrinting, setIsPrinting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -65,6 +66,8 @@ export default function GeradorOrcamento() {
   const [dadosEmpresa, setDadosEmpresa] = useState<DadosEmpresa | null>(null)
 
   const documentoRef = useRef<HTMLDivElement>(null)
+  const orcamentoRef = useRef<HTMLDivElement>(null)
+  const fichasTecnicasRef = useRef<HTMLDivElement[]>([])
 
   const recarregarOrcamentosRef = useRef<(() => Promise<void>) | null>(null)
 
@@ -122,6 +125,7 @@ export default function GeradorOrcamento() {
         prazoEntrega: "30 dias",
         validadeOrcamento: "15 dias",
         status: "proposta", // Adicionar status padrão
+        valorFrete: 0,
       })
       setOrcamentoSalvo(null)
       setCriandoNovoOrcamento(true)
@@ -301,7 +305,7 @@ export default function GeradorOrcamento() {
       }
       
       /* Garantir que os gradientes e cores de fundo sejam impressos */
-      .bg-gradient-to-r, .bg-primary, .bg-accent, .bg-white, .bg-white\/10 {
+      .bg-gradient-to-r, .bg-primary, .bg-accent, .bg-white, .bg-white\\/10 {
         print-color-adjust: exact !important;
         -webkit-print-color-adjust: exact !important;
       }
@@ -379,6 +383,133 @@ export default function GeradorOrcamento() {
     }
   }
 
+  // Nova implementação da função handleGeneratePDF que realmente gera e faz download do PDF
+  const handleGeneratePDF = async () => {
+    try {
+      setIsLoading(true)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: "Gerando PDF, aguarde...",
+      })
+
+      if (!documentoRef.current) {
+        throw new Error("Elemento do documento não encontrado")
+      }
+
+      // Nome do arquivo baseado no número do orçamento e cliente
+      const numeroOrcamento = orcamento.numero.split(" - ")[0]
+      const dataFormatada = new Date().toISOString().split("T")[0].replace(/-/g, "")
+      const nomeCliente = orcamento.cliente
+        ? orcamento.cliente.nome.replace(/\s+/g, "_").substring(0, 20)
+        : "sem_cliente"
+      const nomeArquivo = `Orcamento_${numeroOrcamento}_${nomeCliente}_${dataFormatada}.pdf`
+
+      // Importar dinamicamente as bibliotecas necessárias
+      const [jspdfModule, html2canvasModule] = await Promise.all([import("jspdf"), import("html2canvas")])
+
+      const jsPDF = jspdfModule.default
+      const html2canvas = html2canvasModule.default
+
+      // Criar uma nova instância do jsPDF
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      })
+
+      // Encontrar as fichas técnicas
+      const fichasTecnicas = Array.from(documentoRef.current.querySelectorAll(".ficha-tecnica")) as HTMLElement[]
+
+      // Obter o conteúdo principal do orçamento (excluindo as fichas técnicas)
+      // Criar um clone do documento completo
+      const documentoCompleto = documentoRef.current.cloneNode(true) as HTMLElement
+
+      // Remover as fichas técnicas do clone para obter apenas o orçamento principal
+      const fichasTecnicasNoClone = Array.from(documentoCompleto.querySelectorAll(".ficha-tecnica"))
+      fichasTecnicasNoClone.forEach((ficha) => ficha.parentNode?.removeChild(ficha))
+
+      // Agora documentoCompleto contém apenas o orçamento principal
+      const orcamentoElement = documentoCompleto
+
+      // Função para capturar um elemento e adicionar ao PDF
+      const capturarElemento = async (elemento: HTMLElement, primeiraPagina = false) => {
+        // Criar uma cópia do elemento para manipulação
+        const elementoClone = elemento.cloneNode(true) as HTMLElement
+
+        // Aplicar estilos específicos para a captura
+        elementoClone.style.width = "210mm" // Largura A4
+        elementoClone.style.margin = "0"
+        elementoClone.style.padding = "10mm" // Margem interna
+        elementoClone.style.boxSizing = "border-box"
+        elementoClone.style.backgroundColor = "#ffffff"
+
+        // Adicionar o elemento ao DOM temporariamente para captura
+        elementoClone.style.position = "absolute"
+        elementoClone.style.left = "-9999px"
+        document.body.appendChild(elementoClone)
+
+        try {
+          // Capturar o elemento como uma imagem
+          const canvas = await html2canvas(elementoClone, {
+            scale: 2, // Aumentar a escala para melhor qualidade
+            useCORS: true,
+            logging: false,
+            backgroundColor: "#FFFFFF",
+            width: elementoClone.offsetWidth,
+            height: elementoClone.offsetHeight,
+          })
+
+          // Converter o canvas para uma imagem
+          const imgData = canvas.toDataURL("image/jpeg", 1.0)
+
+          // Calcular as dimensões para ajustar à página A4
+          const imgWidth = 210 // A4 width in mm
+          const pageHeight = 297 // A4 height in mm
+          const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+          // Se não for a primeira página, adicionar uma nova página
+          if (!primeiraPagina) {
+            pdf.addPage()
+          }
+
+          // Adicionar a imagem ao PDF
+          pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight))
+        } finally {
+          // Remover o elemento temporário
+          document.body.removeChild(elementoClone)
+        }
+      }
+
+      // Capturar o orçamento principal como primeira página
+      await capturarElemento(orcamentoElement, true)
+
+      // Capturar cada ficha técnica como uma página separada
+      for (const ficha of fichasTecnicas) {
+        await capturarElemento(ficha, false)
+      }
+
+      // Salvar o PDF
+      pdf.save(nomeArquivo)
+
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: `PDF "${nomeArquivo}" gerado e baixado com sucesso!`,
+      })
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: false,
+        mensagem: `Erro ao gerar PDF: ${error instanceof Error ? error.message : "Tente novamente"}`,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const adicionarCliente = (cliente: Cliente) => {
     setClientes([...clientes, cliente])
   }
@@ -447,6 +578,7 @@ export default function GeradorOrcamento() {
           prazo_entrega: orcamento.prazoEntrega,
           validade_orcamento: orcamento.validadeOrcamento,
           status: orcamento.status || "proposta", // Adicionar status
+          valor_frete: orcamento.valorFrete || 0, // Adicionar valor do frete
           // Garantir que o JSON seja válido
           itens: JSON.stringify(orcamento.itens || []),
         })
@@ -607,6 +739,7 @@ export default function GeradorOrcamento() {
           prazo_entrega: orcamento.prazoEntrega,
           validade_orcamento: orcamento.validadeOrcamento,
           status: orcamento.status || "proposta", // Adicionar status
+          valor_frete: orcamento.valorFrete || 0, // Adicionar valor do frete
           // Garantir que o JSON seja válido
           itens: JSON.stringify(orcamento.itens || []),
           updated_at: new Date().toISOString(),
@@ -752,9 +885,6 @@ export default function GeradorOrcamento() {
 
         if (itemAtualizado) {
           // Atualizar o item
-          // Localizar a parte onde atualiza o item no Supabase (aproximadamente linha 1400)
-          // Substituir o bloco de código que começa com:
-          // const { error } = await supabase.from("itens_orcamento").update({
           const { error } = await supabase
             .from("itens_orcamento")
             .update({
@@ -938,6 +1068,7 @@ export default function GeradorOrcamento() {
         prazoEntrega: data.prazo_entrega || "15 dias",
         validadeOrcamento: data.validade_orcamento || "15 dias",
         status: data.status || "proposta",
+        valorFrete: data.valor_frete ? Number(data.valor_frete) : 0, // Adicionar valor do frete
       })
 
       setOrcamentoSalvo(data.id)
@@ -1180,6 +1311,15 @@ export default function GeradorOrcamento() {
                   >
                     <Printer className="h-4 w-4" />
                     {isPrinting ? "Imprimindo..." : "Imprimir"}
+                  </Button>
+
+                  <Button
+                    onClick={handleGeneratePDF}
+                    disabled={isLoading}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    {isLoading ? "Gerando PDF..." : "Gerar PDF"}
                   </Button>
                 </>
               )}

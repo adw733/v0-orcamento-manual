@@ -71,4 +71,5 @@ export type Orcamento = {
   prazoEntrega: string
   validadeOrcamento: string
   status?: string // Adicionar campo de status
+  valorFrete?: number // Adicionar campo de valor do frete
 }
