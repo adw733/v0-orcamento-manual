@@ -78,6 +78,9 @@ export default function ListaOrcamentos({
       // Converter para o formato da aplicação
       const orcamentosFormatados = data.map((orcamento) => {
         let itensParseados = []
+        let valorFrete = 0
+        let nomeContato = ""
+        let telefoneContato = ""
 
         // Verificar se o campo itens existe e não é nulo
         if (orcamento.itens) {
@@ -86,11 +89,40 @@ export default function ListaOrcamentos({
             if (typeof orcamento.itens === "string") {
               // Verificar se a string não está vazia
               if (orcamento.itens.trim() !== "") {
-                itensParseados = JSON.parse(orcamento.itens)
+                const itensObj = JSON.parse(orcamento.itens)
+
+                // Verificar se o JSON tem a nova estrutura (com metadados)
+                if (itensObj.items && Array.isArray(itensObj.items)) {
+                  itensParseados = itensObj.items
+                  // Extrair o valor do frete e informações de contato dos metadados
+                  if (itensObj.metadados) {
+                    if (typeof itensObj.metadados.valorFrete === "number") {
+                      valorFrete = itensObj.metadados.valorFrete
+                    }
+                    nomeContato = itensObj.metadados.nomeContato || ""
+                    telefoneContato = itensObj.metadados.telefoneContato || ""
+                  }
+                } else if (Array.isArray(itensObj)) {
+                  // Formato antigo (array simples)
+                  itensParseados = itensObj
+                }
               }
-            } else {
-              // Se já for um objeto, usar diretamente
-              itensParseados = orcamento.itens
+            } else if (typeof orcamento.itens === "object") {
+              // Se já for um objeto, verificar a estrutura
+              if (orcamento.itens.items && Array.isArray(orcamento.itens.items)) {
+                itensParseados = orcamento.itens.items
+                // Extrair o valor do frete e informações de contato dos metadados
+                if (orcamento.itens.metadados) {
+                  if (typeof orcamento.itens.metadados.valorFrete === "number") {
+                    valorFrete = orcamento.itens.metadados.valorFrete
+                  }
+                  nomeContato = orcamento.itens.metadados.nomeContato || ""
+                  telefoneContato = orcamento.itens.metadados.telefoneContato || ""
+                }
+              } else if (Array.isArray(orcamento.itens)) {
+                // Formato antigo (array simples)
+                itensParseados = orcamento.itens
+              }
             }
           } catch (parseError) {
             console.error(`Erro ao fazer parse do JSON para o orçamento ${orcamento.id}:`, parseError)
@@ -113,6 +145,9 @@ export default function ListaOrcamentos({
           created_at: orcamento.created_at,
           updated_at: orcamento.updated_at,
           status: orcamento.status || "proposta", // Definir "proposta" como padrão se não houver status
+          valorFrete: valorFrete, // Adicionar o valor do frete
+          nomeContato: nomeContato, // Adicionar o nome do contato
+          telefoneContato: telefoneContato, // Adicionar o telefone do contato
         }
       })
 
@@ -128,9 +163,16 @@ export default function ListaOrcamentos({
   const calcularTotal = (orcamento: Partial<Orcamento>) => {
     if (!orcamento.itens || !Array.isArray(orcamento.itens)) return 0
 
-    return orcamento.itens.reduce((total, item) => {
+    // Calcular o total dos itens
+    const totalItens = orcamento.itens.reduce((total, item) => {
       return total + (item.quantidade || 0) * (item.valorUnitario || 0)
     }, 0)
+
+    // Adicionar o valor do frete, se existir
+    const valorFrete = orcamento.valorFrete || 0
+
+    // Retornar o total (itens + frete)
+    return totalItens + valorFrete
   }
 
   const atualizarStatusOrcamento = async (orcamentoId: string, novoStatus: string) => {
@@ -372,7 +414,7 @@ export default function ListaOrcamentos({
                   onClick={() => alternarOrdenacao("cliente")}
                 >
                   <div className="flex items-center">
-                    Cliente
+                    Cliente / Contato
                     {ordenacao.campo === "cliente" &&
                       (ordenacao.direcao === "asc" ? (
                         <ChevronUp className="ml-1 h-4 w-4" />
@@ -454,9 +496,16 @@ export default function ListaOrcamentos({
                       </div>
                     </TableCell>
                     <TableCell className="px-4 py-3 align-middle">
-                      <div className="flex items-center gap-1">
-                        <Building className="h-3 w-3 text-gray-500" />
-                        <span>{orcamento.cliente?.nome || "Cliente não especificado"}</span>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1">
+                          <Building className="h-3 w-3 text-gray-500" />
+                          <span>{orcamento.cliente?.nome || "Cliente não especificado"}</span>
+                        </div>
+                        {orcamento.nomeContato && (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-gray-600">
+                            <span className="font-medium">Contato:</span> {orcamento.nomeContato}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="px-4 py-3 align-middle hidden md:table-cell">

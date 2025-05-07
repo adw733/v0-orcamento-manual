@@ -25,8 +25,8 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
     elementoParaCapturar.style.left = "-9999px"
     document.body.appendChild(elementoParaCapturar)
 
-    // Capturar cada ficha técnica separadamente
-    const orcamentoElement = elementoParaCapturar.querySelector(":not(.ficha-tecnica)") as HTMLElement
+    // Capturar o orçamento principal e as fichas técnicas separadamente
+    const orcamentoElement = elementoParaCapturar.querySelector(".orcamento-principal") as HTMLElement
     const fichasTecnicas = Array.from(elementoParaCapturar.querySelectorAll(".ficha-tecnica")) as HTMLElement[]
 
     // Criar uma nova instância do jsPDF
@@ -39,6 +39,13 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
 
     // Função para adicionar uma página ao PDF
     const adicionarPagina = async (elemento: HTMLElement, primeiraPagina = false) => {
+      // Aplicar estilos específicos para a captura
+      elemento.style.width = "210mm" // Largura A4
+      elemento.style.margin = "0"
+      elemento.style.padding = "10mm" // Margem interna
+      elemento.style.boxSizing = "border-box"
+      elemento.style.backgroundColor = "#ffffff"
+
       // Capturar o elemento como uma imagem
       const canvas = await html2canvas(elemento, {
         scale: 2, // Aumentar a escala para melhor qualidade

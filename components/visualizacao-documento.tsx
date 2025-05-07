@@ -128,11 +128,15 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     }
 
     /* Configurações para garantir que a ficha técnica caiba em uma folha A4 */
-    .ficha-tecnica {
+    .ficha-tecnica, .orcamento-principal {
       max-height: 297mm; /* Altura de uma folha A4 */
       width: 210mm; /* Largura de uma folha A4 */
       padding: 10mm; /* Margem interna */
       box-sizing: border-box;
+    }
+    
+    /* Apenas as fichas técnicas precisam de quebra de página */
+    .ficha-tecnica {
       page-break-before: always !important;
       break-before: always !important;
     }
@@ -320,13 +324,24 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
   .pdf-page:last-child {
     page-break-after: auto;
   }
+  
+  /* Garantir que o orçamento principal e as fichas técnicas tenham o mesmo layout */
+  .orcamento-principal,
+  .ficha-tecnica {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+    background-color: white;
+  }
 `
 
   return (
     <div className="flex flex-col gap-8 p-4 font-sans text-gray-800 pdf-container">
       <style>{pdfStyles}</style>
       {/* Orçamento */}
-      <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm page-break-inside-avoid pdf-section">
+      <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm page-break-inside-avoid pdf-section orcamento-principal">
         <div className="bg-gradient-to-r from-primary to-primary-dark p-4 pdf-header w-full">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -374,7 +389,8 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                     ORÇAMENTO - {orcamento.numero.split(" - ")[0]}
                   </h1>
                   <p className="text-white/90 text-sm uppercase">
-                    {orcamento.cliente?.nome || "EMPRESA"} - {orcamento.cliente?.contato || "CONTATO"}
+                    {orcamento.cliente?.nome || "EMPRESA"} -{" "}
+                    {orcamento.nomeContato || orcamento.cliente?.contato || "CONTATO"}
                   </p>
                 </div>
               </div>
@@ -403,14 +419,21 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                   <span className="font-medium">Endereço:</span> {orcamento.cliente.endereco}
                 </p>
                 <p>
-                  <span className="font-medium">Contato:</span> {orcamento.cliente.contato}
-                </p>
-                <p>
                   <span className="font-medium">Telefone:</span> {orcamento.cliente.telefone}
                 </p>
                 <p>
                   <span className="font-medium">Email:</span> {orcamento.cliente.email}
                 </p>
+                {orcamento.nomeContato && (
+                  <p>
+                    <span className="font-medium">Contato:</span> {orcamento.nomeContato}
+                  </p>
+                )}
+                {orcamento.telefoneContato && (
+                  <p>
+                    <span className="font-medium">Telefone Contato:</span> {orcamento.telefoneContato}
+                  </p>
+                )}
               </div>
             ) : (
               <p className="text-sm text-gray-500 italic">Nenhum cliente selecionado</p>
@@ -565,7 +588,8 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                     FICHA TÉCNICA - {orcamento.numero.split(" - ")[0]}
                   </h1>
                   <p className="text-white/90 text-sm uppercase">
-                    {orcamento.cliente?.nome || "EMPRESA"} - {orcamento.cliente?.contato || "CONTATO"}
+                    {orcamento.cliente?.nome || "EMPRESA"} -{" "}
+                    {orcamento.nomeContato || orcamento.cliente?.contato || "CONTATO"}
                   </p>
                 </div>
               </div>

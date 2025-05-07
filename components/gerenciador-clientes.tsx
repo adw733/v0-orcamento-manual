@@ -17,7 +17,6 @@ import {
   Building,
   Phone,
   Mail,
-  User,
   AlertCircle,
   FileText,
   Search,
@@ -89,7 +88,7 @@ const obterProximoCodigoCliente = async (): Promise<string> => {
 
 // Tipo para ordenação
 type SortDirection = "asc" | "desc" | null
-type SortField = "codigo" | "nome" | "cnpj" | "telefone" | "email" | "contato" | null
+type SortField = "codigo" | "nome" | "cnpj" | "telefone" | "email" | null
 
 interface GerenciadorClientesProps {
   clientes: Cliente[]
@@ -106,7 +105,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     endereco: "",
     telefone: "",
     email: "",
-    contato: "",
   })
 
   // Estados para gerenciamento da UI
@@ -207,7 +205,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
             endereco: novoCliente.endereco || null,
             telefone: novoCliente.telefone || null,
             email: novoCliente.email || null,
-            contato: novoCliente.contato || null,
           })
           .select()
 
@@ -333,7 +330,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
             endereco: clienteEditando.endereco || null,
             telefone: clienteEditando.telefone || null,
             email: clienteEditando.email || null,
-            contato: clienteEditando.contato || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", clienteEditando.id)
@@ -385,8 +381,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
           return compareStrings(a.telefone, b.telefone)
         case "email":
           return compareStrings(a.email, b.email)
-        case "contato":
-          return compareStrings(a.contato, b.contato)
         default:
           return 0
       }
@@ -458,7 +452,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
               <SortableHeader field="cnpj">CNPJ</SortableHeader>
               <SortableHeader field="telefone">Telefone</SortableHeader>
               <SortableHeader field="email">Email</SortableHeader>
-              <SortableHeader field="contato">Contato</SortableHeader>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -590,26 +583,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                             />
                           </div>
                         </div>
-                        <div>
-                          <Label
-                            htmlFor={`edit-contato-${cliente.id}`}
-                            className="text-primary flex items-center gap-2"
-                          >
-                            <User className="h-4 w-4" />
-                            Contato
-                          </Label>
-                          <Input
-                            id={`edit-contato-${cliente.id}`}
-                            value={clienteEditando.contato}
-                            onChange={(e) =>
-                              setClienteEditando({
-                                ...clienteEditando,
-                                contato: e.target.value,
-                              })
-                            }
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="outline"
@@ -635,7 +608,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                       <TableCell className="hidden md:table-cell">{cliente.cnpj}</TableCell>
                       <TableCell className="hidden md:table-cell">{cliente.telefone}</TableCell>
                       <TableCell className="hidden lg:table-cell">{cliente.email}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{cliente.contato}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -753,19 +725,6 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                     className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="contato" className="text-primary flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Contato
-                </Label>
-                <Input
-                  id="contato"
-                  value={novoCliente.contato}
-                  onChange={(e) => setNovoCliente({ ...novoCliente, contato: e.target.value })}
-                  className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                  placeholder="Nome do contato"
-                />
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setMostrarFormulario(false)} className="flex-1">

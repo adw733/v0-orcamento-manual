@@ -23,6 +23,7 @@ export type Estampa = {
   largura?: number
 }
 
+// Remover o campo contato da interface Cliente
 export type Cliente = {
   id: string
   codigo: string // Novo campo para código sequencial
@@ -31,7 +32,6 @@ export type Cliente = {
   endereco: string
   telefone: string
   email: string
-  contato: string
 }
 
 export type Produto = {
@@ -60,6 +60,7 @@ export type ItemOrcamento = {
   observacao?: string
 }
 
+// Atualizar o tipo Orcamento para incluir os campos de contato
 export type Orcamento = {
   id?: string
   numero: string
@@ -72,4 +73,6 @@ export type Orcamento = {
   validadeOrcamento: string
   status?: string // Adicionar campo de status
   valorFrete?: number // Adicionar campo de valor do frete
+  nomeContato?: string // Novo campo para nome do contato
+  telefoneContato?: string // Novo campo para telefone do contato
 }

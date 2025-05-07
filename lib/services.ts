@@ -682,6 +682,8 @@ export const orcamentoService = {
           condicoes_pagamento: orcamento.condicoesPagamento,
           prazo_entrega: orcamento.prazoEntrega,
           validade_orcamento: orcamento.validadeOrcamento,
+          nome_contato: orcamento.nomeContato || null,
+          telefone_contato: orcamento.telefoneContato || null,
           itens: JSON.stringify(orcamento.itens),
           updated_at: new Date().toISOString(),
         })
@@ -705,6 +707,8 @@ export const orcamentoService = {
           condicoes_pagamento: orcamento.condicoesPagamento,
           prazo_entrega: orcamento.prazoEntrega,
           validade_orcamento: orcamento.validadeOrcamento,
+          nome_contato: orcamento.nomeContato || null,
+          telefone_contato: orcamento.telefoneContato || null,
           itens: JSON.stringify(orcamento.itens),
         })
         .select()

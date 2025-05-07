@@ -709,11 +709,37 @@ export default function FormularioOrcamento({
           <SelectContent>
             {clientes.map((cliente) => (
               <SelectItem key={cliente.id} value={cliente.id}>
-                {cliente.nome}
+                {cliente.cnpj} - {cliente.nome}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <div>
+            <Label htmlFor="nomeContato" className="text-primary mb-1.5">
+              Nome do Contato
+            </Label>
+            <Input
+              id="nomeContato"
+              value={orcamento.nomeContato || ""}
+              onChange={(e) => atualizarOrcamento({ nomeContato: e.target.value })}
+              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+              placeholder="Nome da pessoa de contato"
+            />
+          </div>
+          <div>
+            <Label htmlFor="telefoneContato" className="text-primary mb-1.5">
+              Telefone do Contato
+            </Label>
+            <Input
+              id="telefoneContato"
+              value={orcamento.telefoneContato || ""}
+              onChange={(e) => atualizarOrcamento({ telefoneContato: e.target.value })}
+              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+              placeholder="(00) 00000-0000"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="space-y-4">

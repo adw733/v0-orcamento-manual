@@ -44,6 +44,8 @@ export default function GeradorOrcamento() {
     validadeOrcamento: "15 dias",
     status: "proposta", // Adicionar status padrão
     valorFrete: 0, // Inicializar o valor do frete
+    nomeContato: "",
+    telefoneContato: "",
   })
   const [isPrinting, setIsPrinting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -126,6 +128,8 @@ export default function GeradorOrcamento() {
         validadeOrcamento: "15 dias",
         status: "proposta", // Adicionar status padrão
         valorFrete: 0,
+        nomeContato: "",
+        telefoneContato: "",
       })
       setOrcamentoSalvo(null)
       setCriandoNovoOrcamento(true)
@@ -423,15 +427,10 @@ export default function GeradorOrcamento() {
       const fichasTecnicas = Array.from(documentoRef.current.querySelectorAll(".ficha-tecnica")) as HTMLElement[]
 
       // Obter o conteúdo principal do orçamento (excluindo as fichas técnicas)
-      // Criar um clone do documento completo
-      const documentoCompleto = documentoRef.current.cloneNode(true) as HTMLElement
-
-      // Remover as fichas técnicas do clone para obter apenas o orçamento principal
-      const fichasTecnicasNoClone = Array.from(documentoCompleto.querySelectorAll(".ficha-tecnica"))
-      fichasTecnicasNoClone.forEach((ficha) => ficha.parentNode?.removeChild(ficha))
-
-      // Agora documentoCompleto contém apenas o orçamento principal
-      const orcamentoElement = documentoCompleto
+      const orcamentoElement = documentoRef.current.querySelector(".orcamento-principal") as HTMLElement
+      if (!orcamentoElement) {
+        throw new Error("Elemento do orçamento principal não encontrado")
+      }
 
       // Função para capturar um elemento e adicionar ao PDF
       const capturarElemento = async (elemento: HTMLElement, primeiraPagina = false) => {
@@ -474,7 +473,7 @@ export default function GeradorOrcamento() {
             pdf.addPage()
           }
 
-          // Adicionar a imagem ao PDF
+          // Adicionar a imagem ao PDF - usar as mesmas dimensões para todas as páginas
           pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight))
         } finally {
           // Remover o elemento temporário
@@ -566,7 +565,13 @@ export default function GeradorOrcamento() {
       const itemDescricao = orcamento.itens.length > 0 ? orcamento.itens[0].produto?.nome || "Item" : "Item"
       const novoNumero = `${proximoNumero} - ${itemDescricao} ${orcamento.cliente.nome} ${orcamento.cliente.contato}`
 
-      // Criar novo orçamento
+      // Criar um objeto com metadados adicionais para incluir no JSON
+      const metadados = {
+        valorFrete: orcamento.valorFrete || 0,
+        nomeContato: orcamento.nomeContato || "",
+        telefoneContato: orcamento.telefoneContato || "",
+      }
+
       const { data, error } = await supabase
         .from("orcamentos")
         .insert({
@@ -578,9 +583,14 @@ export default function GeradorOrcamento() {
           prazo_entrega: orcamento.prazoEntrega,
           validade_orcamento: orcamento.validadeOrcamento,
           status: orcamento.status || "proposta", // Adicionar status
-          valor_frete: orcamento.valorFrete || 0, // Adicionar valor do frete
-          // Garantir que o JSON seja válido
-          itens: JSON.stringify(orcamento.itens || []),
+          // Incluir metadados junto com os itens no JSON
+          itens: JSON.stringify({
+            items: orcamento.itens || [],
+            metadados: metadados,
+          }),
+          // Remove these fields as they don't exist in the database
+          // nome_contato: orcamento.nomeContato,
+          // telefone_contato: orcamento.telefoneContato,
         })
         .select()
 
@@ -727,7 +737,13 @@ export default function GeradorOrcamento() {
         }
       }
 
-      // Atualizar orçamento existente
+      // Criar um objeto com metadados adicionais para incluir no JSON
+      const metadados = {
+        valorFrete: orcamento.valorFrete || 0,
+        nomeContato: orcamento.nomeContato || "",
+        telefoneContato: orcamento.telefoneContato || "",
+      }
+
       const { error } = await supabase
         .from("orcamentos")
         .update({
@@ -739,10 +755,15 @@ export default function GeradorOrcamento() {
           prazo_entrega: orcamento.prazoEntrega,
           validade_orcamento: orcamento.validadeOrcamento,
           status: orcamento.status || "proposta", // Adicionar status
-          valor_frete: orcamento.valorFrete || 0, // Adicionar valor do frete
-          // Garantir que o JSON seja válido
-          itens: JSON.stringify(orcamento.itens || []),
+          // Incluir metadados junto com os itens no JSON
+          itens: JSON.stringify({
+            items: orcamento.itens || [],
+            metadados: metadados,
+          }),
           updated_at: new Date().toISOString(),
+          // Remove these fields as they don't exist in the database
+          // nome_contato: orcamento.nomeContato,
+          // telefone_contato: orcamento.telefoneContato,
         })
         .eq("id", orcamentoSalvo)
 
@@ -1056,6 +1077,44 @@ export default function GeradorOrcamento() {
         setClientes((prevClientes) => [...prevClientes, clienteFormatado])
       }
 
+      // Extrair metadados do JSON de itens, se existirem
+      let valorFrete = 0
+      let nomeContato = ""
+      let telefoneContato = ""
+
+      try {
+        if (data.itens && typeof data.itens === "object") {
+          // Se itens já é um objeto (parseado automaticamente)
+          if (data.itens.metadados) {
+            if (data.itens.metadados.valorFrete !== undefined) {
+              valorFrete = Number(data.itens.metadados.valorFrete)
+            }
+            if (data.itens.metadados.nomeContato !== undefined) {
+              nomeContato = data.itens.metadados.nomeContato
+            }
+            if (data.itens.metadados.telefoneContato !== undefined) {
+              telefoneContato = data.itens.metadados.telefoneContato
+            }
+          }
+        } else if (data.itens && typeof data.itens === "string") {
+          // Se itens é uma string JSON
+          const itensObj = JSON.parse(data.itens)
+          if (itensObj.metadados) {
+            if (itensObj.metadados.valorFrete !== undefined) {
+              valorFrete = Number(itensObj.metadados.valorFrete)
+            }
+            if (itensObj.metadados.nomeContato !== undefined) {
+              nomeContato = itensObj.metadados.nomeContato
+            }
+            if (itensObj.metadados.telefoneContato !== undefined) {
+              telefoneContato = itensObj.metadados.telefoneContato
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao extrair metadados do JSON:", e)
+      }
+
       // Atualizar o estado do orçamento
       setOrcamento({
         id: data.id,
@@ -1068,7 +1127,9 @@ export default function GeradorOrcamento() {
         prazoEntrega: data.prazo_entrega || "15 dias",
         validadeOrcamento: data.validade_orcamento || "15 dias",
         status: data.status || "proposta",
-        valorFrete: data.valor_frete ? Number(data.valor_frete) : 0, // Adicionar valor do frete
+        valorFrete: valorFrete,
+        nomeContato: nomeContato,
+        telefoneContato: telefoneContato,
       })
 
       setOrcamentoSalvo(data.id)
