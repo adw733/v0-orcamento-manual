@@ -43,7 +43,7 @@ export default function ListaOrcamentos({
   const [error, setError] = useState<string | null>(null)
 
   // Estados para ordenação
-  const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" | "desc" }>({
+  const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" }>({
     campo: "created_at",
     direcao: "desc",
   })
@@ -292,6 +292,13 @@ export default function ListaOrcamentos({
     }
   }
 
+  const extrairNumeroOrcamento = (numeroCompleto?: string) => {
+    if (!numeroCompleto) return ""
+    // Extrair apenas os dígitos numéricos do início da string
+    const match = numeroCompleto.match(/^\d+/)
+    return match ? match[0] : numeroCompleto
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -487,7 +494,11 @@ export default function ListaOrcamentos({
                 filtrarOrcamentos().map((orcamento) => (
                   <TableRow key={orcamento.id} className="border-t hover:bg-muted/50">
                     <TableCell className="px-4 py-3 align-middle">
-                      <span className="font-medium text-primary">{orcamento.numero}</span>
+                      <span className="font-medium text-primary">
+                        {extrairNumeroOrcamento(orcamento.numero)} -{" "}
+                        {orcamento.cliente?.nome?.toUpperCase() || "SEM EMPRESA"}
+                        {orcamento.nomeContato ? ` - ${orcamento.nomeContato.toUpperCase()}` : ""}
+                      </span>
                     </TableCell>
                     <TableCell className="px-4 py-3 align-middle">
                       <div className="flex items-center gap-1">

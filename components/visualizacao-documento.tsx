@@ -58,6 +58,46 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     "13": 0,
   }
 
+  // Função para ordenar os tamanhos
+  const ordenarTamanhos = (tamanhos: Record<string, number>) => {
+    // Separar os tamanhos por categoria
+    const tamanhosLetras: [string, number][] = []
+    const tamanhosNumericos: [string, number][] = []
+    const tamanhosInfantis: [string, number][] = []
+
+    // Ordem específica para tamanhos de letras
+    const ordemLetras = ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"]
+
+    Object.entries(tamanhos)
+      .filter(([_, quantidade]) => quantidade > 0)
+      .forEach(([tamanho, quantidade]) => {
+        // Verificar se é um tamanho de letra (PP, P, M, G, GG, G1-G7)
+        if (ordemLetras.includes(tamanho)) {
+          tamanhosLetras.push([tamanho, quantidade])
+        }
+        // Verificar se é um tamanho numérico adulto (36-62)
+        else if (/^(3[6-9]|[4-5][0-9]|6[0-2])$/.test(tamanho)) {
+          tamanhosNumericos.push([tamanho, quantidade])
+        }
+        // Verificar se é um tamanho infantil (0-13)
+        else if (/^([0-9]|1[0-3])$/.test(tamanho)) {
+          tamanhosInfantis.push([tamanho, quantidade])
+        }
+        // Outros tamanhos não categorizados
+        else {
+          tamanhosLetras.push([tamanho, quantidade])
+        }
+      })
+
+    // Ordenar cada categoria
+    tamanhosLetras.sort((a, b) => ordemLetras.indexOf(a[0]) - ordemLetras.indexOf(b[0]))
+    tamanhosNumericos.sort((a, b) => Number.parseInt(a[0]) - Number.parseInt(b[0]))
+    tamanhosInfantis.sort((a, b) => Number.parseInt(a[0]) - Number.parseInt(b[0]))
+
+    // Retornar todos os tamanhos ordenados
+    return [...tamanhosLetras, ...tamanhosNumericos, ...tamanhosInfantis]
+  }
+
   // Usar os dados da empresa ou valores padrão
   const nomeEmpresa = dadosEmpresa?.nome || "ONEBASE"
   const cnpjEmpresa = dadosEmpresa?.cnpj || "12.345.678/0001-90"
@@ -68,8 +108,13 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
   // Adicione estas propriedades CSS para garantir que as cores sejam preservadas na impressão
   const pdfStyles = `
   @media print {
-    /* Preservar cores e fundos na impressão */
-    * {
+    /* Configurações gerais de impressão */
+    @page {
+      size: A4;
+      margin: 10mm; /* Adicionar margem de 10mm em todos os lados */
+    }
+    
+    body {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important;
@@ -91,6 +136,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
       border-color: inherit !important;
     }
     
+    /* Controle de quebra de página */
     .page-break-inside-avoid {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
@@ -111,12 +157,14 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
       break-after: avoid !important;
     }
     
+    /* Controle de tamanho de imagens */
     img {
       max-height: 350px;
       max-width: 100%;
       object-fit: contain;
     }
     
+    /* Configurações para fichas técnicas */
     .ficha-tecnica {
       page-break-before: always !important;
       break-before: always !important;
@@ -129,16 +177,43 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
 
     /* Configurações para garantir que a ficha técnica caiba em uma folha A4 */
     .ficha-tecnica, .orcamento-principal {
-      max-height: 297mm; /* Altura de uma folha A4 */
-      width: 210mm; /* Largura de uma folha A4 */
-      padding: 10mm; /* Margem interna */
+      width: 210mm;
       box-sizing: border-box;
+      padding: 0;
+      margin: 0;
     }
     
-    /* Apenas as fichas técnicas precisam de quebra de página */
-    .ficha-tecnica {
-      page-break-before: always !important;
-      break-before: always !important;
+    /* Remover bordas arredondadas na impressão */
+    .rounded-md, .rounded-lg, .rounded-tl-md, .rounded-tr-md {
+      border-radius: 0 !important;
+    }
+    
+    /* Ajustar espaçamentos para impressão */
+    .p-6 {
+      padding: 1rem !important;
+    }
+    
+    .space-y-6 > * + * {
+      margin-top: 1rem !important;
+    }
+    
+    /* Ajustar tamanho da fonte para impressão */
+    .text-sm {
+      font-size: 0.75rem !important;
+    }
+    
+    /* Ajustar layout da tabela de tamanhos */
+    .tamanhos-container {
+      max-height: none !important;
+      overflow: visible !important;
+      display: flex !important;
+      flex-wrap: wrap !important;
+    }
+    
+    .tamanho-texto {
+      margin-right: 8px !important;
+      white-space: nowrap !important;
+      font-size: 0.8rem !important;
     }
   }
   
@@ -148,7 +223,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     box-sizing: border-box;
     width: 100%;
     margin: 0;
-    padding: 10px;
+    padding: 0;
   }
   
   .pdf-content {
@@ -174,7 +249,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     padding: 0.5rem;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
   }
   
   .pdf-image {
@@ -195,24 +269,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     }
   }
   
-  .pdf-header {
-    padding: 1rem;
-    min-height: 80px;
-  }
-  
-  .pdf-content {
-    padding: 1rem;
-  }
-  
-  .pdf-text-sm {
-    font-size: 0.85em;
-  }
-  
-  .pdf-compact {
-    margin: 0;
-    padding: 0.5rem;
-  }
-  
   .pdf-cliente-info {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -230,115 +286,27 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     overflow: hidden;
   }
 
-  .pdf-table-compact {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8em;
-  }
-
-  .pdf-table-compact th,
-  .pdf-table-compact td {
-    padding: 4px;
-    text-align: left;
-    border-bottom: 1px solid #eee;
-  }
-
-  .pdf-table-compact tr:nth-child(even) {
-    background-color: #f9f9f9;
-  }
-
-  @media print {
-    .pdf-table-compact {
-      page-break-inside: avoid;
-    }
-  }
-
-  /* Tabela unificada para especificações */
-  .specs-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85em;
-  }
-
-  .specs-table th,
-  .specs-table td {
-    padding: 6px;
-    text-align: left;
-    border: 1px solid #e5e7eb;
-  }
-
-  .specs-table th {
-    background-color: #f3f4f6;
-    font-weight: 600;
-    color: #0f4c81;
-  }
-
-  .specs-table tr:nth-child(even) {
-    background-color: #f9fafb;
-  }
-
-  /* Estilos para os novos cards de especificações */
-  .spec-card {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  .tamanho-card {
-    display: inline-block;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  @media print {
-    .grid-cols-2 {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1rem;
-    }
-    
-    .grid-cols-3 {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1rem;
-    }
-    
-    .flex-wrap {
-      display: flex;
-      flex-wrap: wrap;
-    }
+  .tamanhos-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    line-height: 1.5;
+    max-height: none;
+    overflow: visible;
+    padding: 0.2rem;
   }
   
-  /* Estilos específicos para geração de PDF */
-  .pdf-container {
-    width: 210mm;
-    box-sizing: border-box;
-    padding: 10mm;
-    background-color: white;
-  }
-  
-  .pdf-page {
-    page-break-after: always;
-    width: 100%;
-  }
-  
-  .pdf-page:last-child {
-    page-break-after: auto;
-  }
-  
-  /* Garantir que o orçamento principal e as fichas técnicas tenham o mesmo layout */
-  .orcamento-principal,
-  .ficha-tecnica {
-    border: 1px solid #e5e7eb;
-    border-radius: 0.375rem;
-    overflow: hidden;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    margin-bottom: 2rem;
-    background-color: white;
+  .tamanho-texto {
+    font-size: 0.8rem;
+    color: #0369a1;
+    margin-right: 8px;
+    white-space: nowrap;
+    padding: 1px 0;
   }
 `
 
   return (
-    <div className="flex flex-col gap-8 p-4 font-sans text-gray-800 pdf-container">
+    <div className="flex flex-col gap-8 p-4 font-sans text-gray-800 pdf-container" style={{ margin: "10mm" }}>
       <style>{pdfStyles}</style>
       {/* Orçamento */}
       <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm page-break-inside-avoid pdf-section orcamento-principal">
@@ -408,7 +376,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
           <div className="border-b pb-4 page-break-inside-avoid">
             <h3 className="font-bold mb-2 text-primary text-lg">DADOS DO CLIENTE</h3>
             {orcamento.cliente ? (
-              <div className="pdf-cliente-info bg-accent p-3 rounded-md border-l-4 border-primary">
+              <div className="pdf-cliente-info bg-accent p-3 rounded-md">
                 <p>
                   <span className="font-medium">Nome:</span> {orcamento.cliente.nome}
                 </p>
@@ -417,9 +385,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                 </p>
                 <p>
                   <span className="font-medium">Endereço:</span> {orcamento.cliente.endereco}
-                </p>
-                <p>
-                  <span className="font-medium">Telefone:</span> {orcamento.cliente.telefone}
                 </p>
                 <p>
                   <span className="font-medium">Email:</span> {orcamento.cliente.email}
@@ -447,9 +412,17 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
             </div>
 
             <table className="w-full text-sm pdf-table">
+              <colgroup>
+                <col style={{ width: "30%" }} />
+                <col style={{ width: "35%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "15%" }} />
+              </colgroup>
               <thead className="bg-primary text-white">
                 <tr>
                   <th className="p-3 text-left rounded-tl-md">Item</th>
+                  <th className="p-3 text-left">Tamanhos</th>
                   <th className="p-3 text-center">Qtd.</th>
                   <th className="p-3 text-right">Valor Unit.</th>
                   <th className="p-3 text-right rounded-tr-md">Total</th>
@@ -465,6 +438,15 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                           {item.observacao && <p className="text-xs mt-1 text-gray-600 italic">{item.observacao}</p>}
                         </div>
                       </td>
+                      <td className="p-1">
+                        <div className="tamanhos-container">
+                          {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
+                            <span key={tamanho} className="tamanho-texto" title={`${tamanho}: ${quantidade} unidades`}>
+                              {tamanho}-{quantidade}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
                       <td className="p-3 text-center">{item.quantidade}</td>
                       <td className="p-3 text-right">R$ {item.valorUnitario.toFixed(2)}</td>
                       <td className="p-3 text-right font-medium">
@@ -474,7 +456,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="p-3 text-center text-gray-500 italic">
+                    <td colSpan={5} className="p-3 text-center text-gray-500 italic">
                       Nenhum item adicionado
                     </td>
                   </tr>
@@ -482,24 +464,24 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
               </tbody>
               <tfoot className="bg-accent font-medium">
                 <tr>
-                  <td colSpan={3} className="p-3 text-right border-t-2 border-primary">
+                  <td colSpan={4} className="p-3 text-right border-t-2 border-primary">
                     Valor dos Produtos:
                   </td>
                   <td className="p-3 text-right border-t-2 border-primary">R$ {calcularTotal().toFixed(2)}</td>
                 </tr>
                 {orcamento.valorFrete !== undefined && orcamento.valorFrete > 0 && (
                   <tr>
-                    <td colSpan={3} className="p-3 text-right">
+                    <td colSpan={4} className="p-3 text-right">
                       Valor do Frete:
                     </td>
                     <td className="p-3 text-right">R$ {orcamento.valorFrete.toFixed(2)}</td>
                   </tr>
                 )}
                 <tr>
-                  <td colSpan={3} className="p-3 text-right border-t-2 border-primary">
+                  <td colSpan={4} className="p-3 text-right border-t-2 border-primary">
                     TOTAL:
                   </td>
-                  <td className="p-3 text-right border-t-2 border-primary text-lg">
+                  <td className="p-3 text-right border-t-2 border-primary whitespace-nowrap">
                     R$ {(calcularTotal() + (orcamento.valorFrete || 0)).toFixed(2)}
                   </td>
                 </tr>
@@ -780,37 +762,29 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                     <table className="w-full border-collapse text-sm pdf-table">
                       <thead>
                         <tr>
-                          <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tl-md">
-                            TAM.
-                          </th>
-                          {Object.keys(tamanhosPadrao)
-                            .filter((tamanho) => item.tamanhos[tamanho] > 0) // Filtrar tamanhos com quantidade > 0
-                            .map((tamanho) => (
-                              <th
-                                key={`header-${item.id}-${tamanho}`}
-                                className="border border-gray-300 p-1 text-center bg-primary text-white"
-                              >
-                                {tamanho}
-                              </th>
-                            ))}
-                          <th className="border border-gray-300 p-1 text-center bg-primary text-white rounded-tr-md">
-                            TOTAL
-                          </th>
+                          <th className="border border-gray-300 p-1 text-center bg-primary text-white">TAM.</th>
+                          {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, _]) => (
+                            <th
+                              key={`header-${item.id}-${tamanho}`}
+                              className="border border-gray-300 p-1 text-center bg-primary text-white"
+                            >
+                              {tamanho}
+                            </th>
+                          ))}
+                          <th className="border border-gray-300 p-1 text-center bg-primary text-white">TOTAL</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
                           <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
-                          {Object.keys(tamanhosPadrao)
-                            .filter((tamanho) => item.tamanhos[tamanho] > 0) // Filtrar tamanhos com quantidade > 0
-                            .map((tamanho) => (
-                              <td
-                                key={`${item.id}-${tamanho}`}
-                                className="border border-gray-300 p-1 text-center bg-white"
-                              >
-                                {item.tamanhos[tamanho]}
-                              </td>
-                            ))}
+                          {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
+                            <td
+                              key={`${item.id}-${tamanho}`}
+                              className="border border-gray-300 p-1 text-center bg-white"
+                            >
+                              {quantidade}
+                            </td>
+                          ))}
                           <td className="border border-gray-300 p-1 text-center font-medium bg-white">
                             {item.quantidade}
                           </td>

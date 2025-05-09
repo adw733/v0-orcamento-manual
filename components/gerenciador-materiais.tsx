@@ -138,7 +138,7 @@ export default function GerenciadorMateriais() {
         setError(null)
 
         const corAdicionada = await corService.adicionar({
-          nome: novaCor.nome,
+          nome: novaCor.nome.toUpperCase(),
           codigo_hex: novaCor.codigo_hex,
         })
 
@@ -170,8 +170,14 @@ export default function GerenciadorMateriais() {
         setIsLoading(true)
         setError(null)
 
-        await corService.atualizar(corEditando)
-        setCores(cores.map((cor) => (cor.id === corEditando.id ? corEditando : cor)))
+        // Garantir que o nome esteja em maiúsculas
+        const corAtualizada = {
+          ...corEditando,
+          nome: corEditando.nome.toUpperCase(),
+        }
+
+        await corService.atualizar(corAtualizada)
+        setCores(cores.map((cor) => (cor.id === corAtualizada.id ? corAtualizada : cor)))
         setEditandoCorId(null)
         setCorEditando(null)
       } catch (error) {
@@ -210,8 +216,8 @@ export default function GerenciadorMateriais() {
         setError(null)
 
         const tecidoAdicionado = await tecidoBaseService.adicionar({
-          nome: novoTecido.nome,
-          composicao: novoTecido.composicao,
+          nome: novoTecido.nome.toUpperCase(),
+          composicao: novoTecido.composicao.toUpperCase(),
         })
 
         setTecidos([...tecidos, tecidoAdicionado])
@@ -242,8 +248,15 @@ export default function GerenciadorMateriais() {
         setIsLoading(true)
         setError(null)
 
-        await tecidoBaseService.atualizar(tecidoEditando)
-        setTecidos(tecidos.map((tecido) => (tecido.id === tecidoEditando.id ? tecidoEditando : tecido)))
+        // Garantir que os dados estejam em maiúsculas
+        const tecidoAtualizado = {
+          ...tecidoEditando,
+          nome: tecidoEditando.nome.toUpperCase(),
+          composicao: tecidoEditando.composicao.toUpperCase(),
+        }
+
+        await tecidoBaseService.atualizar(tecidoAtualizado)
+        setTecidos(tecidos.map((tecido) => (tecido.id === tecidoAtualizado.id ? tecidoAtualizado : tecido)))
         setEditandoTecidoId(null)
         setTecidoEditando(null)
       } catch (error) {
@@ -348,9 +361,9 @@ export default function GerenciadorMateriais() {
                         <Input
                           id="nome-cor"
                           value={novaCor.nome}
-                          onChange={(e) => setNovaCor({ ...novaCor, nome: e.target.value })}
+                          onChange={(e) => setNovaCor({ ...novaCor, nome: e.target.value.toUpperCase() })}
                           className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          placeholder="Ex: Azul Marinho"
+                          placeholder="Ex: AZUL MARINHO"
                         />
                       </div>
                       <div>
@@ -464,7 +477,7 @@ export default function GerenciadorMateriais() {
                                     onChange={(e) =>
                                       setCorEditando({
                                         ...corEditando,
-                                        nome: e.target.value,
+                                        nome: e.target.value.toUpperCase(),
                                       })
                                     }
                                     className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -618,9 +631,9 @@ export default function GerenciadorMateriais() {
                         <Input
                           id="nome-tecido"
                           value={novoTecido.nome}
-                          onChange={(e) => setNovoTecido({ ...novoTecido, nome: e.target.value })}
+                          onChange={(e) => setNovoTecido({ ...novoTecido, nome: e.target.value.toUpperCase() })}
                           className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          placeholder="Ex: Brim"
+                          placeholder="Ex: BRIM"
                         />
                       </div>
                       <div>
@@ -631,7 +644,7 @@ export default function GerenciadorMateriais() {
                         <Input
                           id="composicao"
                           value={novoTecido.composicao}
-                          onChange={(e) => setNovoTecido({ ...novoTecido, composicao: e.target.value })}
+                          onChange={(e) => setNovoTecido({ ...novoTecido, composicao: e.target.value.toUpperCase() })}
                           className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                           placeholder="Ex: 100% ALGODÃO"
                         />
@@ -720,7 +733,7 @@ export default function GerenciadorMateriais() {
                                     onChange={(e) =>
                                       setTecidoEditando({
                                         ...tecidoEditando,
-                                        nome: e.target.value,
+                                        nome: e.target.value.toUpperCase(),
                                       })
                                     }
                                     className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -740,7 +753,7 @@ export default function GerenciadorMateriais() {
                                     onChange={(e) =>
                                       setTecidoEditando({
                                         ...tecidoEditando,
-                                        composicao: e.target.value,
+                                        composicao: e.target.value.toUpperCase(),
                                       })
                                     }
                                     className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"

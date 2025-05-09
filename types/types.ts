@@ -34,6 +34,7 @@ export type Cliente = {
   email: string
 }
 
+// Modificar a interface Produto para incluir categoria
 export type Produto = {
   id: string
   codigo: string // Novo campo para código sequencial
@@ -42,6 +43,7 @@ export type Produto = {
   tecidos: Tecido[]
   cores: string[]
   tamanhosDisponiveis: string[]
+  categoria: string // Nova propriedade para categorização
 }
 
 export type ItemOrcamento = {

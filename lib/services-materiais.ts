@@ -34,7 +34,7 @@ export const corService = {
     const { data, error } = await supabase
       .from("cores")
       .insert({
-        nome: cor.nome,
+        nome: cor.nome.toUpperCase(),
         codigo_hex: cor.codigo_hex,
       })
       .select()
@@ -55,7 +55,7 @@ export const corService = {
     const { error } = await supabase
       .from("cores")
       .update({
-        nome: cor.nome,
+        nome: cor.nome.toUpperCase(),
         codigo_hex: cor.codigo_hex,
         updated_at: new Date().toISOString(),
       })
@@ -98,8 +98,8 @@ export const tecidoBaseService = {
     const { data, error } = await supabase
       .from("tecidos_base")
       .insert({
-        nome: tecido.nome,
-        composicao: tecido.composicao,
+        nome: tecido.nome.toUpperCase(),
+        composicao: tecido.composicao.toUpperCase(),
       })
       .select()
 
@@ -119,8 +119,8 @@ export const tecidoBaseService = {
     const { error } = await supabase
       .from("tecidos_base")
       .update({
-        nome: tecido.nome,
-        composicao: tecido.composicao,
+        nome: tecido.nome.toUpperCase(),
+        composicao: tecido.composicao.toUpperCase(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", tecido.id)

@@ -10,24 +10,27 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
     const jsPDF = jspdfModule.default
     const html2canvas = html2canvasModule.default
 
-    // Criar uma cópia do elemento para manipulação
-    const elementoParaCapturar = element.cloneNode(true) as HTMLElement
+    // Criar uma cópia exata do elemento para preservar a formatação
+    const container = document.createElement("div")
+    container.style.position = "absolute"
+    container.style.left = "-9999px"
+    container.style.width = "210mm" // Largura A4
+    container.style.backgroundColor = "#ffffff"
+    container.style.padding = "0"
+    container.style.margin = "0"
+    container.style.boxSizing = "border-box"
+    container.style.overflow = "hidden"
 
-    // Aplicar estilos específicos para a captura
-    elementoParaCapturar.style.width = "210mm" // Largura A4
-    elementoParaCapturar.style.margin = "0"
-    elementoParaCapturar.style.padding = "10mm" // Margem interna
-    elementoParaCapturar.style.boxSizing = "border-box"
-    elementoParaCapturar.style.backgroundColor = "#ffffff"
+    // Clonar o conteúdo original
+    const clone = element.cloneNode(true) as HTMLElement
+    container.appendChild(clone)
 
-    // Adicionar o elemento ao DOM temporariamente para captura
-    elementoParaCapturar.style.position = "absolute"
-    elementoParaCapturar.style.left = "-9999px"
-    document.body.appendChild(elementoParaCapturar)
+    // Adicionar ao DOM temporariamente
+    document.body.appendChild(container)
 
-    // Capturar o orçamento principal e as fichas técnicas separadamente
-    const orcamentoElement = elementoParaCapturar.querySelector(".orcamento-principal") as HTMLElement
-    const fichasTecnicas = Array.from(elementoParaCapturar.querySelectorAll(".ficha-tecnica")) as HTMLElement[]
+    // Encontrar as fichas técnicas e o orçamento principal no clone
+    const orcamentoPrincipal = container.querySelector(".orcamento-principal") as HTMLElement
+    const fichasTecnicas = Array.from(container.querySelectorAll(".ficha-tecnica")) as HTMLElement[]
 
     // Criar uma nova instância do jsPDF
     const pdf = new jsPDF({
@@ -37,56 +40,115 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
       compress: true,
     })
 
-    // Função para adicionar uma página ao PDF
-    const adicionarPagina = async (elemento: HTMLElement, primeiraPagina = false) => {
-      // Aplicar estilos específicos para a captura
-      elemento.style.width = "210mm" // Largura A4
-      elemento.style.margin = "0"
-      elemento.style.padding = "10mm" // Margem interna
-      elemento.style.boxSizing = "border-box"
-      elemento.style.backgroundColor = "#ffffff"
+    // Função para garantir que todas as imagens estejam carregadas
+    const waitForImagesLoaded = (element: HTMLElement): Promise<void> => {
+      return new Promise((resolve) => {
+        const images = Array.from(element.querySelectorAll("img"))
+        if (images.length === 0) {
+          resolve()
+          return
+        }
 
-      // Capturar o elemento como uma imagem
-      const canvas = await html2canvas(elemento, {
-        scale: 2, // Aumentar a escala para melhor qualidade
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#FFFFFF",
-        width: elemento.offsetWidth,
-        height: elemento.offsetHeight,
+        let loadedCount = 0
+        const checkAllLoaded = () => {
+          loadedCount++
+          if (loadedCount === images.length) {
+            resolve()
+          }
+        }
+
+        images.forEach((img) => {
+          if (img.complete) {
+            checkAllLoaded()
+          } else {
+            img.onload = checkAllLoaded
+            img.onerror = checkAllLoaded
+          }
+        })
       })
+    }
 
-      // Converter o canvas para uma imagem
-      const imgData = canvas.toDataURL("image/jpeg", 1.0)
+    // Função para capturar um elemento e adicionar ao PDF com alta qualidade
+    const capturarElemento = async (elemento: HTMLElement, primeiraPagina = false) => {
+      try {
+        // Garantir que todas as imagens estejam carregadas
+        await waitForImagesLoaded(elemento)
 
-      // Calcular as dimensões para ajustar à página A4
-      const imgWidth = 210 // A4 width in mm
-      const pageHeight = 297 // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+        // Aplicar estilos específicos para melhorar a qualidade
+        elemento.style.width = "210mm"
+        elemento.style.margin = "0"
+        elemento.style.padding = "10mm"
+        elemento.style.boxSizing = "border-box"
+        elemento.style.backgroundColor = "#ffffff"
+        elemento.style.overflow = "visible"
 
-      // Se não for a primeira página, adicionar uma nova página
-      if (!primeiraPagina) {
-        pdf.addPage()
+        // Forçar renderização de cores e fundos
+        const todosElementos = elemento.querySelectorAll("*")
+        todosElementos.forEach((el) => {
+          const htmlEl = el as HTMLElement
+          if (htmlEl.style) {
+            htmlEl.style.printColorAdjust = "exact"
+            htmlEl.style.WebkitPrintColorAdjust = "exact"
+          }
+        })
+
+        // Capturar o elemento como uma imagem com configurações de alta qualidade
+        const canvas = await html2canvas(elemento, {
+          scale: 4, // Aumentar a escala para qualidade muito superior
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#FFFFFF",
+          allowTaint: true,
+          imageTimeout: 15000, // Tempo maior para carregar imagens
+          width: elemento.offsetWidth,
+          height: elemento.offsetHeight,
+          onclone: (clonedDoc, clonedElement) => {
+            // Aplicar estilos adicionais ao clone para melhorar a qualidade
+            const allElements = clonedElement.querySelectorAll("*")
+            allElements.forEach((el) => {
+              const htmlEl = el as HTMLElement
+              if (htmlEl.style) {
+                htmlEl.style.printColorAdjust = "exact"
+                htmlEl.style.WebkitPrintColorAdjust = "exact"
+              }
+            })
+          },
+        })
+
+        // Converter o canvas para uma imagem com alta qualidade
+        const imgData = canvas.toDataURL("image/jpeg", 1.0)
+
+        // Calcular as dimensões para ajustar à página A4
+        const imgWidth = 210 // A4 width in mm
+        const pageHeight = 297 // A4 height in mm
+        const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+        // Se não for a primeira página, adicionar uma nova página
+        if (!primeiraPagina) {
+          pdf.addPage()
+        }
+
+        // Adicionar a imagem ao PDF com alta qualidade
+        pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight))
+      } catch (error) {
+        console.error("Erro ao capturar elemento:", error)
       }
-
-      // Adicionar a imagem ao PDF
-      pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight))
     }
 
-    // Adicionar o orçamento principal como primeira página
-    if (orcamentoElement) {
-      await adicionarPagina(orcamentoElement, true)
+    // Capturar o orçamento principal como primeira página
+    if (orcamentoPrincipal) {
+      await capturarElemento(orcamentoPrincipal, true)
     }
 
-    // Adicionar cada ficha técnica como uma página separada
+    // Capturar cada ficha técnica como uma página separada
     for (const ficha of fichasTecnicas) {
-      await adicionarPagina(ficha)
+      await capturarElemento(ficha)
     }
 
     // Remover o elemento temporário
-    document.body.removeChild(elementoParaCapturar)
+    document.body.removeChild(container)
 
-    // Salvar o PDF
+    // Salvar o PDF com configurações otimizadas
     pdf.save(filename)
   } catch (error) {
     console.error("Erro ao gerar PDF:", error)
@@ -97,11 +159,11 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
 /**
  * Função para formatar o nome do arquivo PDF
  */
-export function formatPDFFilename(numeroOrcamento: string, nomeCliente?: string): string {
-  const dataFormatada = new Date().toISOString().split("T")[0].replace(/-/g, "")
+export function formatPDFFilename(numeroOrcamento: string, nomeCliente?: string, nomeContato?: string): string {
   const clienteFormatado = nomeCliente ? nomeCliente.replace(/\s+/g, "_").substring(0, 20) : "sem_cliente"
+  const contatoFormatado = nomeContato ? nomeContato.replace(/\s+/g, "_").substring(0, 20) : "sem_contato"
 
-  return `Orcamento_${numeroOrcamento}_${clienteFormatado}_${dataFormatada}.pdf`
+  return `01 - ORCAMENTO_${numeroOrcamento}_${clienteFormatado.toUpperCase()}_${contatoFormatado.toUpperCase()}.pdf`
 }
 
 /**

@@ -1,5 +1,7 @@
 "use client"
 
+import React from "react"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,27 +9,33 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Plus,
-  Trash2,
-  Pencil,
-  Save,
-  X,
   Package,
   DollarSign,
   Shirt,
-  Palette,
-  Ruler,
   AlertCircle,
   FileText,
   Search,
   ChevronUp,
   ChevronDown,
+  FolderOpen,
+  FolderClosed,
+  Tag,
+  Pencil,
+  Trash2,
+  X,
+  Save,
+  Palette,
+  Ruler,
 } from "lucide-react"
 import type { Produto } from "@/types/types"
 import { supabase } from "@/lib/supabase"
-import { mockProdutos } from "@/lib/mock-data"
 
 // Importar os serviços de materiais
 import { type Cor, type TecidoBase, corService, tecidoBaseService } from "@/lib/services-materiais"
+
+// Importar o gerenciador de categorias
+import { type Categoria, CORES_CATEGORIAS } from "./gerenciador-categorias"
+import GerenciadorCategorias from "./gerenciador-categorias"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -78,8 +86,17 @@ interface GerenciadorProdutosProps {
   setProdutos: (produtos: Produto[]) => void
 }
 
+// Modificar as categorias padrão para estarem em maiúsculas
+const CATEGORIAS_PADRAO: Categoria[] = [
+  { id: generateUUID(), nome: "CAMISETAS", descricao: "CAMISETAS EM GERAL", cor: CORES_CATEGORIAS[0] },
+  { id: generateUUID(), nome: "CAMISAS", descricao: "CAMISAS SOCIAIS E POLOS", cor: CORES_CATEGORIAS[1] },
+  { id: generateUUID(), nome: "UNIFORMES BRIM", descricao: "CALÇAS E JAQUETAS DE BRIM", cor: CORES_CATEGORIAS[2] },
+  { id: generateUUID(), nome: "JALECOS", descricao: "JALECOS E AVENTAIS", cor: CORES_CATEGORIAS[3] },
+  { id: generateUUID(), nome: "OUTROS", descricao: "OUTROS TIPOS DE PRODUTOS", cor: CORES_CATEGORIAS[7] },
+]
+
 export default function GerenciadorProdutos({ produtos, adicionarProduto, setProdutos }: GerenciadorProdutosProps) {
-  // Modificar o estado do novo produto para incluir o código
+  // Modificar o estado do novo produto para incluir o código e categoria
   const [novoProduto, setNovoProduto] = useState<Partial<Produto>>({
     codigo: "",
     nome: "",
@@ -87,6 +104,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     tecidos: [],
     cores: [],
     tamanhosDisponiveis: [],
+    categoria: "", // Inicializar categoria vazia
   })
 
   const [editandoId, setEditandoId] = useState<string | null>(null)
@@ -99,7 +117,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
 
   // Estados para cores e tecidos pré-cadastrados
   const [coresCadastradas, setCoresCadastradas] = useState<Cor[]>([])
-  const [tecidosCadastrados, setTecidosCadastrados] = useState<TecidoBase[]>([])
+  const [tecidosCadastradas, setTecidosCadastradas] = useState<TecidoBase[]>([])
 
   // Adicione um estado para controlar a visibilidade do formulário de novo produto:
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
@@ -111,53 +129,34 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     direcao: "asc",
   })
 
-  // Carregar produtos do Supabase ao montar o componente
+  // Estado para controlar categorias expandidas
+  const [categoriasExpandidas, setCategoriasExpandidas] = useState<Record<string, boolean>>({})
+
+  // Estado para controlar o modal de gerenciamento de categorias
+  const [mostrarGerenciadorCategorias, setMostrarGerenciadorCategorias] = useState(false)
+
+  // Estado para armazenar as categorias disponíveis - inicializar com categorias padrão
+  const [categorias, setCategorias] = useState<Categoria[]>(CATEGORIAS_PADRAO)
+
+  // Carregar produtos e categorias do Supabase ao montar o componente
   useEffect(() => {
     const carregarDados = async () => {
       try {
         setIsLoading(true)
 
-        // Buscar produtos
-        const { data: produtosData, error: produtosError } = await supabase.from("produtos").select("*").order("codigo")
+        // Buscar categorias - versão simplificada que não depende do banco de dados
+        setCategorias(CATEGORIAS_PADRAO)
 
-        if (produtosError) {
-          console.warn("Erro ao carregar produtos do Supabase, usando dados mock:", produtosError)
-          setProdutos(mockProdutos)
-          return
-        }
-
-        if (produtosData) {
-          // Para cada produto, buscar seus tecidos
-          const produtosCompletos = await Promise.all(
-            produtosData.map(async (produto) => {
-              // Buscar tecidos do produto
-              const { data: tecidosData, error: tecidosError } = await supabase
-                .from("tecidos")
-                .select("*")
-                .eq("produto_id", produto.id)
-
-              if (tecidosError) throw tecidosError
-
-              // Converter para o formato da aplicação
-              return {
-                id: produto.id,
-                codigo: produto.codigo || "",
-                nome: produto.nome,
-                valorBase: Number(produto.valor_base),
-                tecidos: tecidosData
-                  ? tecidosData.map((t) => ({
-                      nome: t.nome,
-                      composicao: t.composicao || "",
-                    }))
-                  : [],
-                cores: produto.cores || [],
-                tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
-              } as Produto
-            }),
-          )
-
-          setProdutos(produtosCompletos)
-        }
+        // Inicializar todas as categorias como compactadas
+        const categorias = [...new Set(produtos.map((p) => p.categoria || "Outros"))]
+        const estadoInicial = categorias.reduce(
+          (acc, cat) => {
+            acc[cat] = false // Inicialmente compactadas
+            return acc
+          },
+          {} as Record<string, boolean>,
+        )
+        setCategoriasExpandidas(estadoInicial)
 
         // Carregar cores e tecidos pré-cadastrados
         try {
@@ -165,22 +164,21 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
           setCoresCadastradas(coresData)
 
           const tecidosData = await tecidoBaseService.listarTodos()
-          setTecidosCadastrados(tecidosData)
+          setTecidosCadastradas(tecidosData)
         } catch (error) {
           console.error("Erro ao carregar cores e tecidos:", error)
         }
       } catch (error) {
         console.error("Erro ao carregar produtos:", error)
-        setProdutos(mockProdutos)
       } finally {
         setIsLoading(false)
       }
     }
 
     carregarDados()
-  }, [setProdutos])
+  }, [produtos])
 
-  // Modificar a função handleAdicionarProduto para gerar o código
+  // Modificar o método handleAdicionarProduto para converter para maiúsculas
   const handleAdicionarProduto = async () => {
     if (novoProduto.nome && novoProduto.valorBase) {
       try {
@@ -193,27 +191,49 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         // Obter o próximo código sequencial
         const codigo = novoProduto.codigo || (await obterProximoCodigoProduto())
 
+        // Verificar se a coluna 'categoria' existe
+        let colunaExiste = false
+        try {
+          // Tentar obter informações sobre a tabela
+          const { data: tableInfo, error: tableError } = await supabase.from("produtos").select("categoria").limit(1)
+
+          // Se não houver erro, a coluna existe
+          if (!tableError) {
+            colunaExiste = true
+          }
+        } catch (error) {
+          console.log("A coluna 'categoria' não existe na tabela 'produtos'")
+          colunaExiste = false
+        }
+
+        // Preparar dados para inserção com valores em maiúsculas
+        const insertData = {
+          id: produtoId,
+          codigo,
+          nome: novoProduto.nome.toUpperCase(),
+          valor_base: novoProduto.valorBase,
+          cores: novoProduto.cores ? novoProduto.cores.map((cor) => cor.toUpperCase()) : [],
+          tamanhos_disponiveis: novoProduto.tamanhosDisponiveis
+            ? novoProduto.tamanhosDisponiveis.map((tamanho) => tamanho.toUpperCase())
+            : [],
+        }
+
+        // Adicionar categoria apenas se a coluna existir
+        if (colunaExiste) {
+          insertData.categoria = novoProduto.categoria ? novoProduto.categoria.toUpperCase() : "OUTROS"
+        }
+
         // Inserir produto no Supabase
-        const { data: insertedData, error: produtoError } = await supabase
-          .from("produtos")
-          .insert({
-            id: produtoId,
-            codigo,
-            nome: novoProduto.nome,
-            valor_base: novoProduto.valorBase,
-            cores: novoProduto.cores || [],
-            tamanhos_disponiveis: novoProduto.tamanhosDisponiveis || [],
-          })
-          .select()
+        const { data: insertedData, error: produtoError } = await supabase.from("produtos").insert(insertData).select()
 
         if (produtoError) throw produtoError
 
         if (insertedData && insertedData[0]) {
-          // Inserir tecidos do produto
+          // Inserir tecidos do produto com valores em maiúsculas
           if (novoProduto.tecidos && novoProduto.tecidos.length > 0) {
             const tecidosParaInserir = novoProduto.tecidos.map((tecido) => ({
-              nome: tecido.nome,
-              composicao: tecido.composicao,
+              nome: tecido.nome.toUpperCase(),
+              composicao: tecido.composicao.toUpperCase(),
               produto_id: insertedData[0].id,
             }))
 
@@ -228,9 +248,15 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
             codigo: insertedData[0].codigo || codigo,
             nome: insertedData[0].nome,
             valorBase: Number(insertedData[0].valor_base),
-            tecidos: novoProduto.tecidos || [],
-            cores: novoProduto.cores || [],
-            tamanhosDisponiveis: novoProduto.tamanhosDisponiveis || [],
+            tecidos: novoProduto.tecidos
+              ? novoProduto.tecidos.map((tecido) => ({
+                  nome: tecido.nome.toUpperCase(),
+                  composicao: tecido.composicao.toUpperCase(),
+                }))
+              : [],
+            cores: insertedData[0].cores || [],
+            tamanhosDisponiveis: insertedData[0].tamanhos_disponiveis || [],
+            categoria: insertedData[0].categoria || novoProduto.categoria?.toUpperCase() || "OUTROS",
           }
 
           // Adicionar à lista local
@@ -244,6 +270,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
             tecidos: [],
             cores: [],
             tamanhosDisponiveis: [],
+            categoria: "",
           })
           setNovoTamanho("")
           setMostrarFormulario(false)
@@ -322,24 +349,44 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     setProdutoEditando(null)
   }
 
+  // Modificar o método salvarEdicao para converter para maiúsculas
   const salvarEdicao = async () => {
     if (produtoEditando) {
       try {
         setIsLoading(true)
         setError(null)
 
-        // Atualizar produto no Supabase
-        const { error: produtoError } = await supabase
-          .from("produtos")
-          .update({
-            codigo: produtoEditando.codigo,
-            nome: produtoEditando.nome,
-            valor_base: produtoEditando.valorBase,
-            cores: produtoEditando.cores,
-            tamanhos_disponiveis: produtoEditando.tamanhosDisponiveis,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", produtoEditando.id)
+        // Primeiro, verificar se a coluna 'categoria' existe
+        let colunaExiste = false
+        try {
+          // Tentar obter informações sobre a tabela
+          const { data: tableInfo, error: tableError } = await supabase.from("produtos").select("categoria").limit(1)
+
+          // Se não houver erro, a coluna existe
+          if (!tableError) {
+            colunaExiste = true
+          }
+        } catch (error) {
+          console.log("A coluna 'categoria' não existe na tabela 'produtos'")
+          colunaExiste = false
+        }
+
+        // Atualizar o produto com ou sem o campo categoria, com valores em maiúsculas
+        const updateData = {
+          codigo: produtoEditando.codigo,
+          nome: produtoEditando.nome.toUpperCase(),
+          valor_base: produtoEditando.valorBase,
+          cores: produtoEditando.cores.map((cor) => cor.toUpperCase()),
+          tamanhos_disponiveis: produtoEditando.tamanhosDisponiveis.map((tamanho) => tamanho.toUpperCase()),
+          updated_at: new Date().toISOString(),
+        }
+
+        // Adicionar categoria apenas se a coluna existir
+        if (colunaExiste) {
+          updateData.categoria = produtoEditando.categoria ? produtoEditando.categoria.toUpperCase() : "OUTROS"
+        }
+
+        const { error: produtoError } = await supabase.from("produtos").update(updateData).eq("id", produtoEditando.id)
 
         if (produtoError) throw produtoError
 
@@ -351,11 +398,11 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
 
         if (deleteTecidosError) throw deleteTecidosError
 
-        // Inserir novos tecidos
+        // Inserir novos tecidos com valores em maiúsculas
         if (produtoEditando.tecidos && produtoEditando.tecidos.length > 0) {
           const tecidosParaInserir = produtoEditando.tecidos.map((tecido) => ({
-            nome: tecido.nome,
-            composicao: tecido.composicao,
+            nome: tecido.nome.toUpperCase(),
+            composicao: tecido.composicao.toUpperCase(),
             produto_id: produtoEditando.id,
           }))
 
@@ -400,7 +447,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     } else {
       setNovoProduto({
         ...novoProduto,
-        cores: (novoProduto.cores || []).filter((_, i) => i !== index),
+        cores: (novoProduto.cores || []).filter((c, i) => i !== index),
       })
     }
   }
@@ -451,6 +498,14 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     }
   }
 
+  // Função para alternar a expansão de uma categoria
+  const alternarCategoria = (categoria: string) => {
+    setCategoriasExpandidas((prev) => ({
+      ...prev,
+      [categoria]: !prev[categoria],
+    }))
+  }
+
   // Função para filtrar e ordenar produtos
   const produtosFiltradosEOrdenados = () => {
     // Primeiro filtra os produtos
@@ -461,6 +516,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
       return (
         produto.codigo.toLowerCase().includes(termoLowerCase) ||
         produto.nome.toLowerCase().includes(termoLowerCase) ||
+        produto.categoria?.toLowerCase().includes(termoLowerCase) ||
         produto.tecidos.some((t) => t.nome.toLowerCase().includes(termoLowerCase)) ||
         produto.cores.some((c) => c.toLowerCase().includes(termoLowerCase))
       )
@@ -483,6 +539,10 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
           valorA = a.valorBase
           valorB = b.valorBase
           break
+        case "categoria":
+          valorA = a.categoria || "Outros"
+          valorB = b.categoria || "Outros"
+          break
         default:
           valorA = a.codigo
           valorB = b.codigo
@@ -498,8 +558,66 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
     })
   }
 
+  // Agrupar produtos por categoria
+  const agruparPorCategoria = (produtos: Produto[]) => {
+    const grupos: Record<string, Produto[]> = {}
+
+    produtos.forEach((produto) => {
+      const categoria = produto.categoria || "Outros"
+      if (!grupos[categoria]) {
+        grupos[categoria] = []
+      }
+      grupos[categoria].push(produto)
+    })
+
+    return grupos
+  }
+
   // Obter produtos filtrados e ordenados
   const produtosExibidos = produtosFiltradosEOrdenados()
+  const produtosAgrupados = agruparPorCategoria(produtosExibidos)
+
+  // Variável para armazenar os tecidos cadastrados
+  const [tecidosCadastrados, setTecidosCadastrados] = useState<TecidoBase[]>([])
+
+  // Funções para gerenciar categorias
+  const handleCategoriaAdded = (categoria: Categoria) => {
+    setCategorias([...categorias, categoria])
+  }
+
+  const handleCategoriaUpdated = (categoriaAtualizada: Categoria) => {
+    setCategorias(categorias.map((cat) => (cat.id === categoriaAtualizada.id ? categoriaAtualizada : cat)))
+
+    // Atualizar produtos com a categoria antiga para a nova
+    const categoriaAntiga = categorias.find((cat) => cat.id === categoriaAtualizada.id)
+    if (categoriaAntiga && categoriaAntiga.nome !== categoriaAtualizada.nome) {
+      setProdutos(
+        produtos.map((produto) =>
+          produto.categoria === categoriaAntiga.nome ? { ...produto, categoria: categoriaAtualizada.nome } : produto,
+        ),
+      )
+    }
+  }
+
+  const handleCategoriaDeleted = (id: string) => {
+    const categoriaRemovida = categorias.find((cat) => cat.id === id)
+    setCategorias(categorias.filter((cat) => cat.id !== id))
+
+    // Mover produtos da categoria removida para "Outros"
+    if (categoriaRemovida) {
+      setProdutos(
+        produtos.map((produto) =>
+          produto.categoria === categoriaRemovida.nome ? { ...produto, categoria: "Outros" } : produto,
+        ),
+      )
+    }
+  }
+
+  // Obter a cor da categoria para exibição
+  const getCorCategoria = (nomeCategoria: string): string => {
+    const categoria = categorias.find((cat) => cat.nome === nomeCategoria)
+    return categoria?.cor || "#4f46e5" // Cor padrão se não encontrar
+  }
 
   return (
     <div className="space-y-6">
@@ -522,18 +640,27 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Pesquisar produtos por código, nome, tecido ou cor..."
+            placeholder="Pesquisar produtos por código, nome, categoria, tecido ou cor..."
             value={termoPesquisa}
             onChange={(e) => setTermoPesquisa(e.target.value)}
             className="pl-10 pr-4 py-2 w-full"
           />
         </div>
-        <Button
-          onClick={() => setMostrarFormulario(true)}
-          className="bg-primary hover:bg-primary-dark text-white transition-colors"
-        >
-          <Plus className="h-4 w-4 mr-2" /> Novo Produto
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setMostrarGerenciadorCategorias(true)}
+            variant="outline"
+            className="border-primary text-primary hover:bg-primary/10"
+          >
+            <Tag className="h-4 w-4 mr-2" /> Gerenciar Categorias
+          </Button>
+          <Button
+            onClick={() => setMostrarFormulario(true)}
+            className="bg-primary hover:bg-primary-dark text-white transition-colors"
+          >
+            <Plus className="h-4 w-4 mr-2" /> Novo Produto
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-md border overflow-hidden">
@@ -548,6 +675,20 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                   <div className="flex items-center">
                     Código
                     {ordenacao.campo === "codigo" &&
+                      (ordenacao.direcao === "asc" ? (
+                        <ChevronUp className="ml-1 h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="ml-1 h-4 w-4" />
+                      ))}
+                  </div>
+                </th>
+                <th
+                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                  onClick={() => alternarOrdenacao("categoria")}
+                >
+                  <div className="flex items-center">
+                    Categoria
+                    {ordenacao.campo === "categoria" &&
                       (ordenacao.direcao === "asc" ? (
                         <ChevronUp className="ml-1 h-4 w-4" />
                       ) : (
@@ -584,7 +725,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                   </div>
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tecidos</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Cores</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Tamanhos</th>
                 <th className="px-4 py-3 text-center font-medium text-muted-foreground">Ações</th>
               </tr>
@@ -592,468 +732,529 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
             <tbody>
               {isLoading && produtos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
                     Carregando produtos...
                   </td>
                 </tr>
               ) : produtosExibidos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
                     {termoPesquisa ? "Nenhum produto encontrado para esta pesquisa." : "Nenhum produto cadastrado."}
                   </td>
                 </tr>
               ) : (
-                produtosExibidos.map((produto) => (
-                  <tr key={produto.id} className="border-t hover:bg-muted/50">
-                    {editandoId === produto.id && produtoEditando ? (
-                      <td colSpan={7} className="p-4">
-                        <div className="space-y-4 bg-accent/50 p-4 rounded-md">
-                          {/* Formulário de edição */}
-                          <div className="grid grid-cols-3 gap-4">
-                            <div>
-                              <Label
-                                htmlFor={`edit-codigo-${produto.id}`}
-                                className="text-primary flex items-center gap-2"
-                              >
-                                <FileText className="h-4 w-4" />
-                                Código
-                              </Label>
-                              <Input
-                                id={`edit-codigo-${produto.id}`}
-                                value={produtoEditando.codigo}
-                                onChange={(e) =>
-                                  setProdutoEditando({
-                                    ...produtoEditando,
-                                    codigo: e.target.value,
-                                  })
-                                }
-                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                                disabled={true} // Código não deve ser editável manualmente
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                htmlFor={`edit-nome-${produto.id}`}
-                                className="text-primary flex items-center gap-2"
-                              >
-                                <Package className="h-4 w-4" />
-                                Nome
-                              </Label>
-                              <Input
-                                id={`edit-nome-${produto.id}`}
-                                value={produtoEditando.nome}
-                                onChange={(e) =>
-                                  setProdutoEditando({
-                                    ...produtoEditando,
-                                    nome: e.target.value,
-                                  })
-                                }
-                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                htmlFor={`edit-valor-${produto.id}`}
-                                className="text-primary flex items-center gap-2"
-                              >
-                                <DollarSign className="h-4 w-4" />
-                                Valor Base
-                              </Label>
-                              <Input
-                                id={`edit-valor-${produto.id}`}
-                                type="number"
-                                value={produtoEditando.valorBase}
-                                onChange={(e) =>
-                                  setProdutoEditando({
-                                    ...produtoEditando,
-                                    valorBase: Number.parseFloat(e.target.value),
-                                  })
-                                }
-                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                              />
-                            </div>
-                          </div>
+                // Renderizar produtos agrupados por categoria
+                Object.entries(produtosAgrupados).map(([categoria, produtosCategoria]) => (
+                  <React.Fragment key={categoria}>
+                    {/* Linha de cabeçalho da categoria */}
+                    <tr className="border-t border-b" style={{ backgroundColor: `${getCorCategoria(categoria)}20` }}>
+                      <td colSpan={8} className="px-4 py-2">
+                        <button
+                          className="flex items-center gap-2 w-full text-left font-medium"
+                          style={{ color: getCorCategoria(categoria) }}
+                          onClick={() => alternarCategoria(categoria)}
+                        >
+                          {categoriasExpandidas[categoria] ? (
+                            <FolderOpen className="h-4 w-4" />
+                          ) : (
+                            <FolderClosed className="h-4 w-4" />
+                          )}
+                          {categoria}{" "}
+                          <span className="text-xs text-gray-500">({produtosCategoria.length} produtos)</span>
+                        </button>
+                      </td>
+                    </tr>
 
-                          {/* Tecidos */}
-                          <div>
-                            <Label className="text-primary flex items-center gap-2">
-                              <Shirt className="h-4 w-4" />
-                              Tecidos Disponíveis
-                            </Label>
-                            <div className="mt-2 space-y-2">
-                              {tecidosCadastrados.length > 0 ? (
-                                <div className="grid grid-cols-2 gap-2">
-                                  {tecidosCadastrados.map((tecido) => (
-                                    <div key={tecido.id} className="flex items-center">
-                                      <input
-                                        type="checkbox"
-                                        id={`edit-tecido-${tecido.id}`}
-                                        className="mr-2"
-                                        checked={produtoEditando.tecidos.some((t) => t.nome === tecido.nome)}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setProdutoEditando({
-                                              ...produtoEditando,
-                                              tecidos: [
-                                                ...produtoEditando.tecidos,
-                                                { nome: tecido.nome, composicao: tecido.composicao },
-                                              ],
-                                            })
-                                          } else {
-                                            setProdutoEditando({
-                                              ...produtoEditando,
-                                              tecidos: produtoEditando.tecidos.filter((t) => t.nome !== tecido.nome),
-                                            })
-                                          }
-                                        }}
-                                      />
-                                      <Label htmlFor={`edit-tecido-${tecido.id}`} className="text-sm cursor-pointer">
-                                        {tecido.nome}{" "}
-                                        <span className="text-xs text-gray-500">({tecido.composicao})</span>
-                                      </Label>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-sm text-gray-500 italic p-2">
-                                  Nenhum tecido cadastrado. Adicione tecidos na aba Materiais.
-                                </div>
-                              )}
-                              <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
-                                {produtoEditando.tecidos.length === 0 && (
-                                  <p className="text-sm text-gray-500 italic p-2">Nenhum tecido selecionado</p>
-                                )}
-                                {produtoEditando.tecidos.map((tecido, index) => (
-                                  <div
-                                    key={index}
-                                    className="flex justify-between items-center p-2 bg-accent rounded-md"
-                                  >
-                                    <div>
-                                      <span className="font-medium">{tecido.nome}</span>
-                                      <span className="text-xs text-gray-500 ml-2">({tecido.composicao})</span>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => removerTecido(index)}
-                                      className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                    {/* Produtos da categoria (mostrar apenas se expandido) */}
+                    {categoriasExpandidas[categoria] &&
+                      produtosCategoria.map((produto) => (
+                        <tr key={produto.id} className="border-t hover:bg-muted/50">
+                          {editandoId === produto.id && produtoEditando ? (
+                            <td colSpan={8} className="p-4">
+                              <div className="space-y-4 bg-accent/50 p-4 rounded-md">
+                                {/* Formulário de edição */}
+                                <div className="grid grid-cols-4 gap-4">
+                                  <div>
+                                    <Label
+                                      htmlFor={`edit-codigo-${produto.id}`}
+                                      className="text-primary flex items-center gap-2"
                                     >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Cores */}
-                          <div>
-                            <Label className="text-primary flex items-center gap-2">
-                              <Palette className="h-4 w-4" />
-                              Cores Disponíveis
-                            </Label>
-                            <div className="mt-2 space-y-2">
-                              {coresCadastradas.length > 0 ? (
-                                <div className="grid grid-cols-3 gap-2">
-                                  {coresCadastradas.map((cor) => (
-                                    <div key={cor.id} className="flex items-center">
-                                      <input
-                                        type="checkbox"
-                                        id={`edit-cor-${cor.id}`}
-                                        className="mr-2"
-                                        checked={produtoEditando.cores.includes(cor.nome)}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setProdutoEditando({
-                                              ...produtoEditando,
-                                              cores: [...produtoEditando.cores, cor.nome],
-                                            })
-                                          } else {
-                                            setProdutoEditando({
-                                              ...produtoEditando,
-                                              cores: produtoEditando.cores.filter((c) => c !== cor.nome),
-                                            })
-                                          }
-                                        }}
-                                      />
-                                      <Label
-                                        htmlFor={`edit-cor-${cor.id}`}
-                                        className="text-sm cursor-pointer flex items-center gap-1"
-                                      >
-                                        <div
-                                          className="w-4 h-4 rounded-full border border-gray-300"
-                                          style={{ backgroundColor: cor.codigo_hex || "#000000" }}
-                                        ></div>
-                                        {cor.nome}
-                                      </Label>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-sm text-gray-500 italic p-2">
-                                  Nenhuma cor cadastrada. Adicione cores na aba Materiais.
-                                </div>
-                              )}
-                              <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
-                                {produtoEditando.cores.length === 0 && (
-                                  <p className="text-sm text-gray-500 italic p-2">Nenhuma cor selecionada</p>
-                                )}
-                                {produtoEditando.cores.map((cor, index) => (
-                                  <div key={index} className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full">
-                                    <div
-                                      className="w-3 h-3 rounded-full border border-gray-300"
-                                      style={{
-                                        backgroundColor:
-                                          coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
-                                      }}
-                                    ></div>
-                                    <span className="text-sm">{cor}</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => removerCor(index)}
-                                      className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Tamanhos */}
-                          <div>
-                            <Label className="text-primary flex items-center gap-2">
-                              <Ruler className="h-4 w-4" />
-                              Tamanhos Disponíveis
-                            </Label>
-                            <div className="mt-2 space-y-4">
-                              <div className="grid grid-cols-1 gap-4">
-                                <div className="border rounded-md p-3 bg-white">
-                                  <div className="flex items-center mb-2">
-                                    <input
-                                      type="radio"
-                                      id={`tamanho-tipo-1-edit`}
-                                      name={`tamanho-tipo-edit`}
-                                      className="mr-2"
-                                      checked={produtoEditando.tamanhosDisponiveis.some((t) =>
-                                        ["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].includes(
-                                          t,
-                                        ),
-                                      )}
-                                      onChange={() => {
+                                      <FileText className="h-4 w-4" />
+                                      Código
+                                    </Label>
+                                    <Input
+                                      id={`edit-codigo-${produto.id}`}
+                                      value={produtoEditando.codigo}
+                                      onChange={(e) =>
                                         setProdutoEditando({
                                           ...produtoEditando,
-                                          tamanhosDisponiveis: [
-                                            "PP",
-                                            "P",
-                                            "M",
-                                            "G",
-                                            "GG",
-                                            "G1",
-                                            "G2",
-                                            "G3",
-                                            "G4",
-                                            "G5",
-                                            "G6",
-                                            "G7",
-                                          ],
+                                          codigo: e.target.value,
                                         })
-                                      }}
+                                      }
+                                      className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                      disabled={true} // Código não deve ser editável manualmente
                                     />
-                                    <Label htmlFor={`tamanho-tipo-1-edit`} className="font-medium">
-                                      Padrão (PP ao G7)
-                                    </Label>
                                   </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].map(
-                                      (tamanho) => (
+                                  <div>
+                                    <Label
+                                      htmlFor={`edit-categoria-${produto.id}`}
+                                      className="text-primary flex items-center gap-2"
+                                    >
+                                      <Tag className="h-4 w-4" />
+                                      Categoria
+                                    </Label>
+                                    <select
+                                      id={`edit-categoria-${produto.id}`}
+                                      value={produtoEditando.categoria || "Outros"}
+                                      onChange={(e) =>
+                                        setProdutoEditando({
+                                          ...produtoEditando,
+                                          categoria: e.target.value,
+                                        })
+                                      }
+                                      className="w-full rounded-md border border-gray-300 p-2 focus:border-primary focus:ring-1 focus:ring-primary"
+                                    >
+                                      {categorias.map((cat) => (
+                                        <option key={cat.id} value={cat.nome}>
+                                          {cat.nome}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <Label
+                                      htmlFor={`edit-nome-${produto.id}`}
+                                      className="text-primary flex items-center gap-2"
+                                    >
+                                      <Package className="h-4 w-4" />
+                                      Nome
+                                    </Label>
+                                    <Input
+                                      id={`edit-nome-${produto.id}`}
+                                      value={produtoEditando.nome}
+                                      onChange={(e) =>
+                                        setProdutoEditando({
+                                          ...produtoEditando,
+                                          nome: e.target.value.toUpperCase(),
+                                        })
+                                      }
+                                      className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label
+                                      htmlFor={`edit-valor-${produto.id}`}
+                                      className="text-primary flex items-center gap-2"
+                                    >
+                                      <DollarSign className="h-4 w-4" />
+                                      Valor Base
+                                    </Label>
+                                    <Input
+                                      id={`edit-valor-${produto.id}`}
+                                      type="number"
+                                      value={produtoEditando.valorBase}
+                                      onChange={(e) =>
+                                        setProdutoEditando({
+                                          ...produtoEditando,
+                                          valorBase: Number.parseFloat(e.target.value),
+                                        })
+                                      }
+                                      className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Tecidos */}
+                                <div>
+                                  <Label className="text-primary flex items-center gap-2">
+                                    <Shirt className="h-4 w-4" />
+                                    Tecidos Disponíveis
+                                  </Label>
+                                  <div className="mt-2 space-y-2">
+                                    {tecidosCadastradas.length > 0 ? (
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {tecidosCadastradas.map((tecido) => (
+                                          <div key={tecido.id} className="flex items-center">
+                                            <input
+                                              type="checkbox"
+                                              id={`edit-tecido-${tecido.id}`}
+                                              className="mr-2"
+                                              checked={produtoEditando.tecidos.some((t) => t.nome === tecido.nome)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setProdutoEditando({
+                                                    ...produtoEditando,
+                                                    tecidos: [
+                                                      ...produtoEditando.tecidos,
+                                                      { nome: tecido.nome, composicao: tecido.composicao },
+                                                    ],
+                                                  })
+                                                } else {
+                                                  setProdutoEditando({
+                                                    ...produtoEditando,
+                                                    tecidos: produtoEditando.tecidos.filter(
+                                                      (t) => t.nome !== tecido.nome,
+                                                    ),
+                                                  })
+                                                }
+                                              }}
+                                            />
+                                            <Label
+                                              htmlFor={`edit-tecido-${tecido.id}`}
+                                              className="text-sm cursor-pointer"
+                                            >
+                                              {tecido.nome}{" "}
+                                              <span className="text-xs text-gray-500">({tecido.composicao})</span>
+                                            </Label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="text-sm text-gray-500 italic p-2">
+                                        Nenhum tecido cadastrado. Adicione tecidos na aba Materiais.
+                                      </div>
+                                    )}
+                                    <div className="space-y-1 max-h-32 overflow-y-auto p-2 bg-white rounded-md">
+                                      {produtoEditando.tecidos.length === 0 && (
+                                        <p className="text-sm text-gray-500 italic p-2">Nenhum tecido selecionado</p>
+                                      )}
+                                      {produtoEditando.tecidos.map((tecido, index) => (
                                         <div
-                                          key={tamanho}
+                                          key={index}
+                                          className="flex justify-between items-center p-2 bg-accent rounded-md"
+                                        >
+                                          <div>
+                                            <span className="font-medium">{tecido.nome}</span>
+                                            <span className="text-xs text-gray-500 ml-2">({tecido.composicao})</span>
+                                          </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removerTecido(index)}
+                                            className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                                          >
+                                            <X className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Cores */}
+                                <div>
+                                  <Label className="text-primary flex items-center gap-2">
+                                    <Palette className="h-4 w-4" />
+                                    Cores Disponíveis
+                                  </Label>
+                                  <div className="mt-2 space-y-2">
+                                    {coresCadastradas.length > 0 ? (
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {coresCadastradas.map((cor) => (
+                                          <div key={cor.id} className="flex items-center">
+                                            <input
+                                              type="checkbox"
+                                              id={`edit-cor-${cor.id}`}
+                                              className="mr-2"
+                                              checked={produtoEditando.cores.includes(cor.nome)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setProdutoEditando({
+                                                    ...produtoEditando,
+                                                    cores: [...produtoEditando.cores, cor.nome],
+                                                  })
+                                                } else {
+                                                  setProdutoEditando({
+                                                    ...produtoEditando,
+                                                    cores: produtoEditando.cores.filter((c) => c !== cor.nome),
+                                                  })
+                                                }
+                                              }}
+                                            />
+                                            <Label
+                                              htmlFor={`edit-cor-${cor.id}`}
+                                              className="text-sm cursor-pointer flex items-center gap-1"
+                                            >
+                                              <div
+                                                className="w-4 h-4 rounded-full border border-gray-300"
+                                                style={{ backgroundColor: cor.codigo_hex || "#000000" }}
+                                              ></div>
+                                              {cor.nome}
+                                            </Label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="text-sm text-gray-500 italic p-2">
+                                        Nenhuma cor cadastrada. Adicione cores na aba Materiais.
+                                      </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto p-2 bg-white rounded-md">
+                                      {produtoEditando.cores.length === 0 && (
+                                        <p className="text-sm text-gray-500 italic p-2">Nenhuma cor selecionada</p>
+                                      )}
+                                      {produtoEditando.cores.map((cor, index) => (
+                                        <div
+                                          key={index}
                                           className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
                                         >
-                                          <span className="text-sm font-medium">{tamanho}</span>
+                                          <div
+                                            className="w-3 h-3 rounded-full border border-gray-300"
+                                            style={{
+                                              backgroundColor:
+                                                coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
+                                            }}
+                                          ></div>
+                                          <span className="text-sm">{cor}</span>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removerCor(index)}
+                                            className="h-5 w-5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full p-0"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </Button>
                                         </div>
-                                      ),
-                                    )}
+                                      ))}
+                                    </div>
                                   </div>
                                 </div>
 
-                                <div className="border rounded-md p-3 bg-white">
-                                  <div className="flex items-center mb-2">
-                                    <input
-                                      type="radio"
-                                      id={`tamanho-tipo-2-edit`}
-                                      name={`tamanho-tipo-edit`}
-                                      className="mr-2"
-                                      checked={produtoEditando.tamanhosDisponiveis.some((t) =>
-                                        t.match(/^(3[68]|[4-5][02468])$/),
-                                      )}
-                                      onChange={() => {
-                                        const numericos = Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString())
-                                        setProdutoEditando({
-                                          ...produtoEditando,
-                                          tamanhosDisponiveis: numericos,
-                                        })
-                                      }}
-                                    />
-                                    <Label htmlFor={`tamanho-tipo-2-edit`} className="font-medium">
-                                      Numérico (36 ao 58 - pares)
-                                    </Label>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
-                                    {Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString()).map((tamanho) => (
-                                      <div
-                                        key={tamanho}
-                                        className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
-                                      >
-                                        <span className="text-sm font-medium">{tamanho}</span>
+                                {/* Tamanhos */}
+                                <div>
+                                  <Label className="text-primary flex items-center gap-2">
+                                    <Ruler className="h-4 w-4" />
+                                    Tamanhos Disponíveis
+                                  </Label>
+                                  <div className="mt-2 space-y-4">
+                                    <div className="grid grid-cols-1 gap-4">
+                                      <div className="border rounded-md p-3 bg-white">
+                                        <div className="flex items-center mb-2">
+                                          <input
+                                            type="radio"
+                                            id={`tamanho-tipo-1-edit`}
+                                            name={`tamanho-tipo-edit`}
+                                            className="mr-2"
+                                            checked={produtoEditando.tamanhosDisponiveis.some((t) =>
+                                              [
+                                                "PP",
+                                                "P",
+                                                "M",
+                                                "G",
+                                                "GG",
+                                                "G1",
+                                                "G2",
+                                                "G3",
+                                                "G4",
+                                                "G5",
+                                                "G6",
+                                                "G7",
+                                              ].includes(t),
+                                            )}
+                                            onChange={() => {
+                                              setProdutoEditando({
+                                                ...produtoEditando,
+                                                tamanhosDisponiveis: [
+                                                  "PP",
+                                                  "P",
+                                                  "M",
+                                                  "G",
+                                                  "GG",
+                                                  "G1",
+                                                  "G2",
+                                                  "G3",
+                                                  "G4",
+                                                  "G5",
+                                                  "G6",
+                                                  "G7",
+                                                ],
+                                              })
+                                            }}
+                                          />
+                                          <Label htmlFor={`tamanho-tipo-1-edit`} className="font-medium">
+                                            Padrão (PP ao G7)
+                                          </Label>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                          {["PP", "P", "M", "G", "GG", "G1", "G2", "G3", "G4", "G5", "G6", "G7"].map(
+                                            (tamanho) => (
+                                              <div
+                                                key={tamanho}
+                                                className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
+                                              >
+                                                <span className="text-sm font-medium">{tamanho}</span>
+                                              </div>
+                                            ),
+                                          )}
+                                        </div>
                                       </div>
-                                    ))}
+
+                                      <div className="border rounded-md p-3 bg-white">
+                                        <div className="flex items-center mb-2">
+                                          <input
+                                            type="radio"
+                                            id={`tamanho-tipo-2-edit`}
+                                            name={`tamanho-tipo-edit`}
+                                            className="mr-2"
+                                            checked={produtoEditando.tamanhosDisponiveis.some((t) =>
+                                              t.match(/^(3[68]|[4-5][02468])$/),
+                                            )}
+                                            onChange={() => {
+                                              const numericos = Array.from({ length: 12 }, (_, i) =>
+                                                (36 + i * 2).toString(),
+                                              )
+                                              setProdutoEditando({
+                                                ...produtoEditando,
+                                                tamanhosDisponiveis: numericos,
+                                              })
+                                            }}
+                                          />
+                                          <Label htmlFor={`tamanho-tipo-2-edit`} className="font-medium">
+                                            Numérico (36 ao 58 - pares)
+                                          </Label>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                                          {Array.from({ length: 12 }, (_, i) => (36 + i * 2).toString()).map(
+                                            (tamanho) => (
+                                              <div
+                                                key={tamanho}
+                                                className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
+                                              >
+                                                <span className="text-sm font-medium">{tamanho}</span>
+                                              </div>
+                                            ),
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="border rounded-md p-3 bg-white">
+                                        <div className="flex items-center mb-2">
+                                          <input
+                                            type="radio"
+                                            id={`tamanho-tipo-3-edit`}
+                                            name={`tamanho-tipo-edit`}
+                                            className="mr-2"
+                                            checked={produtoEditando.tamanhosDisponiveis.some((t) =>
+                                              t.match(/^([0-9]|1[0-3])$/),
+                                            )}
+                                            onChange={() => {
+                                              const infantis = Array.from({ length: 14 }, (_, i) => i.toString())
+                                              setProdutoEditando({
+                                                ...produtoEditando,
+                                                tamanhosDisponiveis: infantis,
+                                              })
+                                            }}
+                                          />
+                                          <Label htmlFor={`tamanho-tipo-3-edit`} className="font-medium">
+                                            Infantil (0 ao 13)
+                                          </Label>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                          {Array.from({ length: 14 }, (_, i) => i.toString()).map((tamanho) => (
+                                            <div
+                                              key={tamanho}
+                                              className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
+                                            >
+                                              <span className="text-sm font-medium">{tamanho}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
 
-                                <div className="border rounded-md p-3 bg-white">
-                                  <div className="flex items-center mb-2">
-                                    <input
-                                      type="radio"
-                                      id={`tamanho-tipo-3-edit`}
-                                      name={`tamanho-tipo-edit`}
-                                      className="mr-2"
-                                      checked={produtoEditando.tamanhosDisponiveis.some((t) =>
-                                        t.match(/^([0-9]|1[0-3])$/),
-                                      )}
-                                      onChange={() => {
-                                        const infantis = Array.from({ length: 14 }, (_, i) => i.toString())
-                                        setProdutoEditando({
-                                          ...produtoEditando,
-                                          tamanhosDisponiveis: infantis,
-                                        })
-                                      }}
-                                    />
-                                    <Label htmlFor={`tamanho-tipo-3-edit`} className="font-medium">
-                                      Infantil (0 ao 13)
-                                    </Label>
-                                  </div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {Array.from({ length: 14 }, (_, i) => i.toString()).map((tamanho) => (
-                                      <div
-                                        key={tamanho}
-                                        className="flex items-center gap-1 bg-accent px-2 py-1 rounded-full"
-                                      >
-                                        <span className="text-sm font-medium">{tamanho}</span>
-                                      </div>
-                                    ))}
-                                  </div>
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    onClick={cancelarEdicao}
+                                    className="text-gray-500 hover:text-gray-700"
+                                  >
+                                    <X className="h-4 w-4 mr-2" /> Cancelar
+                                  </Button>
+                                  <Button
+                                    onClick={salvarEdicao}
+                                    className="bg-primary hover:bg-primary-dark text-white"
+                                    disabled={isLoading}
+                                  >
+                                    <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
+                                  </Button>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              onClick={cancelarEdicao}
-                              className="text-gray-500 hover:text-gray-700"
-                            >
-                              <X className="h-4 w-4 mr-2" /> Cancelar
-                            </Button>
-                            <Button
-                              onClick={salvarEdicao}
-                              className="bg-primary hover:bg-primary-dark text-white"
-                              disabled={isLoading}
-                            >
-                              <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
-                            </Button>
-                          </div>
-                        </div>
-                      </td>
-                    ) : (
-                      <>
-                        <td className="px-4 py-3 align-middle">
-                          <span className="font-medium text-primary">{produto.codigo}</span>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{produto.nome}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <span className="font-medium">R$ {produto.valorBase.toFixed(2)}</span>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <div className="max-w-[200px] truncate">
-                            {produto.tecidos.length > 0 ? (
-                              produto.tecidos.map((t) => t.nome).join(", ")
-                            ) : (
-                              <span className="text-gray-400 italic">Nenhum</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <div className="flex flex-wrap gap-1 max-w-[200px]">
-                            {produto.cores.length > 0 ? (
-                              produto.cores.map((cor, idx) => (
-                                <div key={idx} className="inline-flex items-center" title={cor}>
-                                  <div
-                                    className="w-3 h-3 rounded-full border border-gray-300 mr-1"
-                                    style={{
-                                      backgroundColor:
-                                        coresCadastradas.find((c) => c.nome === cor)?.codigo_hex || "#000000",
-                                    }}
-                                  ></div>
-                                  {idx < 2
-                                    ? cor
-                                    : idx === 2 && produto.cores.length > 3
-                                      ? `+${produto.cores.length - 2}`
-                                      : cor}
-                                  {idx < 2 && idx < produto.cores.length - 1 ? ", " : ""}
+                            </td>
+                          ) : (
+                            <>
+                              <td className="px-4 py-3 align-middle">
+                                <span className="font-medium text-primary">{produto.codigo}</span>
+                              </td>
+                              <td className="px-4 py-3 align-middle">
+                                <span
+                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                  style={{
+                                    backgroundColor: `${getCorCategoria(produto.categoria)}20`,
+                                    color: getCorCategoria(produto.categoria),
+                                  }}
+                                >
+                                  {produto.categoria || "Outros"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 align-middle">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{produto.nome}</span>
                                 </div>
-                              ))
-                            ) : (
-                              <span className="text-gray-400 italic">Nenhuma</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <div className="max-w-[200px] truncate">
-                            {produto.tamanhosDisponiveis.length > 0 ? (
-                              produto.tamanhosDisponiveis.length > 5 ? (
-                                `${produto.tamanhosDisponiveis.slice(0, 5).join(", ")}... +${produto.tamanhosDisponiveis.length - 5}`
-                              ) : (
-                                produto.tamanhosDisponiveis.join(", ")
-                              )
-                            ) : (
-                              <span className="text-gray-400 italic">Nenhum</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <div className="flex justify-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => iniciarEdicao(produto)}
-                              className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
-                              disabled={isLoading}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoverProduto(produto.id)}
-                              className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                              disabled={isLoading}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </>
-                    )}
-                  </tr>
+                              </td>
+                              <td className="px-4 py-3 align-middle">
+                                <span className="font-medium">R$ {produto.valorBase.toFixed(2)}</span>
+                              </td>
+                              <td className="px-4 py-3 align-middle">
+                                <div className="max-w-[200px] truncate">
+                                  {produto.tecidos.length > 0 ? (
+                                    produto.tecidos.map((t) => t.nome).join(", ")
+                                  ) : (
+                                    <span className="text-gray-400 italic">Nenhum</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 align-middle">
+                                <div className="max-w-[200px] truncate">
+                                  {produto.tamanhosDisponiveis.length > 0 ? (
+                                    produto.tamanhosDisponiveis.length > 5 ? (
+                                      `${produto.tamanhosDisponiveis.slice(0, 5).join(", ")}... +${produto.tamanhosDisponiveis.length - 5}`
+                                    ) : (
+                                      produto.tamanhosDisponiveis.join(", ")
+                                    )
+                                  ) : (
+                                    <span className="text-gray-400 italic">Nenhum</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 align-middle">
+                                <div className="flex justify-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => iniciarEdicao(produto)}
+                                    className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
+                                    disabled={isLoading}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoverProduto(produto.id)}
+                                    className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                                    disabled={isLoading}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
@@ -1080,8 +1281,8 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
               </Button>
             </div>
             <div className="space-y-4">
-              {/* Adicionar campo de código no formulário de novo produto */}
-              <div className="grid grid-cols-3 gap-4">
+              {/* Adicionar campo de código e categoria no formulário de novo produto */}
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="codigo-produto" className="text-primary flex items-center gap-2">
                     <FileText className="h-4 w-4" />
@@ -1096,6 +1297,27 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                   />
                 </div>
                 <div>
+                  <Label htmlFor="categoria-produto" className="text-primary flex items-center gap-2">
+                    <Tag className="h-4 w-4" />
+                    Categoria
+                  </Label>
+                  <select
+                    id="categoria-produto"
+                    value={novoProduto.categoria || ""}
+                    onChange={(e) => setNovoProduto({ ...novoProduto, categoria: e.target.value })}
+                    className="w-full rounded-md border border-gray-300 p-2 focus:border-primary focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="" disabled>
+                      Selecione uma categoria
+                    </option>
+                    {categorias.map((cat) => (
+                      <option key={cat.id} value={cat.nome}>
+                        {cat.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <Label htmlFor="nome-produto" className="text-primary flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     Nome
@@ -1103,7 +1325,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                   <Input
                     id="nome-produto"
                     value={novoProduto.nome}
-                    onChange={(e) => setNovoProduto({ ...novoProduto, nome: e.target.value })}
+                    onChange={(e) => setNovoProduto({ ...novoProduto, nome: e.target.value.toUpperCase() })}
                     className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
@@ -1384,13 +1606,23 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
               <Button
                 onClick={handleAdicionarProduto}
                 className="w-full bg-primary hover:bg-primary-dark text-white transition-colors"
-                disabled={isLoading || !novoProduto.nome || !novoProduto.valorBase}
+                disabled={isLoading || !novoProduto.nome || !novoProduto.valorBase || !novoProduto.categoria}
               >
                 <Plus className="h-4 w-4 mr-2" /> {isLoading ? "Adicionando..." : "Adicionar Produto"}
               </Button>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Modal de gerenciamento de categorias */}
+      {mostrarGerenciadorCategorias && (
+        <GerenciadorCategorias
+          onClose={() => setMostrarGerenciadorCategorias(false)}
+          onCategoriaAdded={handleCategoriaAdded}
+          onCategoriaUpdated={handleCategoriaUpdated}
+          onCategoriaDeleted={handleCategoriaDeleted}
+        />
       )}
     </div>
   )

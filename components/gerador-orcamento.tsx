@@ -1,10 +1,9 @@
 "use client"
 
-// Modificar as importações para incluir o novo componente AppSidebar e SidebarInset
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, Save, Check, AlertCircle, FileDown } from "lucide-react" // Adicionar FileDown
+import { Printer, Save, Check, AlertCircle, FileDown } from "lucide-react"
 import FormularioOrcamento from "@/components/formulario-orcamento"
 import VisualizacaoDocumento from "@/components/visualizacao-documento"
 import GerenciadorClientes from "@/components/gerenciador-clientes"
@@ -20,6 +19,8 @@ import { SidebarInset } from "@/components/ui/sidebar"
 import GerenciadorMateriais from "@/components/gerenciador-materiais"
 // Adicionar a importação do GerenciadorEmpresa e DadosEmpresa
 import GerenciadorEmpresa from "@/components/gerenciador-empresa"
+// Importar o GerenciadorCategorias
+import GerenciadorCategorias from "@/components/gerenciador-categorias"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -210,6 +211,40 @@ export default function GeradorOrcamento() {
             setProdutos(mockProdutos)
           }
         } else if (produtosData && produtosData.length > 0) {
+          // Verificar se há produtos sem código e atualizar se necessário
+          const produtosSemCodigo = produtosData.filter((p) => !p.codigo)
+          if (produtosSemCodigo.length > 0) {
+            console.log(`Encontrados ${produtosSemCodigo.length} produtos sem código. Atualizando...`)
+
+            // Atualizar códigos sequencialmente
+            let contador = 1
+            const ultimoProdutoComCodigo = produtosData
+              .filter((p) => p.codigo)
+              .sort((a, b) => {
+                const numA = a.codigo ? Number.parseInt(a.codigo.replace(/\D/g, "")) : 0
+                const numB = b.codigo ? Number.parseInt(b.codigo.replace(/\D/g, "")) : 0
+                return numB - numA
+              })[0]
+
+            if (ultimoProdutoComCodigo && ultimoProdutoComCodigo.codigo) {
+              const match = ultimoProdutoComCodigo.codigo.match(/^P?(\d+)$/)
+              if (match && match[1]) {
+                contador = Number.parseInt(match[1], 10) + 1
+              }
+            }
+
+            // Atualizar cada produto sem código
+            for (const produto of produtosSemCodigo) {
+              const novoCodigo = "P" + String(contador).padStart(4, "0")
+              contador++
+
+              await supabase.from("produtos").update({ codigo: novoCodigo }).eq("id", produto.id)
+
+              // Atualizar o código no objeto local
+              produto.codigo = novoCodigo
+            }
+          }
+
           // Para cada produto, buscar seus tecidos
           const produtosCompletos = await Promise.all(
             produtosData.map(async (produto) => {
@@ -223,17 +258,20 @@ export default function GeradorOrcamento() {
                 console.error("Erro ao listar tecidos do produto:", tecidosError)
                 return {
                   id: produto.id,
+                  codigo: produto.codigo || `P${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`, // Código aleatório se não existir
                   nome: produto.nome,
                   valorBase: Number(produto.valor_base),
                   tecidos: [],
                   cores: produto.cores || [],
                   tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
+                  categoria: produto.categoria || "Outros",
                 }
               }
 
               // Converter para o formato da aplicação
               return {
                 id: produto.id,
+                codigo: produto.codigo || `P${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`, // Código aleatório se não existir
                 nome: produto.nome,
                 valorBase: Number(produto.valor_base),
                 tecidos: tecidosData
@@ -244,13 +282,19 @@ export default function GeradorOrcamento() {
                   : [],
                 cores: produto.cores || [],
                 tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
+                categoria: produto.categoria || "Outros",
               } as Produto
             }),
           )
 
           setProdutos(produtosCompletos)
         } else if (produtos.length === 0) {
-          setProdutos(mockProdutos)
+          // Adicionar códigos aos produtos mock
+          const produtosComCodigo = mockProdutos.map((p, index) => ({
+            ...p,
+            codigo: `P${String(index + 1).padStart(4, "0")}`,
+          }))
+          setProdutos(produtosComCodigo)
         }
       } catch (error) {
         console.error("Erro ao carregar dados iniciais:", error)
@@ -259,7 +303,12 @@ export default function GeradorOrcamento() {
           setClientes(mockClientes)
         }
         if (produtos.length === 0) {
-          setProdutos(mockProdutos)
+          // Adicionar códigos aos produtos mock
+          const produtosComCodigo = mockProdutos.map((p, index) => ({
+            ...p,
+            codigo: `P${String(index + 1).padStart(4, "0")}`,
+          }))
+          setProdutos(produtosComCodigo)
         }
       } finally {
         setIsLoading(false)
@@ -279,7 +328,9 @@ export default function GeradorOrcamento() {
     }
   }, [feedbackSalvamento.visivel])
 
-  // Modifique a função handlePrint para garantir que os estilos sejam preservados na impressão
+  // Vamos também melhorar a função handlePrint para garantir consistência
+
+  // Substitua a função handlePrint por esta versão atualizada:
   const handlePrint = () => {
     setIsPrinting(true)
 
@@ -287,79 +338,116 @@ export default function GeradorOrcamento() {
     const style = document.createElement("style")
     style.id = "print-styles"
     style.innerHTML = `
-    @media print {
-      body * {
-        visibility: hidden;
-      }
-      #print-container, #print-container * {
-        visibility: visible;
-      }
-      #print-container {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-      }
-      
-      /* Preservar cores e fundos na impressão */
-      * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        color-adjust: exact !important;
-      }
-      
-      /* Garantir que os gradientes e cores de fundo sejam impressos */
-      .bg-gradient-to-r, .bg-primary, .bg-accent, .bg-white, .bg-white\\/10 {
-        print-color-adjust: exact !important;
-        -webkit-print-color-adjust: exact !important;
-      }
-      
-      /* Garantir que o texto branco permaneça branco */
-      .text-white {
-        color: white !important;
-      }
-      
-      /* Garantir que as bordas sejam impressas */
-      .border, .border-t, .border-b, .border-l, .border-r {
-        border-color: inherit !important;
-      }
-      
-      .page-break-inside-avoid {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
-      
-      .page-break-before {
-        page-break-before: always !important;
-        break-before: always !important;
-      }
-      
-      table {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
-      
-      h3, h4 {
-        page-break-after: avoid !important;
-        break-after: avoid !important;
-      }
-      
-      img {
-        max-height: 350px;
-        max-width: 100%;
-        object-fit: contain;
-      }
-      
-      .ficha-tecnica {
-        page-break-before: always !important;
-        break-before: always !important;
-      }
-      
-      /* Garantir que cada ficha técnica comece em uma nova página */
-      .ficha-tecnica:not(:first-child) {
-        margin-top: 20px;
-      }
+  @media print {
+    @page {
+      size: A4;
+      margin: 10mm; /* Adicionar margem de 10mm em todos os lados */
     }
+    
+    body * {
+      visibility: hidden;
+    }
+    
+    #print-container, #print-container * {
+      visibility: visible;
+    }
+    
+    #print-container {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      padding: 10mm; /* Adicionar padding interno */
+    }
+    
+    /* Preservar cores e fundos na impressão */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    
+    /* Garantir que os gradientes e cores de fundo sejam impressos */
+    .bg-gradient-to-r, .bg-primary, .bg-accent, .bg-white, .bg-white\\/10 {
+      print-color-adjust: exact !important;
+      -webkit-print-color-adjust: exact !important;
+    }
+    
+    /* Garantir que o texto branco permaneça branco */
+    .text-white {
+      color: white !important;
+    }
+    
+    /* Garantir que as bordas sejam impressas */
+    .border, .border-t, .border-b, .border-l, .border-r {
+      border-color: inherit !important;
+    }
+    
+    /* Remover bordas arredondadas na impressão */
+    .rounded-md, .rounded-lg, .rounded-tl-md, .rounded-tr-md {
+      border-radius: 0 !important;
+    }
+    
+    /* Ajustar espaçamentos para impressão */
+    .p-6 {
+      padding: 1rem !important;
+    }
+    
+    .space-y-6 > * + * {
+      margin-top: 1rem !important;
+    }
+    
+    .page-break-inside-avoid {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    
+    .page-break-before {
+      page-break-before: always !important;
+      break-before: always !important;
+    }
+    
+    table {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    
+    h3, h4 {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+    
+    img {
+      max-height: 350px;
+      max-width: 100%;
+      object-fit: contain;
+    }
+    
+    .ficha-tecnica {
+      page-break-before: always !important;
+      break-before: always !important;
+    }
+    
+    /* Garantir que cada ficha técnica comece em uma nova página */
+    .ficha-tecnica:not(:first-child) {
+      margin-top: 20px;
+    }
+    
+    /* Ajustar layout da tabela de tamanhos */
+    .tamanhos-container {
+      max-height: none !important;
+      overflow: visible !important;
+      display: flex !important;
+      flex-wrap: wrap !important;
+    }
+    
+    .tamanho-texto {
+      margin-right: 8px !important;
+      white-space: nowrap !important;
+      font-size: 0.8rem !important;
+      padding: 1px 0 !important;
+    }
+  }
   `
     document.head.appendChild(style)
 
@@ -370,6 +458,20 @@ export default function GeradorOrcamento() {
     if (documentoRef.current) {
       // Clonar o conteúdo do documento
       const clonedContent = documentoRef.current.cloneNode(true)
+
+      // Ajustar estilos do clone para impressão
+      const elementosArredondados = (clonedContent as HTMLElement).querySelectorAll(
+        ".rounded-md, .rounded-lg, .rounded-tl-md, .rounded-tr-md",
+      )
+      elementosArredondados.forEach((el) => {
+        ;(el as HTMLElement).style.borderRadius = "0"
+      })
+
+      const elementosComPadding = (clonedContent as HTMLElement).querySelectorAll(".p-6")
+      elementosComPadding.forEach((el) => {
+        ;(el as HTMLElement).style.padding = "1rem"
+      })
+
       printContainer.appendChild(clonedContent)
       document.body.appendChild(printContainer)
 
@@ -403,94 +505,19 @@ export default function GeradorOrcamento() {
 
       // Nome do arquivo baseado no número do orçamento e cliente
       const numeroOrcamento = orcamento.numero.split(" - ")[0]
-      const dataFormatada = new Date().toISOString().split("T")[0].replace(/-/g, "")
       const nomeCliente = orcamento.cliente
         ? orcamento.cliente.nome.replace(/\s+/g, "_").substring(0, 20)
         : "sem_cliente"
-      const nomeArquivo = `Orcamento_${numeroOrcamento}_${nomeCliente}_${dataFormatada}.pdf`
+      const nomeContato = orcamento.nomeContato
+        ? orcamento.nomeContato.replace(/\s+/g, "_").substring(0, 20)
+        : "sem_contato"
+      const nomeArquivo = `01 - ORCAMENTO_${numeroOrcamento}_${nomeCliente.toUpperCase()}_${nomeContato.toUpperCase()}.pdf`
 
-      // Importar dinamicamente as bibliotecas necessárias
-      const [jspdfModule, html2canvasModule] = await Promise.all([import("jspdf"), import("html2canvas")])
+      // Importar a função generatePDF dinamicamente
+      const { generatePDF } = await import("@/lib/pdf-utils")
 
-      const jsPDF = jspdfModule.default
-      const html2canvas = html2canvasModule.default
-
-      // Criar uma nova instância do jsPDF
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-        compress: true,
-      })
-
-      // Encontrar as fichas técnicas
-      const fichasTecnicas = Array.from(documentoRef.current.querySelectorAll(".ficha-tecnica")) as HTMLElement[]
-
-      // Obter o conteúdo principal do orçamento (excluindo as fichas técnicas)
-      const orcamentoElement = documentoRef.current.querySelector(".orcamento-principal") as HTMLElement
-      if (!orcamentoElement) {
-        throw new Error("Elemento do orçamento principal não encontrado")
-      }
-
-      // Função para capturar um elemento e adicionar ao PDF
-      const capturarElemento = async (elemento: HTMLElement, primeiraPagina = false) => {
-        // Criar uma cópia do elemento para manipulação
-        const elementoClone = elemento.cloneNode(true) as HTMLElement
-
-        // Aplicar estilos específicos para a captura
-        elementoClone.style.width = "210mm" // Largura A4
-        elementoClone.style.margin = "0"
-        elementoClone.style.padding = "10mm" // Margem interna
-        elementoClone.style.boxSizing = "border-box"
-        elementoClone.style.backgroundColor = "#ffffff"
-
-        // Adicionar o elemento ao DOM temporariamente para captura
-        elementoClone.style.position = "absolute"
-        elementoClone.style.left = "-9999px"
-        document.body.appendChild(elementoClone)
-
-        try {
-          // Capturar o elemento como uma imagem
-          const canvas = await html2canvas(elementoClone, {
-            scale: 2, // Aumentar a escala para melhor qualidade
-            useCORS: true,
-            logging: false,
-            backgroundColor: "#FFFFFF",
-            width: elementoClone.offsetWidth,
-            height: elementoClone.offsetHeight,
-          })
-
-          // Converter o canvas para uma imagem
-          const imgData = canvas.toDataURL("image/jpeg", 1.0)
-
-          // Calcular as dimensões para ajustar à página A4
-          const imgWidth = 210 // A4 width in mm
-          const pageHeight = 297 // A4 height in mm
-          const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-          // Se não for a primeira página, adicionar uma nova página
-          if (!primeiraPagina) {
-            pdf.addPage()
-          }
-
-          // Adicionar a imagem ao PDF - usar as mesmas dimensões para todas as páginas
-          pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight))
-        } finally {
-          // Remover o elemento temporário
-          document.body.removeChild(elementoClone)
-        }
-      }
-
-      // Capturar o orçamento principal como primeira página
-      await capturarElemento(orcamentoElement, true)
-
-      // Capturar cada ficha técnica como uma página separada
-      for (const ficha of fichasTecnicas) {
-        await capturarElemento(ficha, false)
-      }
-
-      // Salvar o PDF
-      pdf.save(nomeArquivo)
+      // Gerar o PDF usando a função atualizada
+      await generatePDF(documentoRef.current, nomeArquivo)
 
       setFeedbackSalvamento({
         visivel: true,
@@ -1326,9 +1353,13 @@ export default function GeradorOrcamento() {
                     ? "Orçamentos Salvos"
                     : abaAtiva === "clientes"
                       ? "Gerenciador de Clientes"
-                      : abaAtiva === "Gerenciador de Produtos"
+                      : abaAtiva === "produtos"
                         ? "Gerenciador de Produtos"
-                        : "Gerenciador de Empresa"}
+                        : abaAtiva === "categorias"
+                          ? "Gerenciador de Categorias"
+                          : abaAtiva === "materiais"
+                            ? "Gerenciador de Materiais"
+                            : "Gerenciador de Empresa"}
               </h1>
               <p className="text-gray-500 mt-1">
                 {abaAtiva === "orcamento"
@@ -1339,7 +1370,11 @@ export default function GeradorOrcamento() {
                       ? "Gerencie seus clientes"
                       : abaAtiva === "produtos"
                         ? "Gerencie seus produtos"
-                        : "Gerencie os dados da sua empresa"}
+                        : abaAtiva === "categorias"
+                          ? "Gerencie as categorias de produtos"
+                          : abaAtiva === "materiais"
+                            ? "Gerencie os materiais disponíveis"
+                            : "Gerencie os dados da sua empresa"}
               </p>
             </div>
             <div className="flex gap-2">
@@ -1471,6 +1506,15 @@ export default function GeradorOrcamento() {
               </CardContent>
             </Card>
           )}
+
+          {abaAtiva === "categorias" && (
+            <Card className="shadow-sm border-0">
+              <CardContent className="p-6">
+                <GerenciadorCategorias />
+              </CardContent>
+            </Card>
+          )}
+
           {abaAtiva === "materiais" && (
             <Card className="shadow-sm border-0">
               <CardContent className="p-6">
@@ -1478,6 +1522,7 @@ export default function GeradorOrcamento() {
               </CardContent>
             </Card>
           )}
+
           {abaAtiva === "empresa" && (
             <Card className="shadow-sm border-0">
               <CardContent className="p-6">

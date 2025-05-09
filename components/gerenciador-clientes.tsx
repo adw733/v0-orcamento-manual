@@ -176,7 +176,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     carregarClientes()
   }, [setClientes])
 
-  // Adicionar cliente
+  // Modificar o método handleAdicionarCliente para converter para maiúsculas
   const handleAdicionarCliente = async () => {
     if (novoCliente.nome) {
       try {
@@ -194,17 +194,17 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
           throw new Error("Erro ao gerar código do cliente. Por favor, tente novamente.")
         }
 
-        // Inserir no Supabase
+        // Inserir no Supabase com dados em maiúsculas
         const { data, error } = await supabase
           .from("clientes")
           .insert({
             id: clienteId,
             codigo,
-            nome: novoCliente.nome,
-            cnpj: novoCliente.cnpj || null,
-            endereco: novoCliente.endereco || null,
-            telefone: novoCliente.telefone || null,
-            email: novoCliente.email || null,
+            nome: novoCliente.nome.toUpperCase(),
+            cnpj: novoCliente.cnpj ? novoCliente.cnpj.toUpperCase() : null,
+            endereco: novoCliente.endereco ? novoCliente.endereco.toUpperCase() : null,
+            telefone: novoCliente.telefone ? novoCliente.telefone.toUpperCase() : null,
+            email: novoCliente.email ? novoCliente.email.toUpperCase() : null,
           })
           .select()
 
@@ -315,21 +315,22 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
     setClienteEditando(null)
   }
 
+  // Modificar o método salvarEdicao para converter para maiúsculas
   const salvarEdicao = async () => {
     if (clienteEditando) {
       try {
         setIsLoading(true)
         setError(null)
 
-        // Atualizar no Supabase
+        // Atualizar no Supabase com dados em maiúsculas
         const { error } = await supabase
           .from("clientes")
           .update({
-            nome: clienteEditando.nome,
-            cnpj: clienteEditando.cnpj || null,
-            endereco: clienteEditando.endereco || null,
-            telefone: clienteEditando.telefone || null,
-            email: clienteEditando.email || null,
+            nome: clienteEditando.nome.toUpperCase(),
+            cnpj: clienteEditando.cnpj ? clienteEditando.cnpj.toUpperCase() : null,
+            endereco: clienteEditando.endereco ? clienteEditando.endereco.toUpperCase() : null,
+            telefone: clienteEditando.telefone ? clienteEditando.telefone.toUpperCase() : null,
+            email: clienteEditando.email ? clienteEditando.email.toUpperCase() : null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", clienteEditando.id)
@@ -501,7 +502,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                               onChange={(e) =>
                                 setClienteEditando({
                                   ...clienteEditando,
-                                  nome: e.target.value,
+                                  nome: e.target.value.toUpperCase(),
                                 })
                               }
                               className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -519,7 +520,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                             onChange={(e) =>
                               setClienteEditando({
                                 ...clienteEditando,
-                                cnpj: e.target.value,
+                                cnpj: e.target.value.toUpperCase(),
                               })
                             }
                             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -535,7 +536,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                             onChange={(e) =>
                               setClienteEditando({
                                 ...clienteEditando,
-                                endereco: e.target.value,
+                                endereco: e.target.value.toUpperCase(),
                               })
                             }
                             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -556,7 +557,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                               onChange={(e) =>
                                 setClienteEditando({
                                   ...clienteEditando,
-                                  telefone: e.target.value,
+                                  telefone: e.target.value.toUpperCase(),
                                 })
                               }
                               className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -576,7 +577,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                               onChange={(e) =>
                                 setClienteEditando({
                                   ...clienteEditando,
-                                  email: e.target.value,
+                                  email: e.target.value.toUpperCase(),
                                 })
                               }
                               className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
@@ -672,7 +673,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                   <Input
                     id="nome"
                     value={novoCliente.nome}
-                    onChange={(e) => setNovoCliente({ ...novoCliente, nome: e.target.value })}
+                    onChange={(e) => setNovoCliente({ ...novoCliente, nome: e.target.value.toUpperCase() })}
                     className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
@@ -685,7 +686,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                 <Input
                   id="cnpj"
                   value={novoCliente.cnpj}
-                  onChange={(e) => setNovoCliente({ ...novoCliente, cnpj: e.target.value })}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, cnpj: e.target.value.toUpperCase() })}
                   className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                 />
               </div>
@@ -696,7 +697,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                 <Input
                   id="endereco"
                   value={novoCliente.endereco}
-                  onChange={(e) => setNovoCliente({ ...novoCliente, endereco: e.target.value })}
+                  onChange={(e) => setNovoCliente({ ...novoCliente, endereco: e.target.value.toUpperCase() })}
                   className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                 />
               </div>
@@ -709,7 +710,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                   <Input
                     id="telefone"
                     value={novoCliente.telefone}
-                    onChange={(e) => setNovoCliente({ ...novoCliente, telefone: e.target.value })}
+                    onChange={(e) => setNovoCliente({ ...novoCliente, telefone: e.target.value.toUpperCase() })}
                     className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
@@ -721,7 +722,7 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                   <Input
                     id="email"
                     value={novoCliente.email}
-                    onChange={(e) => setNovoCliente({ ...novoCliente, email: e.target.value })}
+                    onChange={(e) => setNovoCliente({ ...novoCliente, email: e.target.value.toUpperCase() })}
                     className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
