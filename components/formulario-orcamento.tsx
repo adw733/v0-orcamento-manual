@@ -575,6 +575,12 @@ export default function FormularioOrcamento({
     }
   }
 
+  // Adicione esta função após a função handleCorChange
+  const handleTextUppercase = (e: React.ChangeEvent<HTMLInputElement>, field: keyof Orcamento) => {
+    const value = e.target.value.toUpperCase()
+    atualizarOrcamento({ [field]: value })
+  }
+
   // Componente para gerenciar imagem (upload, prévia, remoção)
   const GerenciadorImagem = ({
     imagem,
@@ -1144,7 +1150,7 @@ export default function FormularioOrcamento({
           <Input
             id="condicoesPagamento"
             value={orcamento.condicoesPagamento}
-            onChange={(e) => atualizarOrcamento({ condicoesPagamento: e.target.value })}
+            onChange={(e) => handleTextUppercase(e, "condicoesPagamento")}
             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -1155,7 +1161,7 @@ export default function FormularioOrcamento({
           <Input
             id="prazoEntrega"
             value={orcamento.prazoEntrega}
-            onChange={(e) => atualizarOrcamento({ prazoEntrega: e.target.value })}
+            onChange={(e) => handleTextUppercase(e, "prazoEntrega")}
             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -1166,7 +1172,7 @@ export default function FormularioOrcamento({
           <Input
             id="validadeOrcamento"
             value={orcamento.validadeOrcamento}
-            onChange={(e) => atualizarOrcamento({ validadeOrcamento: e.target.value })}
+            onChange={(e) => handleTextUppercase(e, "validadeOrcamento")}
             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
           />
         </div>

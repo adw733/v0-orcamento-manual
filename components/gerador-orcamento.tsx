@@ -40,9 +40,9 @@ export default function GeradorOrcamento() {
     cliente: null,
     itens: [],
     observacoes: "",
-    condicoesPagamento: "À vista",
-    prazoEntrega: "30 dias",
-    validadeOrcamento: "15 dias",
+    condicoesPagamento: "45 DIAS FORA QUINZENA",
+    prazoEntrega: "45 DIAS",
+    validadeOrcamento: "15 DIAS",
     status: "proposta", // Adicionar status padrão
     valorFrete: 0, // Inicializar o valor do frete
     nomeContato: "",
@@ -124,9 +124,9 @@ export default function GeradorOrcamento() {
         cliente: null,
         itens: [],
         observacoes: "",
-        condicoesPagamento: "À vista",
-        prazoEntrega: "30 dias",
-        validadeOrcamento: "15 dias",
+        condicoesPagamento: "45 DIAS FORA QUINZENA",
+        prazoEntrega: "45 DIAS",
+        validadeOrcamento: "15 DIAS",
         status: "proposta", // Adicionar status padrão
         valorFrete: 0,
         nomeContato: "",
