@@ -39,13 +39,13 @@ export default function ListaOrcamentos({
   const [orcamentos, setOrcamentos] = useState<Partial<Orcamento>[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("todos")
+  const [statusFilter, setStatusFilter] = useState<string>("execucao")
   const [error, setError] = useState<string | null>(null)
 
   // Estados para ordenação
   const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" }>({
-    campo: "created_at",
-    direcao: "desc",
+    campo: "numero",
+    direcao: "asc",
   })
 
   // Expor a função de recarregar para o componente pai
@@ -67,7 +67,7 @@ export default function ListaOrcamentos({
       const { data, error } = await supabase
         .from("orcamentos")
         .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens, created_at, updated_at, status")
-        .order("created_at", { ascending: false })
+        .order("numero", { ascending: true })
 
       if (error) {
         console.error("Erro ao carregar orçamentos:", error)

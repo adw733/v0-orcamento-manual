@@ -27,13 +27,14 @@ interface ProdutoOrcamento {
   orcamentoData: string
   clienteNome: string
   nomeContato: string
-  produtoId: string // Adicionado para identificar produtos diferentes
+  produtoId: string
   produtoNome: string
   tamanho: string
   cor: string
   quantidade: number
   observacao: string
   status: string
+  ordemItem: number
 }
 
 export default function TabelaProdutos() {
@@ -41,15 +42,15 @@ export default function TabelaProdutos() {
   const [produtosFiltrados, setProdutosFiltrados] = useState<ProdutoOrcamento[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("todos")
+  const [statusFilter, setStatusFilter] = useState<string>("execucao")
   const [error, setError] = useState<string | null>(null)
   const [exportandoPDF, setExportandoPDF] = useState(false)
   const tabelaRef = useRef<HTMLDivElement>(null)
 
   // Estados para ordenação
   const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" | "desc" }>({
-    campo: "orcamentoData",
-    direcao: "desc",
+    campo: "orcamentoNumero",
+    direcao: "asc",
   })
 
   // Função para ordenar tamanhos
@@ -100,7 +101,7 @@ export default function TabelaProdutos() {
       const { data: orcamentosData, error: orcamentosError } = await supabase
         .from("orcamentos")
         .select("id, numero, data, cliente:cliente_id(nome), itens, status")
-        .order("data", { ascending: false })
+        .order("numero", { ascending: true })
 
       if (orcamentosError) {
         console.error("Erro ao carregar orçamentos:", orcamentosError)
@@ -144,7 +145,8 @@ export default function TabelaProdutos() {
         }
 
         // Para cada item do orçamento, processar os tamanhos
-        for (const item of itens) {
+        for (let itemIndex = 0; itemIndex < itens.length; itemIndex++) {
+          const item = itens[itemIndex]
           // Buscar o produto para obter o nome
           const { data: produtoData, error: produtoError } = await supabase
             .from("produtos")
@@ -175,13 +177,14 @@ export default function TabelaProdutos() {
                 orcamentoData: orcamento.data,
                 clienteNome: orcamento.cliente?.nome || "Cliente não especificado",
                 nomeContato: nomeContato,
-                produtoId: item.produtoId, // Armazenar o ID do produto para identificar produtos diferentes
+                produtoId: item.produtoId,
                 produtoNome: produtoNome,
                 tamanho: tamanho,
                 cor: cor,
                 quantidade: Number(quantidade),
-                observacao: "", // Deixando a observação vazia conforme solicitado
+                observacao: "",
                 status: orcamento.status || "proposta",
+                ordemItem: itemIndex,
               })
             }
           } else {
@@ -193,13 +196,14 @@ export default function TabelaProdutos() {
               orcamentoData: orcamento.data,
               clienteNome: orcamento.cliente?.nome || "Cliente não especificado",
               nomeContato: nomeContato,
-              produtoId: item.produtoId, // Armazenar o ID do produto para identificar produtos diferentes
+              produtoId: item.produtoId,
               produtoNome: produtoNome,
               tamanho: "Único",
               cor: cor,
               quantidade: item.quantidade || 0,
-              observacao: "", // Deixando a observação vazia conforme solicitado
+              observacao: "",
               status: orcamento.status || "proposta",
+              ordemItem: itemIndex,
             })
           }
         }
@@ -239,47 +243,68 @@ export default function TabelaProdutos() {
 
     // Ordenar os resultados
     resultado = resultado.sort((a, b) => {
-      let valorA, valorB
+      // Se estamos ordenando por um campo específico
+      if (ordenacao.campo !== "orcamentoNumero") {
+        let valorA, valorB
 
-      switch (ordenacao.campo) {
-        case "orcamentoNumero":
-          valorA = a.orcamentoNumero
-          valorB = b.orcamentoNumero
-          break
-        case "orcamentoData":
-          valorA = a.orcamentoData
-          valorB = b.orcamentoData
-          break
-        case "clienteNome":
-          valorA = a.clienteNome
-          valorB = b.clienteNome
-          break
-        case "produtoNome":
-          valorA = a.produtoNome
-          valorB = b.produtoNome
-          break
-        case "tamanho":
-          // Usar a função de ordenação personalizada para tamanhos
-          return ordenarTamanhos(a.tamanho, b.tamanho) * (ordenacao.direcao === "asc" ? 1 : -1)
-        case "cor":
-          valorA = a.cor
-          valorB = b.cor
-          break
-        case "quantidade":
-          valorA = a.quantidade
-          valorB = b.quantidade
-          break
-        default:
-          valorA = a.orcamentoData
-          valorB = b.orcamentoData
-      }
+        switch (ordenacao.campo) {
+          case "orcamentoData":
+            valorA = a.orcamentoData
+            valorB = b.orcamentoData
+            break
+          case "clienteNome":
+            valorA = a.clienteNome
+            valorB = b.clienteNome
+            break
+          case "produtoNome":
+            valorA = a.produtoNome
+            valorB = b.produtoNome
+            break
+          case "tamanho":
+            // Usar a função de ordenação personalizada para tamanhos
+            return ordenarTamanhos(a.tamanho, b.tamanho) * (ordenacao.direcao === "asc" ? 1 : -1)
+          case "cor":
+            valorA = a.cor
+            valorB = b.cor
+            break
+          case "quantidade":
+            valorA = a.quantidade
+            valorB = b.quantidade
+            break
+          default:
+            valorA = a.orcamentoData
+            valorB = b.orcamentoData
+        }
 
-      if (typeof valorA === "string" && typeof valorB === "string") {
-        return ordenacao.direcao === "asc" ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA)
+        if (typeof valorA === "string" && typeof valorB === "string") {
+          return ordenacao.direcao === "asc" ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA)
+        } else {
+          return ordenacao.direcao === "asc"
+            ? (valorA as number) - (valorB as number)
+            : (valorB as number) - (valorA as number)
+        }
       } else {
-        return ordenacao.direcao === "asc"
-          ? (valorA as number) - (valorB as number)
-          : (valorB as number) - (valorA as number)
+        // Ordenação padrão por número de orçamento
+        const comparacaoOrcamento =
+          ordenacao.direcao === "asc"
+            ? a.orcamentoNumero.localeCompare(b.orcamentoNumero)
+            : b.orcamentoNumero.localeCompare(a.orcamentoNumero)
+
+        // Se forem do mesmo orçamento, ordenar primeiro por nome do produto e depois por tamanho
+        if (comparacaoOrcamento === 0) {
+          // Comparar nomes de produtos primeiro (ordem alfabética)
+          const comparacaoProduto = a.produtoNome.localeCompare(b.produtoNome)
+
+          // Se os produtos forem diferentes, retornar a comparação de produtos
+          if (comparacaoProduto !== 0) {
+            return comparacaoProduto
+          }
+
+          // Se os produtos forem iguais, ordenar por tamanho
+          return ordenarTamanhos(a.tamanho, b.tamanho)
+        }
+
+        return comparacaoOrcamento
       }
     })
 
@@ -343,8 +368,8 @@ export default function TabelaProdutos() {
   const isNovoProduto = (index: number) => {
     if (index === 0) return true
 
-    const produtoAtual = produtosFiltrados[index].produtoId
-    const produtoAnterior = produtosFiltrados[index - 1].produtoId
+    const produtoAtual = produtosFiltrados[index].produtoNome
+    const produtoAnterior = produtosFiltrados[index - 1].produtoNome
     const orcamentoAtual = produtosFiltrados[index].orcamentoId
     const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
 
@@ -502,27 +527,29 @@ export default function TabelaProdutos() {
         pdf.setFontSize(8)
         pdf.setTextColor(0, 0, 0)
 
-        // Ordenar os produtos primeiro por produtoId e depois por tamanho
+        // Ordenar os produtos primeiro por nome do produto e depois por tamanho
         const produtosAgrupados = [...produtosDoOrcamento].sort((a, b) => {
-          // Primeiro agrupar por produto
-          if (a.produtoId !== b.produtoId) {
-            return a.produtoId.localeCompare(b.produtoId)
+          // Primeiro ordenar por nome do produto (ordem alfabética)
+          const comparacaoProduto = a.produtoNome.localeCompare(b.produtoNome)
+
+          // Se os produtos forem diferentes, retornar a comparação de produtos
+          if (comparacaoProduto !== 0) {
+            return comparacaoProduto
           }
-          // Depois ordenar por tamanho dentro do mesmo produto
+
+          // Se os produtos forem iguais, ordenar por tamanho
           return ordenarTamanhos(a.tamanho, b.tamanho)
         })
 
-        let produtoIdAnterior = ""
+        let produtoNomeAnterior = ""
 
         for (let i = 0; i < produtosAgrupados.length; i++) {
           const produto = produtosAgrupados[i]
           const isUltimaLinha = i === produtosAgrupados.length - 1
+          const isNovoProduto = i === 0 || produto.produtoNome !== produtosAgrupados[i - 1].produtoNome
 
-          // Verificar se é um novo produto dentro do mesmo orçamento
-          const isNovoProduto = i > 0 && produto.produtoId !== produtosAgrupados[i - 1].produtoId
-
-          // Se for um novo produto, adicionar uma linha mais grossa para separar
-          if (isNovoProduto) {
+          // Se for um novo produto, adicionar uma linha mais grossa para separar (exceto para o primeiro produto)
+          if (isNovoProduto && i > 0) {
             desenharLinhaGrossa(pdf, yPosition - 1, margin, contentWidth)
           }
 
@@ -563,7 +590,7 @@ export default function TabelaProdutos() {
             desenharCabecalhoTabela()
           }
 
-          produtoIdAnterior = produto.produtoId
+          produtoNomeAnterior = produto.produtoNome
         }
 
         // Adicionar espaço entre orçamentos
@@ -792,7 +819,7 @@ export default function TabelaProdutos() {
                     )}
 
                     {/* Separador entre produtos diferentes do mesmo orçamento */}
-                    {isNovoProduto(index) && (
+                    {isNovoProduto(index) && index > 0 && !isNovoOrcamento(index) && (
                       <TableRow>
                         <TableCell colSpan={8} className="p-0 h-0.5">
                           <div className="border-t-2 border-gray-300"></div>
