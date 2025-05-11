@@ -21,6 +21,8 @@ import GerenciadorMateriais from "@/components/gerenciador-materiais"
 import GerenciadorEmpresa from "@/components/gerenciador-empresa"
 // Importar o GerenciadorCategorias
 import GerenciadorCategorias from "@/components/gerenciador-categorias"
+// Adicionar a importação do componente TabelaProdutos no início do arquivo, junto com as outras importações
+import TabelaProdutos from "@/components/tabela-produtos"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -1479,6 +1481,14 @@ export default function GeradorOrcamento() {
                   onUpdateStatus={atualizarStatusOrcamento}
                   reloadRef={recarregarOrcamentosRef}
                 />
+              </CardContent>
+            </Card>
+          )}
+
+          {abaAtiva === "produtos-tabela" && (
+            <Card className="shadow-sm border-0">
+              <CardContent className="p-6">
+                <TabelaProdutos />
               </CardContent>
             </Card>
           )}

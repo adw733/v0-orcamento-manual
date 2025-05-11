@@ -117,7 +117,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
 
   // Estados para cores e tecidos pré-cadastrados
   const [coresCadastradas, setCoresCadastradas] = useState<Cor[]>([])
-  const [tecidosCadastradas, setTecidosCadastradas] = useState<TecidoBase[]>([])
+  const [tecidosCadastrados, setTecidosCadastrados] = useState<TecidoBase[]>([])
 
   // Adicione um estado para controlar a visibilidade do formulário de novo produto:
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
@@ -164,7 +164,7 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
           setCoresCadastradas(coresData)
 
           const tecidosData = await tecidoBaseService.listarTodos()
-          setTecidosCadastradas(tecidosData)
+          setTecidosCadastrados(tecidosData)
         } catch (error) {
           console.error("Erro ao carregar cores e tecidos:", error)
         }
@@ -517,8 +517,8 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
         produto.codigo.toLowerCase().includes(termoLowerCase) ||
         produto.nome.toLowerCase().includes(termoLowerCase) ||
         produto.categoria?.toLowerCase().includes(termoLowerCase) ||
-        produto.tecidos.some((t) => t.nome.toLowerCase().includes(termoLowerCase)) ||
-        produto.cores.some((c) => c.toLowerCase().includes(termoLowerCase))
+        produto.tecidos.some((t) => t.nome.toLowerCase().includes(termoPesquisa)) ||
+        produto.cores.some((c) => c.toLowerCase().includes(termoPesquisa))
       )
     })
 
@@ -578,7 +578,6 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
   const produtosAgrupados = agruparPorCategoria(produtosExibidos)
 
   // Variável para armazenar os tecidos cadastrados
-  const [tecidosCadastrados, setTecidosCadastrados] = useState<TecidoBase[]>([])
 
   // Funções para gerenciar categorias
   const handleCategoriaAdded = (categoria: Categoria) => {
@@ -871,9 +870,9 @@ export default function GerenciadorProdutos({ produtos, adicionarProduto, setPro
                                     Tecidos Disponíveis
                                   </Label>
                                   <div className="mt-2 space-y-2">
-                                    {tecidosCadastradas.length > 0 ? (
+                                    {tecidosCadastrados.length > 0 ? (
                                       <div className="grid grid-cols-2 gap-2">
-                                        {tecidosCadastradas.map((tecido) => (
+                                        {tecidosCadastrados.map((tecido) => (
                                           <div key={tecido.id} className="flex items-center">
                                             <input
                                               type="checkbox"

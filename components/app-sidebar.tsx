@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { FileText, Users, ShoppingBag, Save, PlusCircle, Layers, Building } from "lucide-react"
+import { FileText, Users, ShoppingBag, Save, PlusCircle, Layers, Building, Database } from "lucide-react"
 
 interface AppSidebarProps {
   abaAtiva: string
@@ -80,6 +80,16 @@ export function AppSidebar({ abaAtiva, setAbaAtiva, criandoNovoOrcamento, criarN
             >
               <Save className="h-5 w-5 mr-3" />
               <span>Orçamentos Salvos</span>
+            </button>
+
+            <button
+              onClick={() => setAbaAtiva("produtos-tabela")}
+              className={`w-full flex items-center px-3 py-2.5 text-sm rounded-md transition-colors ${
+                abaAtiva === "produtos-tabela" ? "bg-primary text-white font-medium" : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              <Database className="h-5 w-5 mr-3" />
+              <span>Tabela de Produtos</span>
             </button>
           </div>
         </div>
