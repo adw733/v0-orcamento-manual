@@ -53,6 +53,9 @@ export default function TabelaProdutos() {
     direcao: "asc",
   })
 
+  // Adicionar um novo estado para controlar o modo de visualização
+  const [modoVisualizacao, setModoVisualizacao] = useState<"orcamento" | "produto">("orcamento")
+
   // Função para ordenar tamanhos
   const ordenarTamanhos = (tamanhoA: string, tamanhoB: string) => {
     // Definir a ordem dos tamanhos padrão
@@ -90,7 +93,7 @@ export default function TabelaProdutos() {
 
   useEffect(() => {
     filtrarProdutos()
-  }, [produtos, searchTerm, statusFilter, ordenacao])
+  }, [produtos, searchTerm, statusFilter, ordenacao, modoVisualizacao])
 
   const carregarProdutos = async () => {
     try {
@@ -219,6 +222,7 @@ export default function TabelaProdutos() {
     }
   }
 
+  // Modificar a função filtrarProdutos para incluir a lógica de agrupamento por produto
   const filtrarProdutos = () => {
     let resultado = [...produtos]
 
@@ -241,72 +245,100 @@ export default function TabelaProdutos() {
       resultado = resultado.filter((produto) => produto.status === statusFilter)
     }
 
-    // Ordenar os resultados
-    resultado = resultado.sort((a, b) => {
-      // Se estamos ordenando por um campo específico
-      if (ordenacao.campo !== "orcamentoNumero") {
-        let valorA, valorB
+    // Ordenar os resultados com base no modo de visualização
+    if (modoVisualizacao === "orcamento") {
+      // Ordenação original por orçamento
+      resultado = resultado.sort((a, b) => {
+        // Se estamos ordenando por um campo específico
+        if (ordenacao.campo !== "orcamentoNumero") {
+          let valorA, valorB
 
-        switch (ordenacao.campo) {
-          case "orcamentoData":
-            valorA = a.orcamentoData
-            valorB = b.orcamentoData
-            break
-          case "clienteNome":
-            valorA = a.clienteNome
-            valorB = b.clienteNome
-            break
-          case "produtoNome":
-            valorA = a.produtoNome
-            valorB = b.produtoNome
-            break
-          case "tamanho":
-            // Usar a função de ordenação personalizada para tamanhos
-            return ordenarTamanhos(a.tamanho, b.tamanho) * (ordenacao.direcao === "asc" ? 1 : -1)
-          case "cor":
-            valorA = a.cor
-            valorB = b.cor
-            break
-          case "quantidade":
-            valorA = a.quantidade
-            valorB = b.quantidade
-            break
-          default:
-            valorA = a.orcamentoData
-            valorB = b.orcamentoData
-        }
-
-        if (typeof valorA === "string" && typeof valorB === "string") {
-          return ordenacao.direcao === "asc" ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA)
-        } else {
-          return ordenacao.direcao === "asc"
-            ? (valorA as number) - (valorB as number)
-            : (valorB as number) - (valorA as number)
-        }
-      } else {
-        // Ordenação padrão por número de orçamento
-        const comparacaoOrcamento =
-          ordenacao.direcao === "asc"
-            ? a.orcamentoNumero.localeCompare(b.orcamentoNumero)
-            : b.orcamentoNumero.localeCompare(a.orcamentoNumero)
-
-        // Se forem do mesmo orçamento, ordenar primeiro por nome do produto e depois por tamanho
-        if (comparacaoOrcamento === 0) {
-          // Comparar nomes de produtos primeiro (ordem alfabética)
-          const comparacaoProduto = a.produtoNome.localeCompare(b.produtoNome)
-
-          // Se os produtos forem diferentes, retornar a comparação de produtos
-          if (comparacaoProduto !== 0) {
-            return comparacaoProduto
+          switch (ordenacao.campo) {
+            case "orcamentoData":
+              valorA = a.orcamentoData
+              valorB = b.orcamentoData
+              break
+            case "clienteNome":
+              valorA = a.clienteNome
+              valorB = b.clienteNome
+              break
+            case "produtoNome":
+              valorA = a.produtoNome
+              valorB = b.produtoNome
+              break
+            case "tamanho":
+              // Usar a função de ordenação personalizada para tamanhos
+              return ordenarTamanhos(a.tamanho, b.tamanho) * (ordenacao.direcao === "asc" ? 1 : -1)
+            case "cor":
+              valorA = a.cor
+              valorB = b.cor
+              break
+            case "quantidade":
+              valorA = a.quantidade
+              valorB = b.quantidade
+              break
+            default:
+              valorA = a.orcamentoData
+              valorB = b.orcamentoData
           }
 
-          // Se os produtos forem iguais, ordenar por tamanho
-          return ordenarTamanhos(a.tamanho, b.tamanho)
+          if (typeof valorA === "string" && typeof valorB === "string") {
+            return ordenacao.direcao === "asc" ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA)
+          } else {
+            return ordenacao.direcao === "asc"
+              ? (valorA as number) - (valorB as number)
+              : (valorB as number) - (valorA as number)
+          }
+        } else {
+          // Ordenação padrão por número de orçamento
+          const comparacaoOrcamento =
+            ordenacao.direcao === "asc"
+              ? a.orcamentoNumero.localeCompare(b.orcamentoNumero)
+              : b.orcamentoNumero.localeCompare(a.orcamentoNumero)
+
+          // Se forem do mesmo orçamento, ordenar primeiro por nome do produto e depois por tamanho
+          if (comparacaoOrcamento === 0) {
+            // Comparar nomes de produtos primeiro (ordem alfabética)
+            const comparacaoProduto = a.produtoNome.localeCompare(b.produtoNome)
+
+            // Se os produtos forem diferentes, retornar a comparação de produtos
+            if (comparacaoProduto !== 0) {
+              return comparacaoProduto
+            }
+
+            // Se os produtos forem iguais, ordenar por tamanho
+            return ordenarTamanhos(a.tamanho, b.tamanho)
+          }
+
+          return comparacaoOrcamento
+        }
+      })
+    } else {
+      // Ordenação por tipo de produto
+      resultado = resultado.sort((a, b) => {
+        // Primeiro ordenar por nome do produto
+        const comparacaoProduto =
+          ordenacao.direcao === "asc"
+            ? a.produtoNome.localeCompare(b.produtoNome)
+            : b.produtoNome.localeCompare(a.produtoNome)
+
+        // Se os produtos forem diferentes, retornar a comparação de produtos
+        if (comparacaoProduto !== 0) {
+          return comparacaoProduto
         }
 
-        return comparacaoOrcamento
-      }
-    })
+        // Se os produtos forem iguais, ordenar por número de orçamento
+        const comparacaoOrcamento = a.orcamentoNumero.localeCompare(b.orcamentoNumero)
+
+        // Se os orçamentos forem diferentes, retornar a comparação de orçamentos
+        if (comparacaoOrcamento !== 0) {
+          return comparacaoOrcamento
+        }
+
+        // Se os orçamentos forem iguais, ordenar por tamanho
+        return ordenarTamanhos(a.tamanho, b.tamanho)
+      })
+    }
 
     setProdutosFiltrados(resultado)
   }
@@ -354,29 +386,58 @@ export default function TabelaProdutos() {
     return numeroCompleto
   }
 
-  // Função para verificar se o produto é o primeiro de um novo orçamento na lista filtrada
+  // Modificar a função isNovoOrcamento para considerar o modo de visualização
   const isNovoOrcamento = (index: number) => {
     if (index === 0) return true
 
-    const orcamentoAtual = produtosFiltrados[index].orcamentoId
-    const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
-
-    return orcamentoAtual !== orcamentoAnterior
+    if (modoVisualizacao === "orcamento") {
+      const orcamentoAtual = produtosFiltrados[index].orcamentoId
+      const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
+      return orcamentoAtual !== orcamentoAnterior
+    } else {
+      const produtoAtual = produtosFiltrados[index].produtoNome
+      const produtoAnterior = produtosFiltrados[index - 1].produtoNome
+      return produtoAtual !== produtoAnterior
+    }
   }
 
-  // Função para verificar se o produto é diferente do anterior dentro do mesmo orçamento
+  // Modificar a função isNovoProduto para considerar o modo de visualização
   const isNovoProduto = (index: number) => {
+    if (index === 0) return true
+
+    if (modoVisualizacao === "orcamento") {
+      const produtoAtual = produtosFiltrados[index].produtoNome
+      const produtoAnterior = produtosFiltrados[index - 1].produtoNome
+      const orcamentoAtual = produtosFiltrados[index].orcamentoId
+      const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
+
+      // Se for um novo orçamento, não é considerado um novo produto para separação
+      if (orcamentoAtual !== orcamentoAnterior) return false
+
+      // Se for o mesmo orçamento mas produto diferente, retorna true
+      return produtoAtual !== produtoAnterior
+    } else {
+      // No modo produto, consideramos um novo produto quando muda o orçamento
+      const produtoAtual = produtosFiltrados[index].produtoNome
+      const produtoAnterior = produtosFiltrados[index - 1].produtoNome
+
+      // Se o produto mudou, não é considerado um novo produto para separação (já terá uma separação maior)
+      if (produtoAtual !== produtoAnterior) return false
+
+      // Se for o mesmo produto mas orçamento diferente, retorna true
+      const orcamentoAtual = produtosFiltrados[index].orcamentoId
+      const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
+      return orcamentoAtual !== orcamentoAnterior
+    }
+  }
+
+  // Adicionar função para verificar se o produto é o primeiro de um novo tipo na lista filtrada
+  const isNovoProdutoTipo = (index: number) => {
     if (index === 0) return true
 
     const produtoAtual = produtosFiltrados[index].produtoNome
     const produtoAnterior = produtosFiltrados[index - 1].produtoNome
-    const orcamentoAtual = produtosFiltrados[index].orcamentoId
-    const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
 
-    // Se for um novo orçamento, não é considerado um novo produto para separação
-    if (orcamentoAtual !== orcamentoAnterior) return false
-
-    // Se for o mesmo orçamento mas produto diferente, retorna true
     return produtoAtual !== produtoAnterior
   }
 
@@ -389,8 +450,9 @@ export default function TabelaProdutos() {
     pdf.setDrawColor(0, 0, 0) // Restaurar a cor padrão
   }
 
-  // Função para exportar a tabela para PDF
-  const exportarParaPDF = async () => {
+  // Modificar a função exportarParaPDF para suportar ambos os modos de visualização
+  // Adicionar o parâmetro modo à função
+  const exportarParaPDF = async (modo: "orcamento" | "produto" = modoVisualizacao) => {
     try {
       setExportandoPDF(true)
 
@@ -414,14 +476,26 @@ export default function TabelaProdutos() {
       const contentWidth = pageWidth - margin * 2
       const contentHeight = pageHeight - margin * 2
 
-      // Agrupar produtos por orçamento
-      const orcamentos: { [key: string]: ProdutoOrcamento[] } = {}
-      produtosFiltrados.forEach((produto) => {
-        if (!orcamentos[produto.orcamentoId]) {
-          orcamentos[produto.orcamentoId] = []
-        }
-        orcamentos[produto.orcamentoId].push(produto)
-      })
+      // Agrupar produtos com base no modo de visualização
+      const agrupamentos: { [key: string]: ProdutoOrcamento[] } = {}
+
+      if (modo === "orcamento") {
+        // Agrupar por orçamento (comportamento original)
+        produtosFiltrados.forEach((produto) => {
+          if (!agrupamentos[produto.orcamentoId]) {
+            agrupamentos[produto.orcamentoId] = []
+          }
+          agrupamentos[produto.orcamentoId].push(produto)
+        })
+      } else {
+        // Agrupar por tipo de produto
+        produtosFiltrados.forEach((produto) => {
+          if (!agrupamentos[produto.produtoNome]) {
+            agrupamentos[produto.produtoNome] = []
+          }
+          agrupamentos[produto.produtoNome].push(produto)
+        })
+      }
 
       // Criar uma cópia da tabela para manipulação
       const container = document.createElement("div")
@@ -437,7 +511,10 @@ export default function TabelaProdutos() {
       // Adicionar título ao PDF
       pdf.setFontSize(16)
       pdf.setFont("helvetica", "bold")
-      pdf.text("Tabela de Produtos por Orçamento", margin, margin + 10)
+
+      // Título baseado no modo de visualização
+      const titulo = modo === "orcamento" ? "Tabela de Produtos por Orçamento" : "Tabela de Produtos Agrupados por Tipo"
+      pdf.text(titulo, margin, margin + 10)
 
       // Adicionar data de geração
       pdf.setFontSize(10)
@@ -448,13 +525,13 @@ export default function TabelaProdutos() {
       let yPosition = margin + 25 // Posição inicial após o título
       let pageCount = 1
 
-      // Função para verificar se um orçamento cabe na página atual
-      const verificarEspacoParaOrcamento = (numProdutos: number) => {
+      // Função para verificar se um grupo cabe na página atual
+      const verificarEspacoParaGrupo = (numProdutos: number) => {
         // Altura estimada para cada linha de produto (7mm)
         const alturaEstimadaPorProduto = 7
-        // Altura estimada para o cabeçalho do orçamento (10mm)
+        // Altura estimada para o cabeçalho do grupo (10mm)
         const alturaEstimadaCabecalho = 10
-        // Altura total estimada para o orçamento
+        // Altura total estimada para o grupo
         const alturaEstimadaTotal = alturaEstimadaCabecalho + numProdutos * alturaEstimadaPorProduto
 
         // Verificar se cabe na página atual
@@ -473,12 +550,21 @@ export default function TabelaProdutos() {
         pdf.setFontSize(9)
         pdf.setTextColor(80, 80, 80)
 
-        // Ajustadas as posições e larguras das colunas
-        pdf.text("Produto", margin + 5, yPosition + 5) // Início no começo da tabela
-        pdf.text("Cor", margin + 95, yPosition + 5) // Reduzida e reposicionada
-        pdf.text("Tamanho", margin + 120, yPosition + 5) // Reduzida e reposicionada
-        pdf.text("Qtd", margin + 145, yPosition + 5) // Reduzida e reposicionada
-        pdf.text("Obs", margin + 160, yPosition + 5) // Aumentada em 1cm (10mm)
+        if (modo === "orcamento") {
+          // Cabeçalho para modo orçamento
+          pdf.text("Produto", margin + 5, yPosition + 5)
+          pdf.text("Cor", margin + 95, yPosition + 5)
+          pdf.text("Tamanho", margin + 120, yPosition + 5)
+          pdf.text("Qtd", margin + 145, yPosition + 5)
+          pdf.text("Obs", margin + 160, yPosition + 5)
+        } else {
+          // Cabeçalho para modo produto
+          pdf.text("Produto", margin + 5, yPosition + 5)
+          pdf.text("Número e Contato", margin + 70, yPosition + 5)
+          pdf.text("Tamanho", margin + 130, yPosition + 5)
+          pdf.text("Cor", margin + 155, yPosition + 5)
+          pdf.text("Qtd", margin + 180, yPosition + 5)
+        }
 
         yPosition += 8
 
@@ -486,72 +572,75 @@ export default function TabelaProdutos() {
         desenharLinhaGrossa(pdf, yPosition, margin, contentWidth)
       }
 
-      // Processar cada orçamento
-      for (const orcamentoId of Object.keys(orcamentos)) {
-        const produtosDoOrcamento = orcamentos[orcamentoId]
+      // Processar cada grupo
+      for (const chaveGrupo of Object.keys(agrupamentos)) {
+        const produtosDoGrupo = agrupamentos[chaveGrupo]
 
-        // Verificar se o orçamento cabe na página atual, senão adicionar nova página
-        if (!verificarEspacoParaOrcamento(produtosDoOrcamento.length)) {
+        // Verificar se o grupo cabe na página atual, senão adicionar nova página
+        if (!verificarEspacoParaGrupo(produtosDoGrupo.length)) {
           pdf.addPage()
           pageCount++
           yPosition = margin + 10
         }
 
-        // Adicionar informações do orçamento
-        const primeiroItem = produtosDoOrcamento[0]
+        // Adicionar informações do grupo
+        const primeiroItem = produtosDoGrupo[0]
         pdf.setFont("helvetica", "bold")
         pdf.setFontSize(11)
         pdf.setTextColor(0, 0, 0)
-        pdf.text(
-          `Orçamento: ${formatarDescricaoPedido(primeiroItem.orcamentoNumero, primeiroItem.nomeContato)}`,
-          margin,
-          yPosition + 5,
-        )
 
-        pdf.setFont("helvetica", "normal")
-        pdf.setFontSize(9)
-        // Reorganizar para mostrar data / cliente / contato
-        pdf.text(
-          `Data: ${formatarData(primeiroItem.orcamentoData)} | Cliente: ${primeiroItem.clienteNome} | Contato: ${primeiroItem.nomeContato || "Não especificado"}`,
-          margin,
-          yPosition + 10,
-        )
+        if (modo === "orcamento") {
+          // Título para modo orçamento
+          pdf.text(
+            `Orçamento: ${formatarDescricaoPedido(primeiroItem.orcamentoNumero, primeiroItem.nomeContato)}`,
+            margin,
+            yPosition + 5,
+          )
+
+          pdf.setFont("helvetica", "normal")
+          pdf.setFontSize(9)
+          pdf.text(
+            `Data: ${formatarData(primeiroItem.orcamentoData)} | Cliente: ${primeiroItem.clienteNome} | Contato: ${primeiroItem.nomeContato || "Não especificado"}`,
+            margin,
+            yPosition + 10,
+          )
+        } else {
+          // Título para modo produto
+          pdf.text(`Produto: ${chaveGrupo}`, margin, yPosition + 5)
+        }
 
         yPosition += 15
 
         // Desenhar cabeçalho da tabela
         desenharCabecalhoTabela()
 
-        // Adicionar produtos do orçamento
+        // Adicionar produtos do grupo
         pdf.setFont("helvetica", "normal")
         pdf.setFontSize(8)
         pdf.setTextColor(0, 0, 0)
 
-        // Ordenar os produtos primeiro por nome do produto e depois por tamanho
-        const produtosAgrupados = [...produtosDoOrcamento].sort((a, b) => {
-          // Primeiro ordenar por nome do produto (ordem alfabética)
-          const comparacaoProduto = a.produtoNome.localeCompare(b.produtoNome)
+        // Ordenar os produtos com base no modo
+        const produtosOrdenados = [...produtosDoGrupo]
 
-          // Se os produtos forem diferentes, retornar a comparação de produtos
-          if (comparacaoProduto !== 0) {
-            return comparacaoProduto
-          }
+        if (modo === "orcamento") {
+          // Ordenar por nome do produto e depois por tamanho
+          produtosOrdenados.sort((a, b) => {
+            const comparacaoProduto = a.produtoNome.localeCompare(b.produtoNome)
+            if (comparacaoProduto !== 0) return comparacaoProduto
+            return ordenarTamanhos(a.tamanho, b.tamanho)
+          })
+        } else {
+          // Ordenar por número de orçamento e depois por tamanho
+          produtosOrdenados.sort((a, b) => {
+            const comparacaoOrcamento = a.orcamentoNumero.localeCompare(b.orcamentoNumero)
+            if (comparacaoOrcamento !== 0) return comparacaoOrcamento
+            return ordenarTamanhos(a.tamanho, b.tamanho)
+          })
+        }
 
-          // Se os produtos forem iguais, ordenar por tamanho
-          return ordenarTamanhos(a.tamanho, b.tamanho)
-        })
-
-        let produtoNomeAnterior = ""
-
-        for (let i = 0; i < produtosAgrupados.length; i++) {
-          const produto = produtosAgrupados[i]
-          const isUltimaLinha = i === produtosAgrupados.length - 1
-          const isNovoProduto = i === 0 || produto.produtoNome !== produtosAgrupados[i - 1].produtoNome
-
-          // Se for um novo produto, adicionar uma linha mais grossa para separar (exceto para o primeiro produto)
-          if (isNovoProduto && i > 0) {
-            desenharLinhaGrossa(pdf, yPosition - 1, margin, contentWidth)
-          }
+        for (let i = 0; i < produtosOrdenados.length; i++) {
+          const produto = produtosOrdenados[i]
+          const isUltimaLinha = i === produtosOrdenados.length - 1
 
           // Desenhar linha alternada para melhor legibilidade
           if (i % 2 === 1) {
@@ -559,20 +648,38 @@ export default function TabelaProdutos() {
             pdf.rect(margin, yPosition, contentWidth, 6, "F")
           }
 
-          // Ajustar o texto do produto para evitar sobreposição
-          const produtoNomeLimitado =
-            produto.produtoNome.length > 40 ? produto.produtoNome.substring(0, 40) + "..." : produto.produtoNome
-          pdf.text(produtoNomeLimitado, margin + 5, yPosition + 4) // Início no começo da tabela
+          if (modo === "orcamento") {
+            // Renderizar linha no modo orçamento
+            const produtoNomeLimitado =
+              produto.produtoNome.length > 40 ? produto.produtoNome.substring(0, 40) + "..." : produto.produtoNome
+            pdf.text(produtoNomeLimitado, margin + 5, yPosition + 4)
 
-          // Ajustar o texto da cor para evitar sobreposição
-          const corLimitada = produto.cor.length > 12 ? produto.cor.substring(0, 12) + "..." : produto.cor
-          pdf.text(corLimitada, margin + 95, yPosition + 4) // Reduzida e reposicionada
+            const corLimitada = produto.cor.length > 12 ? produto.cor.substring(0, 12) + "..." : produto.cor
+            pdf.text(corLimitada, margin + 95, yPosition + 4)
 
-          pdf.text(produto.tamanho, margin + 120, yPosition + 4) // Reduzida e reposicionada
-          pdf.text(produto.quantidade.toString(), margin + 145, yPosition + 4) // Reduzida e reposicionada
+            pdf.text(produto.tamanho, margin + 120, yPosition + 4)
+            pdf.text(produto.quantidade.toString(), margin + 145, yPosition + 4)
+          } else {
+            // Renderizar linha no modo produto
+            // Mostrar o nome do produto em todas as linhas
+            const produtoNomeLimitado =
+              produto.produtoNome.length > 30 ? produto.produtoNome.substring(0, 30) + "..." : produto.produtoNome
+            pdf.text(produtoNomeLimitado, margin + 5, yPosition + 4)
 
-          // Deixar a coluna de observação vazia conforme solicitado
-          // Não adicionar nenhum texto na posição da observação
+            // Extrair apenas o número do orçamento e adicionar o contato
+            const numeroOrcamento = produto.orcamentoNumero.split(" - ")[0] || produto.orcamentoNumero
+            const textoOrcamento = produto.nomeContato
+              ? `${numeroOrcamento} - ${produto.nomeContato.substring(0, 15)}`
+              : numeroOrcamento
+            pdf.text(textoOrcamento, margin + 70, yPosition + 4)
+
+            pdf.text(produto.tamanho, margin + 130, yPosition + 4)
+
+            const corLimitada = produto.cor.length > 12 ? produto.cor.substring(0, 12) + "..." : produto.cor
+            pdf.text(corLimitada, margin + 155, yPosition + 4)
+
+            pdf.text(produto.quantidade.toString(), margin + 180, yPosition + 4)
+          }
 
           // Avançar para a próxima linha
           yPosition += 6
@@ -589,11 +696,9 @@ export default function TabelaProdutos() {
             yPosition = margin + 10
             desenharCabecalhoTabela()
           }
-
-          produtoNomeAnterior = produto.produtoNome
         }
 
-        // Adicionar espaço entre orçamentos
+        // Adicionar espaço entre grupos
         yPosition += 10
       }
 
@@ -609,8 +714,9 @@ export default function TabelaProdutos() {
       // Remover o elemento temporário
       document.body.removeChild(container)
 
-      // Salvar o PDF
-      pdf.save("tabela-produtos-orcamento.pdf")
+      // Salvar o PDF com nome baseado no modo
+      const nomeArquivo = modo === "orcamento" ? "tabela-produtos-por-orcamento.pdf" : "tabela-produtos-por-tipo.pdf"
+      pdf.save(nomeArquivo)
     } catch (error) {
       console.error("Erro ao exportar para PDF:", error)
       alert("Erro ao exportar para PDF. Tente novamente.")
@@ -637,6 +743,27 @@ export default function TabelaProdutos() {
             {exportandoPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {exportandoPDF ? "Exportando..." : "Exportar para PDF"}
           </Button>
+          <div className="border-l border-gray-200 h-8 mx-2"></div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={modoVisualizacao === "orcamento" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setModoVisualizacao("orcamento")}
+              className="flex items-center gap-1"
+            >
+              <FileText className="h-4 w-4" />
+              Por Orçamento
+            </Button>
+            <Button
+              variant={modoVisualizacao === "produto" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setModoVisualizacao("produto")}
+              className="flex items-center gap-1"
+            >
+              <Tag className="h-4 w-4" />
+              Por Produto
+            </Button>
+          </div>
           <span className="text-sm text-gray-500">{produtosFiltrados.length} produtos encontrados</span>
         </div>
       </div>
@@ -686,101 +813,187 @@ export default function TabelaProdutos() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead
-                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                  onClick={() => alternarOrdenacao("orcamentoData")}
-                >
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Data
-                    {ordenacao.campo === "orcamentoData" &&
-                      (ordenacao.direcao === "asc" ? (
-                        <ChevronUp className="ml-1 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="ml-1 h-4 w-4" />
-                      ))}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                  onClick={() => alternarOrdenacao("orcamentoNumero")}
-                >
-                  <div className="flex items-center">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Descrição do Pedido
-                    {ordenacao.campo === "orcamentoNumero" &&
-                      (ordenacao.direcao === "asc" ? (
-                        <ChevronUp className="ml-1 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="ml-1 h-4 w-4" />
-                      ))}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                  onClick={() => alternarOrdenacao("produtoNome")}
-                >
-                  <div className="flex items-center">
-                    <Tag className="h-4 w-4 mr-2" />
-                    Produto
-                    {ordenacao.campo === "produtoNome" &&
-                      (ordenacao.direcao === "asc" ? (
-                        <ChevronUp className="ml-1 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="ml-1 h-4 w-4" />
-                      ))}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                  onClick={() => alternarOrdenacao("cor")}
-                >
-                  <div className="flex items-center">
-                    <Palette className="h-4 w-4 mr-2" />
-                    Cor
-                    {ordenacao.campo === "cor" &&
-                      (ordenacao.direcao === "asc" ? (
-                        <ChevronUp className="ml-1 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="ml-1 h-4 w-4" />
-                      ))}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                  onClick={() => alternarOrdenacao("tamanho")}
-                >
-                  <div className="flex items-center">
-                    <Ruler className="h-4 w-4 mr-2" />
-                    Tamanho
-                    {ordenacao.campo === "tamanho" &&
-                      (ordenacao.direcao === "asc" ? (
-                        <ChevronUp className="ml-1 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="ml-1 h-4 w-4" />
-                      ))}
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                  onClick={() => alternarOrdenacao("quantidade")}
-                >
-                  <div className="flex items-center">
-                    Qtd
-                    {ordenacao.campo === "quantidade" &&
-                      (ordenacao.direcao === "asc" ? (
-                        <ChevronUp className="ml-1 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="ml-1 h-4 w-4" />
-                      ))}
-                  </div>
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                  <div className="flex items-center">Status</div>
-                </TableHead>
-                <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                  <div className="flex items-center">Observação</div>
-                </TableHead>
+                {modoVisualizacao === "orcamento" ? (
+                  // Cabeçalho para modo orçamento (original)
+                  <>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("orcamentoData")}
+                    >
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Data
+                        {ordenacao.campo === "orcamentoData" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("orcamentoNumero")}
+                    >
+                      <div className="flex items-center">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Descrição do Pedido
+                        {ordenacao.campo === "orcamentoNumero" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("produtoNome")}
+                    >
+                      <div className="flex items-center">
+                        <Tag className="h-4 w-4 mr-2" />
+                        Produto
+                        {ordenacao.campo === "produtoNome" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("cor")}
+                    >
+                      <div className="flex items-center">
+                        <Palette className="h-4 w-4 mr-2" />
+                        Cor
+                        {ordenacao.campo === "cor" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("tamanho")}
+                    >
+                      <div className="flex items-center">
+                        <Ruler className="h-4 w-4 mr-2" />
+                        Tamanho
+                        {ordenacao.campo === "tamanho" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("quantidade")}
+                    >
+                      <div className="flex items-center">
+                        Qtd
+                        {ordenacao.campo === "quantidade" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      <div className="flex items-center">Status</div>
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      <div className="flex items-center">Observação</div>
+                    </TableHead>
+                  </>
+                ) : (
+                  // Cabeçalho para modo produto
+                  <>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("produtoNome")}
+                    >
+                      <div className="flex items-center">
+                        <Tag className="h-4 w-4 mr-2" />
+                        Produto
+                        {ordenacao.campo === "produtoNome" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("orcamentoNumero")}
+                    >
+                      <div className="flex items-center">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Número e Contato
+                        {ordenacao.campo === "orcamentoNumero" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("tamanho")}
+                    >
+                      <div className="flex items-center">
+                        <Ruler className="h-4 w-4 mr-2" />
+                        Tamanho
+                        {ordenacao.campo === "tamanho" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("cor")}
+                    >
+                      <div className="flex items-center">
+                        <Palette className="h-4 w-4 mr-2" />
+                        Cor
+                        {ordenacao.campo === "cor" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                      onClick={() => alternarOrdenacao("quantidade")}
+                    >
+                      <div className="flex items-center">
+                        Qtd
+                        {ordenacao.campo === "quantidade" &&
+                          (ordenacao.direcao === "asc" ? (
+                            <ChevronUp className="ml-1 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-1 h-4 w-4" />
+                          ))}
+                      </div>
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      <div className="flex items-center">Observação</div>
+                    </TableHead>
+                  </>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -809,7 +1022,7 @@ export default function TabelaProdutos() {
               ) : (
                 produtosFiltrados.map((produto, index) => (
                   <>
-                    {/* Separador entre orçamentos diferentes */}
+                    {/* Separador entre orçamentos diferentes ou produtos diferentes, dependendo do modo */}
                     {isNovoOrcamento(index) && index > 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="p-0 h-2 bg-gray-100">
@@ -818,7 +1031,7 @@ export default function TabelaProdutos() {
                       </TableRow>
                     )}
 
-                    {/* Separador entre produtos diferentes do mesmo orçamento */}
+                    {/* Separador entre produtos diferentes do mesmo orçamento ou orçamentos diferentes do mesmo produto */}
                     {isNovoProduto(index) && index > 0 && !isNovoOrcamento(index) && (
                       <TableRow>
                         <TableCell colSpan={8} className="p-0 h-0.5">
@@ -834,32 +1047,66 @@ export default function TabelaProdutos() {
                         isNovoOrcamento(index) ? "border-t-2 border-t-primary/20" : "border-t-gray-100"
                       }`}
                     >
-                      <TableCell className="px-4 py-0.5 align-middle">{formatarData(produto.orcamentoData)}</TableCell>
-                      <TableCell className="px-4 py-0.5 align-middle">
-                        <span className="font-medium text-primary">
-                          {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-4 py-0.5 align-middle">{produto.produtoNome}</TableCell>
-                      <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
-                      <TableCell className="px-4 py-0.5 align-middle">{produto.tamanho}</TableCell>
-                      <TableCell className="px-4 py-0.5 align-middle font-medium">{produto.quantidade}</TableCell>
-                      <TableCell className="px-4 py-0.5 align-middle">
-                        <span
-                          className={`text-xs font-medium px-1.5 py-0.5 rounded-full border ${getStatusClassName(produto.status)}`}
-                        >
-                          {produto.status === "proposta"
-                            ? "Proposta"
-                            : produto.status === "execucao"
-                              ? "Em Execução"
-                              : produto.status === "finalizado"
-                                ? "Finalizado"
-                                : produto.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-4 py-0.5 align-middle min-w-[150px] h-[30px]">
-                        {/* Célula em branco para anotações manuais */}
-                      </TableCell>
+                      {modoVisualizacao === "orcamento" ? (
+                        // Células para modo orçamento (original)
+                        <>
+                          <TableCell className="px-4 py-0.5 align-middle">
+                            {formatarData(produto.orcamentoData)}
+                          </TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle">
+                            <span className="font-medium text-primary">
+                              {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle">{produto.produtoNome}</TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle">{produto.tamanho}</TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle font-medium">{produto.quantidade}</TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle">
+                            <span
+                              className={`text-xs font-medium px-1.5 py-0.5 rounded-full border ${getStatusClassName(produto.status)}`}
+                            >
+                              {produto.status === "proposta"
+                                ? "Proposta"
+                                : produto.status === "execucao"
+                                  ? "Em Execução"
+                                  : produto.status === "finalizado"
+                                    ? "Finalizado"
+                                    : produto.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle min-w-[150px] h-[30px]">
+                            {/* Célula em branco para anotações manuais */}
+                          </TableCell>
+                        </>
+                      ) : (
+                        // Células para modo produto
+                        <>
+                          <TableCell className="px-4 py-0.5 align-middle">
+                            <span
+                              className={
+                                index === 0 || produto.produtoNome !== produtosFiltrados[index - 1].produtoNome
+                                  ? "font-medium text-primary"
+                                  : ""
+                              }
+                            >
+                              {produto.produtoNome}
+                            </span>
+                          </TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle">
+                            {produto.orcamentoNumero.split(" - ")[0] || produto.orcamentoNumero}
+                            {produto.nomeContato && (
+                              <span className="text-gray-500 text-xs block">{produto.nomeContato}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle">{produto.tamanho}</TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle font-medium">{produto.quantidade}</TableCell>
+                          <TableCell className="px-4 py-0.5 align-middle min-w-[150px] h-[30px]">
+                            {/* Célula em branco para anotações manuais */}
+                          </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   </>
                 ))
