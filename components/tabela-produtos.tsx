@@ -392,131 +392,13 @@ export default function TabelaProdutos() {
   }
 
   const formatarDescricaoPedido = (numeroCompleto: string, nomeContato?: string) => {
-    // Extrair as partes do formato "0129 - CAMISA SOCIAL MASCULINA MANGA LONGA MIZU CIMENTOS - WILLIAN"
+    // Extrair apenas a parte relevante no formato "0145 - CAMISETA POLIMIX CONCRETO LTDA"
     const partes = numeroCompleto.split(" - ")
     if (partes.length >= 2) {
-      const numero = partes[0] // "0129"
-
-      // Extrair a empresa do nome do produto (assumindo que são as últimas 2-3 palavras)
-      const produtoParts = partes[1].split(" ")
-      let empresa = ""
-
-      // Se o produto tem pelo menos 3 palavras, pegamos as últimas 2-3 como empresa
-      if (produtoParts.length >= 3) {
-        // Pegar as últimas 2 ou 3 palavras como empresa
-        const palavrasEmpresa = produtoParts.slice(-Math.min(3, Math.floor(produtoParts.length / 2)))
-        empresa = palavrasEmpresa.join(" ")
-      } else {
-        empresa = partes[1] // Se for curto, usar todo o texto
-      }
-
       // Adicionar o nome do contato se disponível
-      return nomeContato ? `${numero} - ${empresa} - ${nomeContato}` : `${numero} - ${empresa}`
+      return nomeContato ? `${partes[0]} - ${partes[1]} - ${nomeContato}` : `${partes[0]} - ${partes[1]}`
     }
     return numeroCompleto
-  }
-
-  // Função para obter todos os produtos de um orçamento específico
-  const obterProdutosDoOrcamento = (orcamentoId: string): string => {
-    const produtosDoOrcamento = produtos.filter((p) => p.orcamentoId === orcamentoId)
-    // Obter nomes únicos de produtos
-    const nomesUnicos = [...new Set(produtosDoOrcamento.map((p) => p.produtoNome))]
-    return nomesUnicos.join(" / ")
-  }
-
-  // Função para resumir inteligentemente os produtos de um orçamento
-  const resumirProdutosDoOrcamento = (orcamentoId: string): string => {
-    const produtosDoOrcamento = produtos.filter((p) => p.orcamentoId === orcamentoId)
-    // Obter nomes únicos de produtos
-    const nomesUnicos = [...new Set(produtosDoOrcamento.map((p) => p.produtoNome))]
-
-    // Se houver apenas um produto, retorná-lo diretamente
-    if (nomesUnicos.length === 1) {
-      return nomesUnicos[0]
-    }
-
-    // Dividir cada nome de produto em palavras
-    const produtosEmPalavras = nomesUnicos.map((nome) => nome.split(" "))
-
-    // Agrupar produtos por palavras-chave principais
-    const grupos: { [key: string]: string[] } = {}
-
-    for (const produto of nomesUnicos) {
-      // Extrair as duas primeiras palavras como possível categoria
-      const palavras = produto.split(" ")
-      let categoria = ""
-
-      // Tentar identificar a categoria principal do produto
-      if (palavras.length >= 2) {
-        // Se a primeira palavra for um tipo de vestuário, usá-la como base
-        const tiposVestuario = [
-          "CAMISA",
-          "CAMISETA",
-          "CALÇA",
-          "JAQUETA",
-          "COLETE",
-          "JALECO",
-          "MACACÃO",
-          "UNIFORME",
-          "BONÉ",
-          "CHAPÉU",
-          "AVENTAL",
-        ]
-
-        if (tiposVestuario.includes(palavras[0])) {
-          // Se a segunda palavra for um qualificador comum, incluí-la
-          const qualificadores = ["SOCIAL", "OPERACIONAL", "EXECUTIVA", "POLO", "BÁSICA", "TÉCNICA", "INDUSTRIAL"]
-          if (palavras.length > 1 && qualificadores.includes(palavras[1])) {
-            categoria = `${palavras[0]} ${palavras[1]}`
-          } else {
-            categoria = palavras[0]
-          }
-        } else {
-          // Caso não seja um tipo de vestuário reconhecido, usar as duas primeiras palavras
-          categoria = `${palavras[0]} ${palavras[1]}`
-        }
-      } else {
-        categoria = palavras[0]
-      }
-
-      // Pluralizar a categoria se necessário
-      if (!categoria.endsWith("S") && nomesUnicos.length > 1) {
-        categoria += "S"
-      }
-
-      if (!grupos[categoria]) {
-        grupos[categoria] = []
-      }
-      grupos[categoria].push(produto)
-    }
-
-    // Converter os grupos em texto
-    const categoriasResumidas = Object.keys(grupos)
-
-    // Se houver muitas categorias, tentar um agrupamento mais genérico
-    if (categoriasResumidas.length > 3) {
-      // Tentar agrupar apenas pela primeira palavra
-      const gruposSimplificados: { [key: string]: string[] } = {}
-
-      for (const produto of nomesUnicos) {
-        const primeiraPalavra = produto.split(" ")[0]
-        let categoria = primeiraPalavra
-
-        // Pluralizar a categoria
-        if (!categoria.endsWith("S") && nomesUnicos.length > 1) {
-          categoria += "S"
-        }
-
-        if (!gruposSimplificados[categoria]) {
-          gruposSimplificados[categoria] = []
-        }
-        gruposSimplificados[categoria].push(produto)
-      }
-
-      return Object.keys(gruposSimplificados).join(" / ")
-    }
-
-    return categoriasResumidas.join(" / ")
   }
 
   // Modificar a função isNovoOrcamento para considerar o modo de visualização
@@ -1656,16 +1538,9 @@ export default function TabelaProdutos() {
                             {formatarData(produto.orcamentoData)}
                           </TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">
-                            <div>
-                              <span className="font-medium text-primary">
-                                {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
-                              </span>
-                              {isNovoOrcamento(index) && (
-                                <div className="text-xs text-gray-500 mt-0.5">
-                                  {obterProdutosDoOrcamento(produto.orcamentoId)}
-                                </div>
-                              )}
-                            </div>
+                            <span className="font-medium text-primary">
+                              {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
+                            </span>
                           </TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">{produto.produtoNome}</TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
