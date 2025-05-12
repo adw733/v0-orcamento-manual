@@ -45,7 +45,7 @@ export default function GeradorOrcamento() {
     condicoesPagamento: "45 DIAS FORA QUINZENA",
     prazoEntrega: "45 DIAS",
     validadeOrcamento: "15 DIAS",
-    status: "proposta", // Adicionar status padrão
+    status: "5", // Atualizar para o novo formato de status
     valorFrete: 0, // Inicializar o valor do frete
     nomeContato: "",
     telefoneContato: "",
@@ -113,6 +113,7 @@ export default function GeradorOrcamento() {
     }
   }
 
+  // Atualizar o status padrão para "5" (Proposta) ao criar um novo orçamento
   const criarNovoOrcamento = async () => {
     try {
       setIsLoading(true)
@@ -129,7 +130,7 @@ export default function GeradorOrcamento() {
         condicoesPagamento: "45 DIAS FORA QUINZENA",
         prazoEntrega: "45 DIAS",
         validadeOrcamento: "15 DIAS",
-        status: "proposta", // Adicionar status padrão
+        status: "5", // Atualizar para o novo formato de status
         valorFrete: 0,
         nomeContato: "",
         telefoneContato: "",

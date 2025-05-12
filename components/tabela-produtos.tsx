@@ -15,7 +15,7 @@ import {
   Filter,
   ChevronUp,
   ChevronDown,
-  Download,
+  Printer,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -42,10 +42,12 @@ export default function TabelaProdutos() {
   const [produtosFiltrados, setProdutosFiltrados] = useState<ProdutoOrcamento[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("execucao")
+  const [statusFilter, setStatusFilter] = useState<string>("4")
   const [error, setError] = useState<string | null>(null)
   const [exportandoPDF, setExportandoPDF] = useState(false)
+  const [imprimindo, setImprimindo] = useState(false)
   const tabelaRef = useRef<HTMLDivElement>(null)
+  const impressaoRef = useRef<HTMLDivElement>(null)
 
   // Estados para ordenação
   const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" | "desc" }>({
@@ -242,7 +244,11 @@ export default function TabelaProdutos() {
 
     // Filtrar por status
     if (statusFilter !== "todos") {
-      resultado = resultado.filter((produto) => produto.status === statusFilter)
+      resultado = resultado.filter((produto) => {
+        // Mapear status antigos para novos códigos numéricos
+        const statusMapeado = mapearStatusAntigo(produto.status || "")
+        return statusMapeado === statusFilter
+      })
     }
 
     // Ordenar os resultados com base no modo de visualização
@@ -365,10 +371,19 @@ export default function TabelaProdutos() {
 
   const getStatusClassName = (status: string) => {
     switch (status) {
+      case "5":
       case "proposta":
         return "bg-blue-100 text-blue-700 border-blue-300"
+      case "4":
       case "execucao":
         return "bg-amber-100 text-amber-700 border-amber-300"
+      case "3":
+      case "cobranca":
+        return "bg-red-100 text-red-700 border-red-300"
+      case "2":
+      case "entregue":
+        return "bg-purple-100 text-purple-700 border-purple-300"
+      case "1":
       case "finalizado":
         return "bg-green-100 text-green-700 border-green-300"
       default:
@@ -377,13 +392,131 @@ export default function TabelaProdutos() {
   }
 
   const formatarDescricaoPedido = (numeroCompleto: string, nomeContato?: string) => {
-    // Extrair apenas a parte relevante no formato "0145 - CAMISETA POLIMIX CONCRETO LTDA"
+    // Extrair as partes do formato "0129 - CAMISA SOCIAL MASCULINA MANGA LONGA MIZU CIMENTOS - WILLIAN"
     const partes = numeroCompleto.split(" - ")
     if (partes.length >= 2) {
+      const numero = partes[0] // "0129"
+
+      // Extrair a empresa do nome do produto (assumindo que são as últimas 2-3 palavras)
+      const produtoParts = partes[1].split(" ")
+      let empresa = ""
+
+      // Se o produto tem pelo menos 3 palavras, pegamos as últimas 2-3 como empresa
+      if (produtoParts.length >= 3) {
+        // Pegar as últimas 2 ou 3 palavras como empresa
+        const palavrasEmpresa = produtoParts.slice(-Math.min(3, Math.floor(produtoParts.length / 2)))
+        empresa = palavrasEmpresa.join(" ")
+      } else {
+        empresa = partes[1] // Se for curto, usar todo o texto
+      }
+
       // Adicionar o nome do contato se disponível
-      return nomeContato ? `${partes[0]} - ${partes[1]} - ${nomeContato}` : `${partes[0]} - ${partes[1]}`
+      return nomeContato ? `${numero} - ${empresa} - ${nomeContato}` : `${numero} - ${empresa}`
     }
     return numeroCompleto
+  }
+
+  // Função para obter todos os produtos de um orçamento específico
+  const obterProdutosDoOrcamento = (orcamentoId: string): string => {
+    const produtosDoOrcamento = produtos.filter((p) => p.orcamentoId === orcamentoId)
+    // Obter nomes únicos de produtos
+    const nomesUnicos = [...new Set(produtosDoOrcamento.map((p) => p.produtoNome))]
+    return nomesUnicos.join(" / ")
+  }
+
+  // Função para resumir inteligentemente os produtos de um orçamento
+  const resumirProdutosDoOrcamento = (orcamentoId: string): string => {
+    const produtosDoOrcamento = produtos.filter((p) => p.orcamentoId === orcamentoId)
+    // Obter nomes únicos de produtos
+    const nomesUnicos = [...new Set(produtosDoOrcamento.map((p) => p.produtoNome))]
+
+    // Se houver apenas um produto, retorná-lo diretamente
+    if (nomesUnicos.length === 1) {
+      return nomesUnicos[0]
+    }
+
+    // Dividir cada nome de produto em palavras
+    const produtosEmPalavras = nomesUnicos.map((nome) => nome.split(" "))
+
+    // Agrupar produtos por palavras-chave principais
+    const grupos: { [key: string]: string[] } = {}
+
+    for (const produto of nomesUnicos) {
+      // Extrair as duas primeiras palavras como possível categoria
+      const palavras = produto.split(" ")
+      let categoria = ""
+
+      // Tentar identificar a categoria principal do produto
+      if (palavras.length >= 2) {
+        // Se a primeira palavra for um tipo de vestuário, usá-la como base
+        const tiposVestuario = [
+          "CAMISA",
+          "CAMISETA",
+          "CALÇA",
+          "JAQUETA",
+          "COLETE",
+          "JALECO",
+          "MACACÃO",
+          "UNIFORME",
+          "BONÉ",
+          "CHAPÉU",
+          "AVENTAL",
+        ]
+
+        if (tiposVestuario.includes(palavras[0])) {
+          // Se a segunda palavra for um qualificador comum, incluí-la
+          const qualificadores = ["SOCIAL", "OPERACIONAL", "EXECUTIVA", "POLO", "BÁSICA", "TÉCNICA", "INDUSTRIAL"]
+          if (palavras.length > 1 && qualificadores.includes(palavras[1])) {
+            categoria = `${palavras[0]} ${palavras[1]}`
+          } else {
+            categoria = palavras[0]
+          }
+        } else {
+          // Caso não seja um tipo de vestuário reconhecido, usar as duas primeiras palavras
+          categoria = `${palavras[0]} ${palavras[1]}`
+        }
+      } else {
+        categoria = palavras[0]
+      }
+
+      // Pluralizar a categoria se necessário
+      if (!categoria.endsWith("S") && nomesUnicos.length > 1) {
+        categoria += "S"
+      }
+
+      if (!grupos[categoria]) {
+        grupos[categoria] = []
+      }
+      grupos[categoria].push(produto)
+    }
+
+    // Converter os grupos em texto
+    const categoriasResumidas = Object.keys(grupos)
+
+    // Se houver muitas categorias, tentar um agrupamento mais genérico
+    if (categoriasResumidas.length > 3) {
+      // Tentar agrupar apenas pela primeira palavra
+      const gruposSimplificados: { [key: string]: string[] } = {}
+
+      for (const produto of nomesUnicos) {
+        const primeiraPalavra = produto.split(" ")[0]
+        let categoria = primeiraPalavra
+
+        // Pluralizar a categoria
+        if (!categoria.endsWith("S") && nomesUnicos.length > 1) {
+          categoria += "S"
+        }
+
+        if (!gruposSimplificados[categoria]) {
+          gruposSimplificados[categoria] = []
+        }
+        gruposSimplificados[categoria].push(produto)
+      }
+
+      return Object.keys(gruposSimplificados).join(" / ")
+    }
+
+    return categoriasResumidas.join(" / ")
   }
 
   // Modificar a função isNovoOrcamento para considerar o modo de visualização
@@ -448,6 +581,415 @@ export default function TabelaProdutos() {
     pdf.line(margin, yPosition, margin + contentWidth, yPosition)
     pdf.setLineWidth(0.1) // Restaurar a espessura padrão
     pdf.setDrawColor(0, 0, 0) // Restaurar a cor padrão
+  }
+
+  // Função para mapear status antigos para novos códigos numéricos
+  const mapearStatusAntigo = (status: string): string => {
+    switch (status) {
+      case "proposta":
+        return "5"
+      case "execucao":
+        return "4"
+      case "cobranca":
+        return "3"
+      case "entregue":
+        return "2"
+      case "finalizado":
+        return "1"
+      default:
+        return status
+    }
+  }
+
+  // Função para criar o cabeçalho da tabela na impressão
+  const criarCabecalhoTabela = (modo: "orcamento" | "produto") => {
+    const headerRow = document.createElement("tr")
+    headerRow.className = "cabecalho-tabela"
+
+    if (modo === "orcamento") {
+      // Cabeçalho para modo orçamento
+      const headers = ["Produto", "Cor", "Tamanho", "Qtd", "Observação"]
+      const classes = ["coluna-produto", "coluna-cor", "coluna-tamanho", "coluna-qtd", "coluna-obs"]
+
+      headers.forEach((header, index) => {
+        const th = document.createElement("th")
+        th.textContent = header
+        th.className = classes[index]
+        headerRow.appendChild(th)
+      })
+    } else {
+      // Cabeçalho para modo produto
+      const headers = ["Produto", "Número e Contato", "Tamanho", "Cor", "Qtd", "Observação"]
+      const classes = ["coluna-produto", "coluna-numero", "coluna-tamanho", "coluna-cor", "coluna-qtd", "coluna-obs"]
+
+      headers.forEach((header, index) => {
+        const th = document.createElement("th")
+        th.textContent = header
+        th.className = classes[index]
+        headerRow.appendChild(th)
+      })
+    }
+
+    return headerRow
+  }
+
+  // Função para imprimir a tabela diretamente
+  const imprimirTabela = () => {
+    try {
+      setImprimindo(true)
+
+      // Criar um elemento temporário para a impressão
+      const conteudoImpressao = document.createElement("div")
+      conteudoImpressao.className = "conteudo-impressao"
+
+      // Adicionar estilos específicos para impressão
+      const estilosImpressao = document.createElement("style")
+      estilosImpressao.textContent = `
+        @page {
+          size: A4 portrait;
+          margin: 10mm;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          font-size: 9pt;
+          line-height: 1.2;
+        }
+        .conteudo-impressao {
+          width: 100%;
+          max-width: 190mm; /* A4 width - margins */
+        }
+        .titulo-impressao {
+          font-size: 14pt;
+          font-weight: bold;
+          margin-bottom: 5mm;
+          text-align: center;
+        }
+        .subtitulo-impressao {
+          font-size: 10pt;
+          margin-bottom: 3mm;
+          text-align: center;
+        }
+        .data-impressao {
+          font-size: 8pt;
+          margin-bottom: 5mm;
+          text-align: right;
+        }
+        .grupo-tabela {
+          margin-bottom: 10mm;
+          page-break-inside: avoid;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          page-break-inside: avoid;
+          margin-bottom: 5mm;
+        }
+        tr {
+          page-break-inside: avoid;
+          page-break-after: auto;
+        }
+        th, td {
+          border: 0.5pt solid #ddd;
+          padding: 2mm 1mm;
+          text-align: left;
+          font-size: 8pt;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
+        th {
+          background-color: #f0f0f0;
+          font-weight: bold;
+        }
+        .coluna-produto {
+          width: 25%;
+        }
+        .coluna-numero {
+          width: 15%;
+        }
+        .coluna-tamanho {
+          width: 10%;
+        }
+        .coluna-cor {
+          width: 10%;
+        }
+        .coluna-qtd {
+          width: 5%;
+          text-align: center;
+        }
+        .coluna-obs {
+          width: 35%; /* Aproximadamente 5cm */
+        }
+        .separador-grupo {
+          border-top: 4pt solid #666;
+          height: 4pt;
+        }
+        .separador-item {
+          border-top: 2pt solid #999;
+          height: 2pt;
+        }
+        .cabecalho-grupo {
+          background-color: #f5f5f5;
+          font-weight: bold;
+          font-size: 10pt;
+          padding: 3mm 2mm;
+          border: none;
+          text-align: left;
+          margin-bottom: 2mm;
+        }
+        .cabecalho-tabela {
+          background-color: #e0e0e0;
+        }
+        .linha-alternada {
+          background-color: #f9f9f9;
+        }
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .conteudo-impressao, .conteudo-impressao * {
+            visibility: visible;
+          }
+          .conteudo-impressao {
+            position: absolute;
+            left: 0;
+            top: 0;
+          }
+        }
+      `
+      document.head.appendChild(estilosImpressao)
+
+      // Adicionar título
+      const titulo = document.createElement("div")
+      titulo.className = "titulo-impressao"
+      titulo.textContent =
+        modoVisualizacao === "orcamento" ? "Tabela de Produtos por Orçamento" : "Tabela de Produtos Agrupados por Tipo"
+      conteudoImpressao.appendChild(titulo)
+
+      // Adicionar data de geração
+      const dataGeracao = document.createElement("div")
+      dataGeracao.className = "data-impressao"
+      dataGeracao.textContent = `Gerado em: ${new Date().toLocaleDateString("pt-BR")}`
+      conteudoImpressao.appendChild(dataGeracao)
+
+      // Agrupar produtos com base no modo de visualização
+      const agrupamentos: { [key: string]: ProdutoOrcamento[] } = {}
+
+      if (modoVisualizacao === "orcamento") {
+        // Agrupar por orçamento
+        produtosFiltrados.forEach((produto) => {
+          if (!agrupamentos[produto.orcamentoId]) {
+            agrupamentos[produto.orcamentoId] = []
+          }
+          agrupamentos[produto.orcamentoId].push(produto)
+        })
+      } else {
+        // Agrupar por tipo de produto
+        produtosFiltrados.forEach((produto) => {
+          if (!agrupamentos[produto.produtoNome]) {
+            agrupamentos[produto.produtoNome] = []
+          }
+          agrupamentos[produto.produtoNome].push(produto)
+        })
+      }
+
+      // Processar cada grupo
+      Object.keys(agrupamentos).forEach((chaveGrupo, grupoIndex) => {
+        const produtosDoGrupo = agrupamentos[chaveGrupo]
+        const primeiroItem = produtosDoGrupo[0]
+
+        // Criar um container para o grupo
+        const grupoContainer = document.createElement("div")
+        grupoContainer.className = "grupo-tabela"
+
+        // Adicionar cabeçalho do grupo
+        const cabecalhoGrupo = document.createElement("div")
+        cabecalhoGrupo.className = "cabecalho-grupo"
+
+        if (modoVisualizacao === "orcamento") {
+          cabecalhoGrupo.textContent = `Orçamento: ${formatarDescricaoPedido(primeiroItem.orcamentoNumero, primeiroItem.nomeContato)}`
+          cabecalhoGrupo.title = `Data: ${formatarData(primeiroItem.orcamentoData)} | Cliente: ${primeiroItem.clienteNome} | Contato: ${primeiroItem.nomeContato || "Não especificado"}`
+
+          // Adicionar informações adicionais
+          const infoAdicional = document.createElement("div")
+          infoAdicional.style.fontSize = "8pt"
+          infoAdicional.style.fontWeight = "normal"
+          infoAdicional.style.marginTop = "1mm"
+          infoAdicional.textContent = `Data: ${formatarData(primeiroItem.orcamentoData)} | Cliente: ${primeiroItem.clienteNome} | Contato: ${primeiroItem.nomeContato || "Não especificado"}`
+          cabecalhoGrupo.appendChild(infoAdicional)
+        } else {
+          cabecalhoGrupo.textContent = `Produto: ${chaveGrupo}`
+        }
+
+        grupoContainer.appendChild(cabecalhoGrupo)
+
+        // Criar tabela para este grupo
+        const tabela = document.createElement("table")
+
+        // Adicionar cabeçalho da tabela
+        const thead = document.createElement("thead")
+        thead.appendChild(criarCabecalhoTabela(modoVisualizacao))
+        tabela.appendChild(thead)
+
+        // Criar corpo da tabela
+        const tbody = document.createElement("tbody")
+
+        // Ordenar os produtos com base no modo
+        const produtosOrdenados = [...produtosDoGrupo]
+
+        if (modoVisualizacao === "orcamento") {
+          // Ordenar por nome do produto e depois por tamanho
+          produtosOrdenados.sort((a, b) => {
+            const comparacaoProduto = a.produtoNome.localeCompare(b.produtoNome)
+            if (comparacaoProduto !== 0) return comparacaoProduto
+            return ordenarTamanhos(a.tamanho, b.tamanho)
+          })
+        } else {
+          // Ordenar por número de orçamento e depois por tamanho
+          produtosOrdenados.sort((a, b) => {
+            const comparacaoOrcamento = a.orcamentoNumero.localeCompare(b.orcamentoNumero)
+            if (comparacaoOrcamento !== 0) return comparacaoOrcamento
+            return ordenarTamanhos(a.tamanho, b.tamanho)
+          })
+        }
+
+        let orcamentoAnterior = ""
+        let totalQuantidade = 0
+
+        // Adicionar linhas de produtos
+        produtosOrdenados.forEach((produto, index) => {
+          // Verificar se é um novo orçamento no modo produto
+          const isNovoOrcamentoNoProduto =
+            modoVisualizacao === "produto" && orcamentoAnterior !== "" && orcamentoAnterior !== produto.orcamentoId
+
+          // Se for um novo orçamento no modo produto, adicionar uma linha separadora antes
+          if (isNovoOrcamentoNoProduto) {
+            const separatorRow = document.createElement("tr")
+            separatorRow.className = "separador-item"
+            const separatorCell = document.createElement("td")
+            separatorCell.colSpan = modoVisualizacao === "orcamento" ? 5 : 6
+            separatorCell.style.padding = "0"
+            separatorCell.style.height = "6px"
+            separatorCell.style.backgroundColor = "#f0f0f0"
+            separatorCell.style.borderTop = "2pt solid #666"
+            separatorCell.style.borderBottom = "1pt solid #999"
+            separatorRow.appendChild(separatorCell)
+            tbody.appendChild(separatorRow)
+          }
+
+          // Adicionar linha para o produto
+          const row = document.createElement("tr")
+          row.className = index % 2 === 1 ? "linha-alternada" : ""
+
+          if (modoVisualizacao === "orcamento") {
+            // Células para modo orçamento
+            const cells = [
+              { text: produto.produtoNome, class: "coluna-produto" },
+              { text: produto.cor, class: "coluna-cor" },
+              { text: produto.tamanho, class: "coluna-tamanho" },
+              { text: produto.quantidade.toString(), class: "coluna-qtd" },
+              { text: "", class: "coluna-obs" },
+            ]
+
+            cells.forEach((cellInfo) => {
+              const td = document.createElement("td")
+              td.textContent = cellInfo.text
+              td.className = cellInfo.class
+              row.appendChild(td)
+            })
+          } else {
+            // Células para modo produto
+            const numeroEContato = produto.nomeContato
+              ? `${produto.orcamentoNumero.split(" - ")[0]} - ${produto.nomeContato}`
+              : produto.orcamentoNumero.split(" - ")[0]
+
+            const cells = [
+              { text: produto.produtoNome, class: "coluna-produto" },
+              { text: numeroEContato, class: "coluna-numero" },
+              { text: produto.tamanho, class: "coluna-tamanho" },
+              { text: produto.cor, class: "coluna-cor" },
+              { text: produto.quantidade.toString(), class: "coluna-qtd" },
+              { text: "", class: "coluna-obs" },
+            ]
+
+            cells.forEach((cellInfo) => {
+              const td = document.createElement("td")
+              td.textContent = cellInfo.text
+              td.className = cellInfo.class
+              row.appendChild(td)
+            })
+          }
+
+          tbody.appendChild(row)
+
+          // Somar a quantidade para o total
+          totalQuantidade += produto.quantidade
+
+          // Atualizar o orçamento anterior
+          orcamentoAnterior = produto.orcamentoId
+        })
+
+        // Adicionar linha de total
+        const totalRow = document.createElement("tr")
+        totalRow.style.fontWeight = "bold"
+        totalRow.style.backgroundColor = "#f0f0f0"
+
+        if (modoVisualizacao === "orcamento") {
+          const totalCell1 = document.createElement("td")
+          totalCell1.colSpan = 3
+          totalCell1.textContent = "Total"
+          totalCell1.style.textAlign = "right"
+          totalRow.appendChild(totalCell1)
+
+          const totalCell2 = document.createElement("td")
+          totalCell2.textContent = totalQuantidade.toString()
+          totalCell2.className = "coluna-qtd"
+          totalRow.appendChild(totalCell2)
+
+          const totalCell3 = document.createElement("td")
+          totalCell3.className = "coluna-obs"
+          totalRow.appendChild(totalCell3)
+        } else {
+          const totalCell1 = document.createElement("td")
+          totalCell1.colSpan = 4
+          totalCell1.textContent = "Total"
+          totalCell1.style.textAlign = "right"
+          totalRow.appendChild(totalCell1)
+
+          const totalCell2 = document.createElement("td")
+          totalCell2.textContent = totalQuantidade.toString()
+          totalCell2.className = "coluna-qtd"
+          totalRow.appendChild(totalCell2)
+
+          const totalCell3 = document.createElement("td")
+          totalCell3.className = "coluna-obs"
+          totalRow.appendChild(totalCell3)
+        }
+
+        tbody.appendChild(totalRow)
+
+        tabela.appendChild(tbody)
+        grupoContainer.appendChild(tabela)
+        conteudoImpressao.appendChild(grupoContainer)
+      })
+
+      // Adicionar o conteúdo ao DOM temporariamente
+      document.body.appendChild(conteudoImpressao)
+
+      // Imprimir
+      window.print()
+
+      // Remover elementos temporários após a impressão
+      setTimeout(() => {
+        document.body.removeChild(conteudoImpressao)
+        document.head.removeChild(estilosImpressao)
+        setImprimindo(false)
+      }, 1000)
+    } catch (error) {
+      console.error("Erro ao imprimir tabela:", error)
+      alert("Erro ao imprimir tabela. Tente novamente.")
+      setImprimindo(false)
+    }
   }
 
   // Modificar a função exportarParaPDF para suportar ambos os modos de visualização
@@ -638,9 +1180,46 @@ export default function TabelaProdutos() {
           })
         }
 
+        // Garantir que os produtos estejam ordenados corretamente para detectar mudanças de orçamento
+        if (modo === "produto") {
+          // Ordenar primeiro por nome do produto e depois por número de orçamento
+          produtosOrdenados.sort((a, b) => {
+            const comparacaoProduto = a.produtoNome.localeCompare(b.produtoNome)
+            if (comparacaoProduto !== 0) return comparacaoProduto
+            return a.orcamentoNumero.localeCompare(b.orcamentoNumero)
+          })
+        }
+
+        let orcamentoAnterior = ""
+        let totalQuantidade = 0
+
         for (let i = 0; i < produtosOrdenados.length; i++) {
           const produto = produtosOrdenados[i]
           const isUltimaLinha = i === produtosOrdenados.length - 1
+
+          // Verificar se é um novo orçamento no modo produto
+          if (modo === "produto" && orcamentoAnterior !== "" && orcamentoAnterior !== produto.orcamentoId) {
+            // Adicionar uma linha mais grossa para separar os orçamentos
+            // Primeiro uma linha de fundo cinza
+            pdf.setFillColor(240, 240, 240)
+            pdf.rect(margin, yPosition, contentWidth, 3, "F")
+
+            // Depois uma linha mais grossa e escura
+            pdf.setDrawColor(50, 50, 50) // Cor cinza mais escura para maior contraste
+            pdf.setLineWidth(1.5) // Linha muito mais grossa para garantir visibilidade
+            pdf.line(margin, yPosition, margin + contentWidth, yPosition)
+
+            // Adicionar uma segunda linha para reforçar
+            pdf.setLineWidth(0.8)
+            pdf.setDrawColor(100, 100, 100)
+            pdf.line(margin, yPosition + 2, margin + contentWidth, yPosition + 2)
+
+            // Restaurar configurações padrão
+            pdf.setLineWidth(0.1)
+            pdf.setDrawColor(0, 0, 0)
+
+            yPosition += 4 // Aumentar o espaço após a linha para melhor visualização
+          }
 
           // Desenhar linha alternada para melhor legibilidade
           if (i % 2 === 1) {
@@ -681,11 +1260,31 @@ export default function TabelaProdutos() {
             pdf.text(produto.quantidade.toString(), margin + 180, yPosition + 4)
           }
 
+          // Somar a quantidade para o total
+          totalQuantidade += produto.quantidade
+
           // Avançar para a próxima linha
           yPosition += 6
 
           // Se for a última linha, adicionar uma linha grossa no final
           if (isUltimaLinha) {
+            desenharLinhaGrossa(pdf, yPosition, margin, contentWidth)
+
+            // Adicionar linha de total
+            yPosition += 6
+
+            pdf.setFont("helvetica", "bold")
+            pdf.setFontSize(9)
+
+            if (modo === "orcamento") {
+              pdf.text("Total:", margin + 120, yPosition + 4)
+              pdf.text(totalQuantidade.toString(), margin + 145, yPosition + 4)
+            } else {
+              pdf.text("Total:", margin + 155, yPosition + 4)
+              pdf.text(totalQuantidade.toString(), margin + 180, yPosition + 4)
+            }
+
+            yPosition += 6
             desenharLinhaGrossa(pdf, yPosition, margin, contentWidth)
           }
 
@@ -696,6 +1295,9 @@ export default function TabelaProdutos() {
             yPosition = margin + 10
             desenharCabecalhoTabela()
           }
+
+          // Atualizar o orçamento anterior para a próxima iteração
+          orcamentoAnterior = produto.orcamentoId
         }
 
         // Adicionar espaço entre grupos
@@ -736,12 +1338,12 @@ export default function TabelaProdutos() {
           <Button
             variant="outline"
             size="sm"
-            onClick={exportarParaPDF}
-            disabled={exportandoPDF || produtosFiltrados.length === 0}
+            onClick={imprimirTabela}
+            disabled={imprimindo || produtosFiltrados.length === 0}
             className="flex items-center gap-1"
           >
-            {exportandoPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {exportandoPDF ? "Exportando..." : "Exportar para PDF"}
+            {imprimindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+            {imprimindo ? "Imprimindo..." : "Imprimir Tabela"}
           </Button>
           <div className="border-l border-gray-200 h-8 mx-2"></div>
           <div className="flex items-center gap-2">
@@ -800,9 +1402,11 @@ export default function TabelaProdutos() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
-              <SelectItem value="proposta">Proposta</SelectItem>
-              <SelectItem value="execucao">Em Execução</SelectItem>
-              <SelectItem value="finalizado">Finalizado</SelectItem>
+              <SelectItem value="5">5 - Proposta</SelectItem>
+              <SelectItem value="4">4 - Execução</SelectItem>
+              <SelectItem value="3">3 - Emitir Cobrança</SelectItem>
+              <SelectItem value="2">2 - Entregue</SelectItem>
+              <SelectItem value="1">1 - Finalizada</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -905,9 +1509,7 @@ export default function TabelaProdutos() {
                           ))}
                       </div>
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      <div className="flex items-center">Status</div>
-                    </TableHead>
+
                     <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
                       <div className="flex items-center">Observação</div>
                     </TableHead>
@@ -1054,27 +1656,22 @@ export default function TabelaProdutos() {
                             {formatarData(produto.orcamentoData)}
                           </TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">
-                            <span className="font-medium text-primary">
-                              {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
-                            </span>
+                            <div>
+                              <span className="font-medium text-primary">
+                                {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
+                              </span>
+                              {isNovoOrcamento(index) && (
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {obterProdutosDoOrcamento(produto.orcamentoId)}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">{produto.produtoNome}</TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">{produto.tamanho}</TableCell>
                           <TableCell className="px-4 py-0.5 align-middle font-medium">{produto.quantidade}</TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle">
-                            <span
-                              className={`text-xs font-medium px-1.5 py-0.5 rounded-full border ${getStatusClassName(produto.status)}`}
-                            >
-                              {produto.status === "proposta"
-                                ? "Proposta"
-                                : produto.status === "execucao"
-                                  ? "Em Execução"
-                                  : produto.status === "finalizado"
-                                    ? "Finalizado"
-                                    : produto.status}
-                            </span>
-                          </TableCell>
+
                           <TableCell className="px-4 py-0.5 align-middle min-w-[150px] h-[30px]">
                             {/* Célula em branco para anotações manuais */}
                           </TableCell>
@@ -1083,15 +1680,7 @@ export default function TabelaProdutos() {
                         // Células para modo produto
                         <>
                           <TableCell className="px-4 py-0.5 align-middle">
-                            <span
-                              className={
-                                index === 0 || produto.produtoNome !== produtosFiltrados[index - 1].produtoNome
-                                  ? "font-medium text-primary"
-                                  : ""
-                              }
-                            >
-                              {produto.produtoNome}
-                            </span>
+                            <span className="font-medium">{produto.produtoNome}</span>
                           </TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">
                             {produto.orcamentoNumero.split(" - ")[0] || produto.orcamentoNumero}
@@ -1115,6 +1704,9 @@ export default function TabelaProdutos() {
           </Table>
         </div>
       </div>
+
+      {/* Div oculta para impressão */}
+      <div ref={impressaoRef} className="hidden"></div>
     </div>
   )
 }

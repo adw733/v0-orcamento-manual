@@ -39,7 +39,7 @@ export default function ListaOrcamentos({
   const [orcamentos, setOrcamentos] = useState<Partial<Orcamento>[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("execucao")
+  const [statusFilter, setStatusFilter] = useState<string>("4")
   const [error, setError] = useState<string | null>(null)
 
   // Estados para ordenação
@@ -144,7 +144,7 @@ export default function ListaOrcamentos({
           itens: Array.isArray(itensParseados) ? itensParseados : [],
           created_at: orcamento.created_at,
           updated_at: orcamento.updated_at,
-          status: orcamento.status || "proposta", // Definir "proposta" como padrão se não houver status
+          status: orcamento.status ? mapearStatusAntigo(orcamento.status) : "5", // Converter status antigos e definir "5" (Proposta) como padrão
           valorFrete: valorFrete, // Adicionar o valor do frete
           nomeContato: nomeContato, // Adicionar o nome do contato
           telefoneContato: telefoneContato, // Adicionar o telefone do contato
@@ -227,7 +227,11 @@ export default function ListaOrcamentos({
 
     // Filtrar por status
     if (statusFilter !== "todos") {
-      resultado = resultado.filter((orcamento) => orcamento.status === statusFilter)
+      resultado = resultado.filter((orcamento) => {
+        // Mapear status antigos para novos códigos numéricos
+        const statusMapeado = mapearStatusAntigo(orcamento.status || "")
+        return statusMapeado === statusFilter
+      })
     }
 
     // Ordenar os resultados
@@ -279,16 +283,40 @@ export default function ListaOrcamentos({
     return data.toLocaleDateString("pt-BR")
   }
 
+  // Modificar a função getStatusClassName para incluir os novos status
   const getStatusClassName = (status: string) => {
     switch (status) {
+      case "5":
       case "proposta":
         return "bg-blue-100 text-blue-700 border-blue-300"
+      case "4":
       case "execucao":
         return "bg-amber-100 text-amber-700 border-amber-300"
+      case "1":
       case "finalizado":
         return "bg-green-100 text-green-700 border-green-300"
+      case "2":
+      case "entregue":
+        return "bg-purple-100 text-purple-700 border-purple-300"
+      case "3":
+      case "cobranca":
+        return "bg-red-100 text-red-700 border-red-300"
       default:
         return "bg-gray-100 text-gray-700 border-gray-300"
+    }
+  }
+
+  // Função para mapear status antigos para novos códigos numéricos
+  const mapearStatusAntigo = (status: string): string => {
+    switch (status) {
+      case "proposta":
+        return "5"
+      case "execucao":
+        return "4"
+      case "finalizado":
+        return "1"
+      default:
+        return status
     }
   }
 
@@ -297,6 +325,136 @@ export default function ListaOrcamentos({
     // Extrair apenas os dígitos numéricos do início da string
     const match = numeroCompleto.match(/^\d+/)
     return match ? match[0] : numeroCompleto
+  }
+
+  const formatarDescricaoPedido = (numeroCompleto: string, nomeContato?: string) => {
+    // Extrair as partes do formato "0129 - CAMISA SOCIAL MASCULINA MANGA LONGA MIZU CIMENTOS - WILLIAN"
+    const partes = numeroCompleto.split(" - ")
+    if (partes.length >= 2) {
+      const numero = partes[0] // "0129"
+
+      // Extrair a empresa do nome do produto (assumindo que são as últimas 2-3 palavras)
+      const produtoParts = partes[1].split(" ")
+      let empresa = ""
+
+      // Se o produto tem pelo menos 3 palavras, pegamos as últimas 2-3 como empresa
+      if (produtoParts.length >= 3) {
+        // Pegar as últimas 2 ou 3 palavras como empresa
+        const palavrasEmpresa = produtoParts.slice(-Math.min(3, Math.floor(produtoParts.length / 2)))
+        empresa = palavrasEmpresa.join(" ")
+      } else {
+        empresa = partes[1] // Se for curto, usar todo o texto
+      }
+
+      // Adicionar o nome do contato se disponível
+      return nomeContato ? `${numero} - ${empresa} - ${nomeContato}` : `${numero} - ${empresa}`
+    }
+    return numeroCompleto
+  }
+
+  // Função para resumir inteligentemente os produtos de um orçamento
+  const resumirProdutosDoOrcamento = (orcamento: Partial<Orcamento>): string => {
+    if (!orcamento.itens || !Array.isArray(orcamento.itens)) return ""
+
+    // Obter nomes únicos de produtos
+    const nomesUnicos = [
+      ...new Set(
+        orcamento.itens.map((item) => {
+          // Tentar obter o nome do produto do item
+          return item.produtoNome || ""
+        }),
+      ).filter((nome) => nome !== ""),
+    ]
+
+    // Se houver apenas um produto, retorná-lo diretamente
+    if (nomesUnicos.length === 1) {
+      return nomesUnicos[0]
+    }
+
+    // Se não houver produtos, retornar string vazia
+    if (nomesUnicos.length === 0) {
+      return ""
+    }
+
+    // Agrupar produtos por palavras-chave principais
+    const grupos: { [key: string]: string[] } = {}
+
+    for (const produto of nomesUnicos) {
+      // Extrair as duas primeiras palavras como possível categoria
+      const palavras = produto.split(" ")
+      let categoria = ""
+
+      // Tentar identificar a categoria principal do produto
+      if (palavras.length >= 2) {
+        // Se a primeira palavra for um tipo de vestuário, usá-la como base
+        const tiposVestuario = [
+          "CAMISA",
+          "CAMISETA",
+          "CALÇA",
+          "JAQUETA",
+          "COLETE",
+          "JALECO",
+          "MACACÃO",
+          "UNIFORME",
+          "BONÉ",
+          "CHAPÉU",
+          "AVENTAL",
+        ]
+
+        if (tiposVestuario.includes(palavras[0])) {
+          // Se a segunda palavra for um qualificador comum, incluí-la
+          const qualificadores = ["SOCIAL", "OPERACIONAL", "EXECUTIVA", "POLO", "BÁSICA", "TÉCNICA", "INDUSTRIAL"]
+          if (palavras.length > 1 && qualificadores.includes(palavras[1])) {
+            categoria = `${palavras[0]} ${palavras[1]}`
+          } else {
+            categoria = palavras[0]
+          }
+        } else {
+          // Caso não seja um tipo de vestuário reconhecido, usar as duas primeiras palavras
+          categoria = `${palavras[0]} ${palavras[1]}`
+        }
+      } else {
+        categoria = palavras[0]
+      }
+
+      // Pluralizar a categoria se necessário
+      if (!categoria.endsWith("S") && nomesUnicos.length > 1) {
+        categoria += "S"
+      }
+
+      if (!grupos[categoria]) {
+        grupos[categoria] = []
+      }
+      grupos[categoria].push(produto)
+    }
+
+    // Converter os grupos em texto
+    const categoriasResumidas = Object.keys(grupos)
+
+    // Se houver muitas categorias, tentar um agrupamento mais genérico
+    if (categoriasResumidas.length > 3) {
+      // Tentar agrupar apenas pela primeira palavra
+      const gruposSimplificados: { [key: string]: string[] } = {}
+
+      for (const produto of nomesUnicos) {
+        const primeiraPalavra = produto.split(" ")[0]
+        let categoria = primeiraPalavra
+
+        // Pluralizar a categoria
+        if (!categoria.endsWith("S") && nomesUnicos.length > 1) {
+          categoria += "S"
+        }
+
+        if (!gruposSimplificados[categoria]) {
+          gruposSimplificados[categoria] = []
+        }
+        gruposSimplificados[categoria].push(produto)
+      }
+
+      return Object.keys(gruposSimplificados).join(" / ")
+    }
+
+    return categoriasResumidas.join(" / ")
   }
 
   return (
@@ -338,6 +496,7 @@ export default function ListaOrcamentos({
         </Button>
       </div>
 
+      {/* Modificar os botões de filtro de status */}
       <div className="flex flex-wrap gap-2 mb-4">
         <Button
           variant={statusFilter === "todos" ? "default" : "outline"}
@@ -348,38 +507,64 @@ export default function ListaOrcamentos({
           Todos
         </Button>
         <Button
-          variant={statusFilter === "proposta" ? "default" : "outline"}
+          variant={statusFilter === "5" || statusFilter === "proposta" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("proposta")}
+          onClick={() => setStatusFilter("5")}
           className={
-            statusFilter === "proposta" ? "bg-blue-500 text-white" : "text-blue-500 border-blue-500 hover:bg-blue-50"
+            statusFilter === "5" || statusFilter === "proposta"
+              ? "bg-blue-500 text-white"
+              : "text-blue-500 border-blue-500 hover:bg-blue-50"
           }
         >
-          Proposta
+          5 - Proposta
         </Button>
         <Button
-          variant={statusFilter === "execucao" ? "default" : "outline"}
+          variant={statusFilter === "4" || statusFilter === "execucao" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("execucao")}
+          onClick={() => setStatusFilter("4")}
           className={
-            statusFilter === "execucao"
+            statusFilter === "4" || statusFilter === "execucao"
               ? "bg-amber-500 text-white"
               : "text-amber-500 border-amber-500 hover:bg-amber-50"
           }
         >
-          Em Execução
+          4 - Execução
         </Button>
         <Button
-          variant={statusFilter === "finalizado" ? "default" : "outline"}
+          variant={statusFilter === "3" || statusFilter === "cobranca" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter("finalizado")}
+          onClick={() => setStatusFilter("3")}
           className={
-            statusFilter === "finalizado"
+            statusFilter === "3" || statusFilter === "cobranca"
+              ? "bg-red-500 text-white"
+              : "text-red-500 border-red-500 hover:bg-red-50"
+          }
+        >
+          3 - Emitir Cobrança
+        </Button>
+        <Button
+          variant={statusFilter === "2" || statusFilter === "entregue" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setStatusFilter("2")}
+          className={
+            statusFilter === "2" || statusFilter === "entregue"
+              ? "bg-purple-500 text-white"
+              : "text-purple-500 border-purple-500 hover:bg-purple-50"
+          }
+        >
+          2 - Entregue
+        </Button>
+        <Button
+          variant={statusFilter === "1" || statusFilter === "finalizado" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setStatusFilter("1")}
+          className={
+            statusFilter === "1" || statusFilter === "finalizado"
               ? "bg-green-500 text-white"
               : "text-green-500 border-green-500 hover:bg-green-50"
           }
         >
-          Finalizado
+          1 - Finalizada
         </Button>
       </div>
 
@@ -499,6 +684,7 @@ export default function ListaOrcamentos({
                         {orcamento.cliente?.nome?.toUpperCase() || "SEM EMPRESA"}
                         {orcamento.nomeContato ? ` - ${orcamento.nomeContato.toUpperCase()}` : ""}
                       </span>
+                      <div className="text-xs text-gray-500 mt-0.5">{resumirProdutosDoOrcamento(orcamento)}</div>
                     </TableCell>
                     <TableCell className="px-4 py-3 align-middle">
                       <div className="flex items-center gap-1">
@@ -526,14 +712,17 @@ export default function ListaOrcamentos({
                       <span className="font-medium">R$ {calcularTotal(orcamento).toFixed(2)}</span>
                     </TableCell>
                     <TableCell className="px-4 py-3 align-middle">
+                      {/* Modificar o select de status na tabela */}
                       <select
-                        value={orcamento.status || "proposta"}
+                        value={orcamento.status || "5"}
                         onChange={(e) => atualizarStatusOrcamento(orcamento.id!, e.target.value)}
-                        className={`text-xs font-medium px-2 py-1 rounded-full border ${getStatusClassName(orcamento.status || "proposta")}`}
+                        className={`text-xs font-medium px-2 py-1 rounded-full border ${getStatusClassName(orcamento.status || "5")}`}
                       >
-                        <option value="proposta">Proposta</option>
-                        <option value="execucao">Em Execução</option>
-                        <option value="finalizado">Finalizado</option>
+                        <option value="5">5 - Proposta</option>
+                        <option value="4">4 - Execução</option>
+                        <option value="3">3 - Emitir Cobrança</option>
+                        <option value="2">2 - Entregue</option>
+                        <option value="1">1 - Finalizada</option>
                       </select>
                     </TableCell>
                     <TableCell className="px-4 py-3 align-middle">
