@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, Save, Check, AlertCircle, FileDown, Copy } from "lucide-react"
+import { Printer, Save, Check, AlertCircle, FileDown, Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset } from "@/components/ui/sidebar"
@@ -35,7 +35,7 @@ const generateUUID = () => {
   })
 }
 
-export default function GeradorOrcamento() {
+export function GeradorOrcamento() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [orcamento, setOrcamento] = useState<Orcamento>({
@@ -53,9 +53,7 @@ export default function GeradorOrcamento() {
     telefoneContato: "",
   })
   const [isPrinting, setIsPrinting] = useState(false)
-  const [abaAtiva, setAbaAtiva] = useState<string>(
-    window.location.hash ? window.location.hash.substring(1) : "orcamento",
-  )
+  const [abaAtiva, setAbaAtiva] = useState<string>("orcamento")
   const [isLoading, setIsLoading] = useState(false)
   const [orcamentoSalvo, setOrcamentoSalvo] = useState<string | null>(null)
   // Adicionar um novo estado para controlar se estamos criando um novo orçamento
@@ -188,6 +186,12 @@ export default function GeradorOrcamento() {
   // Iniciar sempre com um orçamento vazio ao carregar a página
   useEffect(() => {
     criarNovoOrcamento()
+
+    // Get hash from URL if available
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash ? window.location.hash.substring(1) : "orcamento"
+      setAbaAtiva(hash)
+    }
   }, [])
 
   // Initialize with mock data if empty
@@ -481,8 +485,8 @@ export default function GeradorOrcamento() {
     .tamanhos-container {
       max-height: none !important;
       overflow: visible !important;
-      display: flex !important;
-      flex-wrap: wrap !important;
+      display: flex;
+      flex-wrap: wrap;
     }
     
     .tamanho-texto {
@@ -1482,8 +1486,8 @@ export default function GeradorOrcamento() {
                     disabled={isLoading || !orcamento.cliente}
                     className="flex items-center gap-2 bg-secondary hover:bg-secondary-dark text-white transition-all shadow-sm"
                   >
-                    {orcamentoSalvo ? <Copy className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-                    {isLoading ? "Processando..." : orcamentoSalvo ? "Copiar Orçamento" : "Salvar"}
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    {orcamentoSalvo ? "Copiar Orçamento" : "Salvar"}
                   </Button>
 
                   {orcamentoSalvo && (
@@ -1683,29 +1687,17 @@ export default function GeradorOrcamento() {
                 )
             }
           })()}
-
-          {abaAtiva !== "lixeira" && abaAtiva !== "produtos-tabela" && (
-            <div className="text-center p-8 bg-white rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold mb-2">
-                Selecione "Lixeira" ou "Tabela de Produtos" no menu lateral
-              </h2>
-              <p className="text-gray-500">
-                Para testar a funcionalidade da lixeira ou da tabela de produtos, clique na opção correspondente no menu
-                lateral.
-              </p>
-            </div>
-          )}
         </div>
-        <AssistenteIA
-          clientes={clientes}
-          produtos={produtos}
-          orcamento={orcamento}
-          setClientes={setClientes}
-          setProdutos={setProdutos}
-          setOrcamento={setOrcamento}
-          setAbaAtiva={setAbaAtiva}
-        />
       </SidebarInset>
+      <AssistenteIA
+        clientes={clientes}
+        produtos={produtos}
+        orcamento={orcamento}
+        setClientes={setClientes}
+        setProdutos={setProdutos}
+        setOrcamento={setOrcamento}
+        setAbaAtiva={setAbaAtiva}
+      />
     </div>
   )
 }
