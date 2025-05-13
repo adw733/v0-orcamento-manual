@@ -391,69 +391,11 @@ export default function TabelaProdutos() {
     }
   }
 
-  const formatarDescricaoPedido = (numeroCompleto: string, nomeContato?: string) => {
-    // Extrair apenas a parte relevante no formato "0145 - CAMISETA POLIMIX CONCRETO LTDA"
-    const partes = numeroCompleto.split(" - ")
-    if (partes.length >= 2) {
-      // Adicionar o nome do contato se disponível
-      return nomeContato ? `${partes[0]} - ${partes[1]} - ${nomeContato}` : `${partes[0]} - ${partes[1]}`
+  const formatarDescricaoPedido = (descricao: string, nomeContato?: string) => {
+    if (nomeContato) {
+      return `${descricao} - ${nomeContato}`
     }
-    return numeroCompleto
-  }
-
-  // Modificar a função isNovoOrcamento para considerar o modo de visualização
-  const isNovoOrcamento = (index: number) => {
-    if (index === 0) return true
-
-    if (modoVisualizacao === "orcamento") {
-      const orcamentoAtual = produtosFiltrados[index].orcamentoId
-      const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
-      return orcamentoAtual !== orcamentoAnterior
-    } else {
-      const produtoAtual = produtosFiltrados[index].produtoNome
-      const produtoAnterior = produtosFiltrados[index - 1].produtoNome
-      return produtoAtual !== produtoAnterior
-    }
-  }
-
-  // Modificar a função isNovoProduto para considerar o modo de visualização
-  const isNovoProduto = (index: number) => {
-    if (index === 0) return true
-
-    if (modoVisualizacao === "orcamento") {
-      const produtoAtual = produtosFiltrados[index].produtoNome
-      const produtoAnterior = produtosFiltrados[index - 1].produtoNome
-      const orcamentoAtual = produtosFiltrados[index].orcamentoId
-      const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
-
-      // Se for um novo orçamento, não é considerado um novo produto para separação
-      if (orcamentoAtual !== orcamentoAnterior) return false
-
-      // Se for o mesmo orçamento mas produto diferente, retorna true
-      return produtoAtual !== produtoAnterior
-    } else {
-      // No modo produto, consideramos um novo produto quando muda o orçamento
-      const produtoAtual = produtosFiltrados[index].produtoNome
-      const produtoAnterior = produtosFiltrados[index - 1].produtoNome
-
-      // Se o produto mudou, não é considerado um novo produto para separação (já terá uma separação maior)
-      if (produtoAtual !== produtoAnterior) return false
-
-      // Se for o mesmo produto mas orçamento diferente, retorna true
-      const orcamentoAtual = produtosFiltrados[index].orcamentoId
-      const orcamentoAnterior = produtosFiltrados[index - 1].orcamentoId
-      return orcamentoAtual !== orcamentoAnterior
-    }
-  }
-
-  // Adicionar função para verificar se o produto é o primeiro de um novo tipo na lista filtrada
-  const isNovoProdutoTipo = (index: number) => {
-    if (index === 0) return true
-
-    const produtoAtual = produtosFiltrados[index].produtoNome
-    const produtoAnterior = produtosFiltrados[index - 1].produtoNome
-
-    return produtoAtual !== produtoAnterior
+    return descricao
   }
 
   // Função para desenhar uma linha grossa no PDF
@@ -1209,6 +1151,16 @@ export default function TabelaProdutos() {
     }
   }
 
+  const isNovoOrcamento = (index: number): boolean => {
+    if (index === 0) return true
+    return produtosFiltrados[index].orcamentoId !== produtosFiltrados[index - 1].orcamentoId
+  }
+
+  const isNovoProduto = (index: number): boolean => {
+    if (index === 0) return true
+    return produtosFiltrados[index].produtoNome !== produtosFiltrados[index - 1].produtoNome
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1538,9 +1490,11 @@ export default function TabelaProdutos() {
                             {formatarData(produto.orcamentoData)}
                           </TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">
-                            <span className="font-medium text-primary">
-                              {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
-                            </span>
+                            <div>
+                              <span className="font-medium text-primary">
+                                {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
+                              </span>
+                            </div>
                           </TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">{produto.produtoNome}</TableCell>
                           <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>

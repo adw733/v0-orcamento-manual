@@ -327,6 +327,113 @@ export default function ListaOrcamentos({
     return match ? match[0] : numeroCompleto
   }
 
+  const formatarDescricaoPedido = (numeroCompleto: string, nomeContato?: string) => {
+    // Extrair as partes do formato "0129 - CAMISA SOCIAL MASCULINA MANGA LONGA MIZU CIMENTOS - WILLIAN"
+    const partes = numeroCompleto.split(" - ")
+    if (partes.length >= 2) {
+      const numero = partes[0] // "0129"
+
+      // Extrair a empresa do nome do produto (assumindo que são as últimas 2-3 palavras)
+      const produtoParts = partes[1].split(" ")
+      let empresa = ""
+
+      // Se o produto tem pelo menos 3 palavras, pegamos as últimas 2-3 como empresa
+      if (produtoParts.length >= 3) {
+        // Pegar as últimas 2 ou 3 palavras como empresa
+        const palavrasEmpresa = produtoParts.slice(-Math.min(3, Math.floor(produtoParts.length / 2)))
+        empresa = palavrasEmpresa.join(" ")
+      } else {
+        empresa = partes[1] // Se for curto, usar todo o texto
+      }
+
+      // Adicionar o nome do contato se disponível
+      return nomeContato ? `${numero} - ${empresa} - ${nomeContato}` : `${numero} - ${empresa}`
+    }
+    return numeroCompleto
+  }
+
+  // Função simplificada para resumir produtos sem pluralização e sem quantidades
+  const resumirProdutosDoOrcamento = (orcamento: Partial<Orcamento>): string => {
+    if (!orcamento.itens || !Array.isArray(orcamento.itens) || orcamento.itens.length === 0) return ""
+
+    // Extrair apenas as categorias principais dos produtos
+    const categoriasProdutos = new Set<string>()
+
+    orcamento.itens.forEach((item) => {
+      // Obter o nome do produto de qualquer fonte disponível
+      let nomeProduto = ""
+      if (item.produtoNome) {
+        nomeProduto = item.produtoNome
+      } else if (item.descricao) {
+        const partes = item.descricao.split(" - ")
+        if (partes.length >= 2) {
+          nomeProduto = partes[1]
+        } else {
+          nomeProduto = item.descricao
+        }
+      } else if (item.produto && typeof item.produto === "object" && item.produto.nome) {
+        nomeProduto = item.produto.nome
+      }
+
+      if (!nomeProduto) return
+
+      // Extrair apenas a categoria principal (primeira ou duas primeiras palavras)
+      const palavras = nomeProduto.split(" ")
+      let categoria = ""
+
+      // Lista de tipos de vestuário comuns
+      const tiposVestuario = [
+        "CAMISA",
+        "CAMISETA",
+        "CALÇA",
+        "JAQUETA",
+        "COLETE",
+        "JALECO",
+        "MACACÃO",
+        "UNIFORME",
+        "BONÉ",
+        "CHAPÉU",
+        "AVENTAL",
+      ]
+
+      // Se a primeira palavra for um tipo de vestuário conhecido
+      if (palavras.length > 0 && tiposVestuario.includes(palavras[0])) {
+        // Qualificadores comuns que podem ser incluídos
+        const qualificadores = ["SOCIAL", "POLO", "OPERACIONAL", "EXECUTIVA"]
+
+        if (palavras.length > 1 && qualificadores.includes(palavras[1])) {
+          // Se a segunda palavra for um qualificador importante, incluí-la
+          categoria = `${palavras[0]} ${palavras[1]}`
+        } else {
+          // Caso contrário, usar apenas o tipo de vestuário
+          categoria = palavras[0]
+        }
+      } else if (palavras.length > 0) {
+        // Para outros tipos de produtos, usar apenas a primeira palavra
+        categoria = palavras[0]
+      }
+
+      // Adicionar a categoria ao conjunto (sem pluralização)
+      if (categoria) {
+        categoriasProdutos.add(categoria)
+      }
+    })
+
+    // Se não encontrou categorias
+    if (categoriasProdutos.size === 0) return ""
+
+    // Converter o conjunto em array e limitar a 5 categorias para não ficar muito longo
+    const categoriasArray = Array.from(categoriasProdutos).slice(0, 5)
+
+    // Se houver mais categorias além das 5 principais
+    if (categoriasProdutos.size > 5) {
+      categoriasArray.push("OUTROS")
+    }
+
+    // Juntar as categorias com " / "
+    return categoriasArray.join(" / ")
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -554,6 +661,7 @@ export default function ListaOrcamentos({
                         {orcamento.cliente?.nome?.toUpperCase() || "SEM EMPRESA"}
                         {orcamento.nomeContato ? ` - ${orcamento.nomeContato.toUpperCase()}` : ""}
                       </span>
+                      <div className="text-xs text-gray-500 mt-0.5">{resumirProdutosDoOrcamento(orcamento)}</div>
                     </TableCell>
                     <TableCell className="px-4 py-3 align-middle">
                       <div className="flex items-center gap-1">
