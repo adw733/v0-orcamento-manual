@@ -662,7 +662,7 @@ export default function FormularioOrcamento({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
           <Label htmlFor="numero" className="text-primary mb-1.5">
             Número do Orçamento
@@ -701,6 +701,23 @@ export default function FormularioOrcamento({
             onChange={(e) => atualizarOrcamento({ data: e.target.value })}
             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
           />
+        </div>
+        <div>
+          <Label htmlFor="status" className="text-primary mb-1.5">
+            Status
+          </Label>
+          <Select value={orcamento.status || "5"} onValueChange={(value) => atualizarOrcamento({ status: value })}>
+            <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+              <SelectValue placeholder="Selecione o status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5 - Proposta</SelectItem>
+              <SelectItem value="4">4 - Execução</SelectItem>
+              <SelectItem value="3">3 - Emitir Cobrança</SelectItem>
+              <SelectItem value="2">2 - Entregue</SelectItem>
+              <SelectItem value="1">1 - Finalizada</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

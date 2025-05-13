@@ -43,9 +43,9 @@ export default function ListaOrcamentos({
   const [error, setError] = useState<string | null>(null)
 
   // Estados para ordenação
-  const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" }>({
+  const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" | "desc" }>({
     campo: "numero",
-    direcao: "asc",
+    direcao: "desc",
   })
 
   // Expor a função de recarregar para o componente pai
@@ -67,7 +67,8 @@ export default function ListaOrcamentos({
       const { data, error } = await supabase
         .from("orcamentos")
         .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens, created_at, updated_at, status")
-        .order("numero", { ascending: true })
+        .is("deleted_at", null) // Adicionar esta linha para filtrar orçamentos excluídos
+        .order("numero", { ascending: false })
 
       if (error) {
         console.error("Erro ao carregar orçamentos:", error)
@@ -240,8 +241,9 @@ export default function ListaOrcamentos({
 
       switch (ordenacao.campo) {
         case "numero":
-          valorA = a.numero || ""
-          valorB = b.numero || ""
+          // Extrair apenas os números para comparação numérica
+          valorA = Number.parseInt(extrairNumeroOrcamento(a.numero || "0"), 10) || 0
+          valorB = Number.parseInt(extrairNumeroOrcamento(b.numero || "0"), 10) || 0
           break
         case "data":
           valorA = a.data || ""
@@ -265,9 +267,16 @@ export default function ListaOrcamentos({
           valorB = b.created_at || ""
       }
 
-      if (typeof valorA === "string" && typeof valorB === "string") {
+      if (ordenacao.campo === "numero" || ordenacao.campo === "valor") {
+        // Comparação numérica
+        return ordenacao.direcao === "asc"
+          ? (valorA as number) - (valorB as number)
+          : (valorB as number) - (valorA as number)
+      } else if (typeof valorA === "string" && typeof valorB === "string") {
+        // Comparação de strings
         return ordenacao.direcao === "asc" ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA)
       } else {
+        // Fallback para outros tipos
         return ordenacao.direcao === "asc"
           ? (valorA as number) - (valorB as number)
           : (valorB as number) - (valorA as number)

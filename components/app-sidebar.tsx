@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { FileText, Users, ShoppingBag, Save, PlusCircle, Layers, Building, Database } from "lucide-react"
+import { FileText, Users, ShoppingBag, Save, PlusCircle, Trash2, Table } from "lucide-react"
 
 interface AppSidebarProps {
   abaAtiva: string
@@ -11,9 +11,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ abaAtiva, setAbaAtiva, criandoNovoOrcamento, criarNovoOrcamento }: AppSidebarProps) {
-  // Efeito para atualizar a URL quando a aba ativa mudar
   useEffect(() => {
-    // Atualizar a URL sem recarregar a página
     window.history.pushState({}, "", `#${abaAtiva}`)
   }, [abaAtiva])
 
@@ -81,16 +79,6 @@ export function AppSidebar({ abaAtiva, setAbaAtiva, criandoNovoOrcamento, criarN
               <Save className="h-5 w-5 mr-3" />
               <span>Orçamentos Salvos</span>
             </button>
-
-            <button
-              onClick={() => setAbaAtiva("produtos-tabela")}
-              className={`w-full flex items-center px-3 py-2.5 text-sm rounded-md transition-colors ${
-                abaAtiva === "produtos-tabela" ? "bg-primary text-white font-medium" : "text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              <Database className="h-5 w-5 mr-3" />
-              <span>Tabela de Produtos</span>
-            </button>
           </div>
         </div>
 
@@ -118,23 +106,23 @@ export function AppSidebar({ abaAtiva, setAbaAtiva, criandoNovoOrcamento, criarN
             </button>
 
             <button
-              onClick={() => setAbaAtiva("materiais")}
+              onClick={() => setAbaAtiva("produtos-tabela")}
               className={`w-full flex items-center px-3 py-2.5 text-sm rounded-md transition-colors ${
-                abaAtiva === "materiais" ? "bg-primary text-white font-medium" : "text-gray-700 hover:bg-gray-100"
+                abaAtiva === "produtos-tabela" ? "bg-primary text-white font-medium" : "text-gray-700 hover:bg-gray-100"
               }`}
             >
-              <Layers className="h-5 w-5 mr-3" />
-              <span>Materiais</span>
+              <Table className="h-5 w-5 mr-3" />
+              <span>Tabela de Produtos</span>
             </button>
 
             <button
-              onClick={() => setAbaAtiva("empresa")}
+              onClick={() => setAbaAtiva("lixeira")}
               className={`w-full flex items-center px-3 py-2.5 text-sm rounded-md transition-colors ${
-                abaAtiva === "empresa" ? "bg-primary text-white font-medium" : "text-gray-700 hover:bg-gray-100"
+                abaAtiva === "lixeira" ? "bg-red-500 text-white font-medium" : "text-gray-700 hover:bg-gray-100"
               }`}
             >
-              <Building className="h-5 w-5 mr-3" />
-              <span>Empresa</span>
+              <Trash2 className="h-5 w-5 mr-3" />
+              <span>Lixeira</span>
             </button>
           </div>
         </div>
