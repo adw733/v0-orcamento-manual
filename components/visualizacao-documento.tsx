@@ -9,30 +9,7 @@ interface VisualizacaoDocumentoProps {
 }
 
 export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosEmpresa }: VisualizacaoDocumentoProps) {
-  const dataFormatada = orcamento.data ? formatarDataSemFusoHorario(orcamento.data) : ""
-
-  // Adicionar esta função auxiliar logo após a constante dataFormatada:
-  function formatarDataSemFusoHorario(dataString: string) {
-    // Garantir que a data não seja afetada pelo fuso horário
-    const partes = dataString.split("-")
-    if (partes.length !== 3) return ""
-
-    const ano = Number.parseInt(partes[0])
-    const mes = Number.parseInt(partes[1]) - 1 // Meses em JS são 0-11
-    const dia = Number.parseInt(partes[2])
-
-    // Criar data usando UTC para evitar ajustes de fuso horário
-    const data = new Date(Date.UTC(ano, mes, dia))
-
-    // Formatar no padrão brasileiro
-    return (
-      data.getUTCDate().toString().padStart(2, "0") +
-      "/" +
-      (data.getUTCMonth() + 1).toString().padStart(2, "0") +
-      "/" +
-      data.getUTCFullYear()
-    )
-  }
+  const dataFormatada = orcamento.data ? new Date(orcamento.data).toLocaleDateString("pt-BR") : ""
 
   // Definição da ordem padrão dos tamanhos
   const tamanhosPadrao = {
