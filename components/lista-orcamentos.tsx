@@ -17,7 +17,6 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
-  FileDown,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { Orcamento } from "@/types/types"
@@ -27,7 +26,6 @@ interface ListaOrcamentosProps {
   onNovoOrcamento: () => void
   onDeleteOrcamento: (orcamentoId: string) => Promise<void>
   onUpdateStatus?: (orcamentoId: string, status: string) => Promise<void>
-  onExportOrcamento?: (orcamentoId: string, tipoExportacao: "completo" | "ficha") => Promise<void>
   reloadRef?: React.MutableRefObject<(() => Promise<void>) | null>
 }
 
@@ -37,14 +35,12 @@ export default function ListaOrcamentos({
   onDeleteOrcamento,
   reloadRef,
   onUpdateStatus,
-  onExportOrcamento,
 }: ListaOrcamentosProps) {
   const [orcamentos, setOrcamentos] = useState<Partial<Orcamento>[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("4")
   const [error, setError] = useState<string | null>(null)
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
 
   // Estados para ordenação
   const [ordenacao, setOrdenacao] = useState<{ campo: string; direcao: "asc" | "desc" }>({
@@ -723,58 +719,9 @@ export default function ListaOrcamentos({
                           size="icon"
                           onClick={() => orcamento.id && onSelectOrcamento(orcamento.id)}
                           className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
-                          title="Visualizar orçamento"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-
-                        {onExportOrcamento && (
-                          <div className="relative">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                              title="Exportar orçamento"
-                              onClick={() => setOpenDropdownId(openDropdownId === orcamento.id ? null : orcamento.id)}
-                            >
-                              <FileDown className="h-4 w-4" />
-                            </Button>
-                            {openDropdownId === orcamento.id && (
-                              <div
-                                className="absolute right-0 mt-1 flex flex-col bg-white shadow-lg rounded-md p-1 z-10 w-40"
-                                onMouseLeave={() => setOpenDropdownId(null)}
-                              >
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="justify-start text-xs"
-                                  onClick={() => {
-                                    if (orcamento.id && onExportOrcamento) {
-                                      onExportOrcamento(orcamento.id, "completo")
-                                      setOpenDropdownId(null)
-                                    }
-                                  }}
-                                >
-                                  Orçamento completo
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="justify-start text-xs"
-                                  onClick={() => {
-                                    if (orcamento.id && onExportOrcamento) {
-                                      onExportOrcamento(orcamento.id, "ficha")
-                                      setOpenDropdownId(null)
-                                    }
-                                  }}
-                                >
-                                  Ficha técnica
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
                         <Button
                           variant="ghost"
                           size="icon"
@@ -790,7 +737,6 @@ export default function ListaOrcamentos({
                             }
                           }}
                           className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                          title="Excluir orçamento"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
