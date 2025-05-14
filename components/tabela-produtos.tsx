@@ -391,11 +391,68 @@ export default function TabelaProdutos() {
     }
   }
 
-  const formatarDescricaoPedido = (descricao: string, nomeContato?: string) => {
-    if (nomeContato) {
-      return `${descricao} - ${nomeContato}`
+  // Função para extrair a empresa da descrição do produto
+  const extrairEmpresa = (descricaoProduto: string, clienteNome: string): string => {
+    // Lista de palavras-chave que geralmente indicam nomes de empresas
+    const palavrasChaveEmpresas = [
+      "LTDA",
+      "ME",
+      "EIRELI",
+      "S/A",
+      "SA",
+      "EMPRESA",
+      "INDÚSTRIA",
+      "INDUSTRIA",
+      "COMÉRCIO",
+      "COMERCIO",
+      "SERVIÇOS",
+      "SERVICOS",
+      "CALDEIRARIA",
+      "CIMENTOS",
+      "CONSTRUTORA",
+    ]
+
+    // Verificar se alguma palavra-chave está presente na descrição
+    for (const palavraChave of palavrasChaveEmpresas) {
+      if (descricaoProduto.includes(palavraChave)) {
+        // Encontrar a posição da palavra-chave
+        const posicao = descricaoProduto.indexOf(palavraChave)
+
+        // Encontrar o início da empresa (algumas palavras antes da palavra-chave)
+        const palavras = descricaoProduto.substring(0, posicao + palavraChave.length).split(" ")
+
+        // Pegar as últimas 2-3 palavras incluindo a palavra-chave
+        const numPalavras = Math.min(3, palavras.length)
+        return palavras.slice(-numPalavras).join(" ")
+      }
     }
-    return descricao
+
+    // Se não encontrou palavras-chave, verificar se o nome do cliente está na descrição
+    if (clienteNome && descricaoProduto.includes(clienteNome)) {
+      return clienteNome
+    }
+
+    // Se não encontrou nada, pegar as últimas 2 palavras da descrição
+    const palavras = descricaoProduto.split(" ")
+    if (palavras.length > 2) {
+      return palavras.slice(-2).join(" ")
+    }
+
+    // Se tem apenas 1-2 palavras, usar a última
+    return palavras[palavras.length - 1]
+  }
+
+  // Modifique a função formatarDescricaoPedido para usar uma abordagem padronizada
+  const formatarDescricaoPedido = (descricao: string, clienteNome: string, nomeContato: string): string => {
+    // Extrair apenas o número do orçamento (primeira parte antes do hífen)
+    const numero = descricao.split("-")[0].trim()
+
+    // Extrair a empresa e o contato do orcamento atual
+    const empresa = clienteNome || ""
+    const contato = nomeContato || ""
+
+    // Retornar no formato "numero - empresa - contato"
+    return `${numero} - ${empresa} - ${contato}`
   }
 
   // Função para desenhar uma linha grossa no PDF
@@ -631,7 +688,7 @@ export default function TabelaProdutos() {
         cabecalhoGrupo.className = "cabecalho-grupo"
 
         if (modoVisualizacao === "orcamento") {
-          cabecalhoGrupo.textContent = `Orçamento: ${formatarDescricaoPedido(primeiroItem.orcamentoNumero, primeiroItem.nomeContato)}`
+          cabecalhoGrupo.textContent = `Orçamento: ${formatarDescricaoPedido(primeiroItem.orcamentoNumero, primeiroItem.clienteNome, primeiroItem.nomeContato)}`
           cabecalhoGrupo.title = `Data: ${formatarData(primeiroItem.orcamentoData)} | Cliente: ${primeiroItem.clienteNome} | Contato: ${primeiroItem.nomeContato || "Não especificado"}`
 
           // Adicionar informações adicionais
@@ -846,7 +903,7 @@ export default function TabelaProdutos() {
       const agrupamentos: { [key: string]: ProdutoOrcamento[] } = {}
 
       if (modo === "orcamento") {
-        // Agrupar por orçamento (comportamento original)
+        // Agrupar por orçamento
         produtosFiltrados.forEach((produto) => {
           if (!agrupamentos[produto.orcamentoId]) {
             agrupamentos[produto.orcamentoId] = []
@@ -958,7 +1015,7 @@ export default function TabelaProdutos() {
         if (modo === "orcamento") {
           // Título para modo orçamento
           pdf.text(
-            `Orçamento: ${formatarDescricaoPedido(primeiroItem.orcamentoNumero, primeiroItem.nomeContato)}`,
+            `Orçamento: ${formatarDescricaoPedido(primeiroItem.orcamentoNumero, primeiroItem.clienteNome, primeiroItem.nomeContato)}`,
             margin,
             yPosition + 5,
           )
@@ -1492,7 +1549,11 @@ export default function TabelaProdutos() {
                           <TableCell className="px-4 py-0.5 align-middle">
                             <div>
                               <span className="font-medium text-primary">
-                                {formatarDescricaoPedido(produto.orcamentoNumero, produto.nomeContato)}
+                                {formatarDescricaoPedido(
+                                  produto.orcamentoNumero,
+                                  produto.clienteNome,
+                                  produto.nomeContato,
+                                )}
                               </span>
                             </div>
                           </TableCell>

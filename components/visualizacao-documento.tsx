@@ -322,6 +322,32 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     white-space: nowrap;
     padding: 1px 0;
   }
+
+  /* Estilos para a tabela de tamanhos */
+  .tamanhos-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  .tamanhos-table th, .tamanhos-table td {
+    padding: 6px 8px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+  }
+
+  .tamanhos-table th {
+    background-color: #f3f4f6;
+    font-weight: 500;
+    color: #0f4c81;
+  }
+
+  .tamanhos-table th:first-child, .tamanhos-table td:first-child {
+    font-weight: 600;
+    background-color: #f3f4f6;
+    color: #0f4c81;
+    text-align: left;
+  }
 `
 
   // Função para exportar apenas a ficha técnica
@@ -355,10 +381,16 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
       container.style.padding = "0"
       container.style.margin = "0"
       container.style.boxSizing = "border-box"
+      container.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
 
       // Adicionar as fichas técnicas ao container
-      fichasTecnicas.forEach((ficha) => {
-        container.appendChild(ficha.cloneNode(true))
+      fichasTecnicas.forEach((ficha, index) => {
+        const fichaClone = ficha.cloneNode(true) as HTMLElement
+        // Remover a classe page-break-before da primeira ficha para evitar página em branco
+        if (index === 0) {
+          fichaClone.classList.remove("page-break-before")
+        }
+        container.appendChild(fichaClone)
       })
 
       // Adicionar ao DOM temporariamente
@@ -855,47 +887,41 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-6">
-                <h4 className="font-bold mb-2 text-primary">Quantidades por Tamanho</h4>
-                <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm">
-                  <div className="p-3 bg-white overflow-x-auto">
-                    <table className="w-full border-collapse text-sm pdf-table">
-                      <thead>
-                        <tr>
-                          <th className="border border-gray-300 p-1 text-center bg-primary text-white">TAM.</th>
-                          {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, _]) => (
-                            <th
-                              key={`header-${item.id}-${tamanho}`}
-                              className="border border-gray-300 p-1 text-center bg-primary text-white"
-                            >
-                              {tamanho}
-                            </th>
-                          ))}
-                          <th className="border border-gray-300 p-1 text-center bg-primary text-white">TOTAL</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
-                          {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
-                            <td
-                              key={`${item.id}-${tamanho}`}
-                              className="border border-gray-300 p-1 text-center bg-white"
-                            >
-                              {quantidade}
-                            </td>
-                          ))}
-                          <td className="border border-gray-300 p-1 text-center font-medium bg-white">
-                            {item.quantidade}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                {/* Tabela de Tamanhos */}
+                <div className="mt-6">
+                  <h4 className="font-bold mb-2 text-primary">Tabela de Tamanhos</h4>
+                  <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+                    {ordenarTamanhos(item.tamanhos || {}).length > 0 ? (
+                      <table className="tamanhos-table">
+                        <tbody>
+                          <tr>
+                            <th>Tam.</th>
+                            {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, _]) => (
+                              <th key={`header-${tamanho}`}>{tamanho}</th>
+                            ))}
+                          </tr>
+                          <tr>
+                            <td>Qtd.</td>
+                            {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
+                              <td key={`qty-${tamanho}`}>{quantidade}</td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="py-3 px-3 text-center text-gray-500 italic">Nenhum tamanho especificado</div>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {item.observacao && (
+                <div>
+                  <h4 className="font-bold mb-2 text-primary">Observações</h4>
+                  <p className="text-sm bg-accent p-3 rounded-md">{item.observacao}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

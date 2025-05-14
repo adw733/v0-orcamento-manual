@@ -32,6 +32,9 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
     const orcamentoPrincipal = container.querySelector(".orcamento-principal") as HTMLElement
     const fichasTecnicas = Array.from(container.querySelectorAll(".ficha-tecnica")) as HTMLElement[]
 
+    // Verificar se estamos gerando apenas fichas técnicas
+    const apenasGerarFichasTecnicas = container.classList.contains("fichas-tecnicas-container") || !orcamentoPrincipal
+
     // Criar uma nova instância do jsPDF
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -135,14 +138,23 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
       }
     }
 
-    // Capturar o orçamento principal como primeira página
-    if (orcamentoPrincipal) {
-      await capturarElemento(orcamentoPrincipal, true)
-    }
+    // Se estamos gerando apenas fichas técnicas, não incluir o orçamento principal
+    if (apenasGerarFichasTecnicas) {
+      // Capturar cada ficha técnica
+      for (let i = 0; i < fichasTecnicas.length; i++) {
+        // A primeira ficha não precisa de uma nova página
+        await capturarElemento(fichasTecnicas[i], i === 0)
+      }
+    } else {
+      // Capturar o orçamento principal como primeira página
+      if (orcamentoPrincipal) {
+        await capturarElemento(orcamentoPrincipal, true)
+      }
 
-    // Capturar cada ficha técnica como uma página separada
-    for (const ficha of fichasTecnicas) {
-      await capturarElemento(ficha)
+      // Capturar cada ficha técnica como uma página separada
+      for (const ficha of fichasTecnicas) {
+        await capturarElemento(ficha)
+      }
     }
 
     // Remover o elemento temporário

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, Save, Check, AlertCircle, FileDown, Loader2, FileText } from "lucide-react"
+import { Printer, Save, Check, AlertCircle, FileDown, FileText } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset } from "@/components/ui/sidebar"
@@ -25,6 +25,8 @@ import GerenciadorCategorias from "@/components/gerenciador-categorias"
 // Adicionar a importação do componente TabelaProdutos no início do arquivo, junto com as outras importações
 import TabelaProdutos from "@/components/tabela-produtos"
 // Adicionar a importação do componente LixeiraOrcamentos
+import * as ReactDOM from "react-dom/client"
+import { Loader2 } from "lucide-react"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -283,10 +285,16 @@ export function GeradorOrcamento() {
       container.style.padding = "0"
       container.style.margin = "0"
       container.style.boxSizing = "border-box"
+      container.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
 
       // Adicionar as fichas técnicas ao container
-      fichasTecnicas.forEach((ficha) => {
-        container.appendChild(ficha.cloneNode(true))
+      fichasTecnicas.forEach((ficha, index) => {
+        const fichaClone = ficha.cloneNode(true) as HTMLElement
+        // Remover a classe page-break-before da primeira ficha para evitar página em branco
+        if (index === 0) {
+          fichaClone.classList.remove("page-break-before")
+        }
+        container.appendChild(fichaClone)
       })
 
       // Adicionar ao DOM temporariamente
@@ -320,6 +328,273 @@ export function GeradorOrcamento() {
       })
     } finally {
       setExportandoFichaTecnica(false)
+    }
+  }
+
+  // Adicionar a função exportarOrcamento após a função exportarFichaTecnica
+
+  // Função para exportar orçamento (completo ou apenas ficha técnica)
+  const exportarOrcamento = async (orcamentoId: string, tipoExportacao: "completo" | "ficha") => {
+    try {
+      setIsLoading(true)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: `Exportando ${tipoExportacao === "completo" ? "orçamento completo" : "ficha técnica"}, aguarde...`,
+      })
+
+      // Primeiro, carregar o orçamento
+      const { data, error } = await supabase
+        .from("orcamentos")
+        .select("*, cliente:cliente_id(*)")
+        .eq("id", orcamentoId)
+        .single()
+
+      if (error) throw error
+
+      // Carregar itens do orçamento
+      const { data: itensData, error: itensError } = await supabase
+        .from("itens_orcamento")
+        .select("*, produto:produto_id(*)")
+        .eq("orcamento_id", orcamentoId)
+
+      if (itensError) throw itensError
+
+      // Converter para o formato da aplicação
+      const itensFormatados: ItemOrcamento[] = await Promise.all(
+        itensData
+          ? itensData.map(async (item) => {
+              // Buscar o produto completo com tecidos
+              let produto: Produto | undefined = undefined
+              if (item.produto) {
+                const { data: tecidosData, error: tecidosError } = await supabase
+                  .from("tecidos")
+                  .select("*")
+                  .eq("produto_id", item.produto.id)
+
+                if (tecidosError) throw tecidosError
+
+                produto = {
+                  id: item.produto.id,
+                  nome: item.produto.nome,
+                  valorBase: Number(item.produto.valor_base),
+                  tecidos: tecidosData
+                    ? tecidosData.map((t) => ({
+                        nome: t.nome,
+                        composicao: t.composicao || "",
+                      }))
+                    : [],
+                  cores: item.produto.cores || [],
+                  tamanhosDisponiveis: item.produto.tamanhos_disponiveis || [],
+                }
+              }
+
+              // Carregar estampas do item
+              const { data: estampasData, error: estampasError } = await supabase
+                .from("estampas")
+                .select("*")
+                .eq("item_orcamento_id", item.id)
+
+              if (estampasError) throw estampasError
+
+              // Converter estampas para o formato da aplicação
+              const estampas: Estampa[] = estampasData
+                ? estampasData.map((estampa) => ({
+                    id: estampa.id,
+                    posicao: estampa.posicao || undefined,
+                    tipo: estampa.tipo || undefined,
+                    largura: estampa.largura || undefined,
+                  }))
+                : []
+
+              return {
+                id: item.id,
+                produtoId: item.produto_id || "",
+                produto,
+                quantidade: item.quantidade,
+                valorUnitario: Number(item.valor_unitario),
+                tecidoSelecionado: item.tecido_nome
+                  ? {
+                      nome: item.tecido_nome,
+                      composicao: item.tecido_composicao || "",
+                    }
+                  : undefined,
+                corSelecionada: item.cor_selecionada || undefined,
+                estampas: estampas,
+                tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
+                imagem: item.imagem || undefined,
+                observacao: item.observacao || undefined,
+              }
+            })
+          : [],
+      )
+
+      // Extrair metadados do JSON de itens, se existirem
+      let valorFrete = 0
+      let nomeContato = ""
+      let telefoneContato = ""
+
+      try {
+        if (data.itens && typeof data.itens === "object") {
+          // Se itens já é um objeto (parseado automaticamente)
+          if (data.itens.metadados) {
+            if (data.itens.metadados.valorFrete !== undefined) {
+              valorFrete = Number(data.itens.metadados.valorFrete)
+            }
+            if (data.itens.metadados.nomeContato !== undefined) {
+              nomeContato = data.itens.metadados.nomeContato
+            }
+            if (data.itens.metadados.telefoneContato !== undefined) {
+              telefoneContato = data.itens.metadados.telefoneContato
+            }
+          }
+        } else if (data.itens && typeof data.itens === "string") {
+          // Se itens é uma string JSON
+          const itensObj = JSON.parse(data.itens)
+          if (itensObj.metadados) {
+            if (itensObj.metadados.valorFrete !== undefined) {
+              valorFrete = Number(itensObj.metadados.valorFrete)
+            }
+            if (itensObj.metadados.nomeContato !== undefined) {
+              nomeContato = itensObj.metadados.nomeContato
+            }
+            if (itensObj.metadados.telefoneContato !== undefined) {
+              telefoneContato = itensObj.metadados.telefoneContato
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao extrair metadados do JSON:", e)
+      }
+
+      // Converter cliente
+      const clienteFormatado = {
+        id: data.cliente.id,
+        nome: data.cliente.nome,
+        cnpj: data.cliente.cnpj || "",
+        endereco: data.cliente.endereco || "",
+        telefone: data.cliente.telefone || "",
+        email: data.cliente.email || "",
+        contato: data.cliente.contato || "",
+      }
+
+      // Criar o orçamento temporário para exportação
+      const orcamentoExportacao: Orcamento = {
+        id: data.id,
+        numero: data.numero,
+        data: data.data,
+        cliente: clienteFormatado,
+        itens: itensFormatados,
+        observacoes: data.observacoes || "",
+        condicoesPagamento: data.condicoes_pagamento || "À vista",
+        prazoEntrega: data.prazo_entrega || "15 dias",
+        validadeOrcamento: data.validade_orcamento || "15 dias",
+        status: data.status || "proposta",
+        valorFrete: valorFrete,
+        nomeContato: nomeContato,
+        telefoneContato: telefoneContato,
+      }
+
+      // Importar dinamicamente as funções de PDF
+      const { generatePDF, formatPDFFilename } = await import("@/lib/pdf-utils")
+
+      // Criar um container temporário para o documento
+      const container = document.createElement("div")
+      container.style.position = "absolute"
+      container.style.left = "-9999px"
+      container.style.width = "210mm" // Largura A4
+      container.style.backgroundColor = "#ffffff"
+      container.style.padding = "0"
+      container.style.margin = "0"
+      container.style.boxSizing = "border-box"
+
+      // Adicionar ao DOM temporariamente
+      document.body.appendChild(container)
+
+      // Renderizar o documento no container
+      const root = ReactDOM.createRoot(container)
+      root.render(
+        <VisualizacaoDocumento
+          orcamento={orcamentoExportacao}
+          calcularTotal={() =>
+            orcamentoExportacao.itens.reduce((total, item) => total + item.quantidade * item.valorUnitario, 0) +
+            (orcamentoExportacao.valorFrete || 0)
+          }
+          dadosEmpresa={dadosEmpresa || undefined}
+        />,
+      )
+
+      // Esperar um pouco para garantir que o documento seja renderizado
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      // Gerar o nome do arquivo
+      const nomeCliente = orcamentoExportacao.cliente?.nome
+      const nomeContatoExportacao = orcamentoExportacao.nomeContato
+      const filename = formatPDFFilename(orcamentoExportacao.numero, nomeCliente, nomeContatoExportacao).replace(
+        "ORCAMENTO",
+        tipoExportacao === "ficha" ? "FICHA_TECNICA" : "ORCAMENTO",
+      )
+
+      // Se for apenas ficha técnica, encontrar as fichas técnicas no container
+      if (tipoExportacao === "ficha") {
+        const fichasTecnicas = container.querySelectorAll(".ficha-tecnica")
+
+        if (fichasTecnicas.length === 0) {
+          throw new Error("Nenhuma ficha técnica encontrada para exportar")
+        }
+
+        // Criar um novo container apenas para as fichas técnicas
+        const fichasContainer = document.createElement("div")
+        fichasContainer.style.position = "absolute"
+        fichasContainer.style.left = "-9999px"
+        fichasContainer.style.width = "210mm" // Largura A4
+        fichasContainer.style.backgroundColor = "#ffffff"
+        fichasContainer.style.padding = "0"
+        fichasContainer.style.margin = "0"
+        fichasContainer.style.boxSizing = "border-box"
+        fichasContainer.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
+
+        // Adicionar as fichas técnicas ao container
+        fichasTecnicas.forEach((ficha, index) => {
+          const fichaClone = ficha.cloneNode(true) as HTMLElement
+          // Remover a classe page-break-before da primeira ficha para evitar página em branco
+          if (index === 0) {
+            fichaClone.classList.remove("page-break-before")
+          }
+          fichasContainer.appendChild(fichaClone)
+        })
+
+        // Substituir o container original pelo container de fichas
+        document.body.removeChild(container)
+        document.body.appendChild(fichasContainer)
+
+        // Gerar o PDF apenas com as fichas técnicas
+        await generatePDF(fichasContainer, filename)
+
+        // Remover o container de fichas
+        document.body.removeChild(fichasContainer)
+      } else {
+        // Gerar o PDF completo
+        await generatePDF(container, filename)
+
+        // Remover o container
+        document.body.removeChild(container)
+      }
+
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: `${tipoExportacao === "completo" ? "Orçamento" : "Ficha técnica"} "${filename}" exportado(a) com sucesso!`,
+      })
+    } catch (error) {
+      console.error(`Erro ao exportar ${tipoExportacao === "completo" ? "orçamento" : "ficha técnica"}:`, error)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: false,
+        mensagem: `Erro ao exportar: ${error instanceof Error ? error.message : "Tente novamente"}`,
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -1731,6 +2006,7 @@ export function GeradorOrcamento() {
                         }}
                         onDeleteOrcamento={excluirOrcamento}
                         onUpdateStatus={atualizarStatusOrcamento}
+                        onExportOrcamento={exportarOrcamento}
                         reloadRef={recarregarOrcamentosRef}
                       />
                     </CardContent>
