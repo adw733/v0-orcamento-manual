@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, Save, Check, AlertCircle, FileDown, Loader2 } from "lucide-react"
+import { Printer, Save, Check, AlertCircle, FileDown, FileText } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset } from "@/components/ui/sidebar"
@@ -25,6 +25,8 @@ import GerenciadorCategorias from "@/components/gerenciador-categorias"
 // Adicionar a importação do componente TabelaProdutos no início do arquivo, junto com as outras importações
 import TabelaProdutos from "@/components/tabela-produtos"
 // Adicionar a importação do componente LixeiraOrcamentos
+import * as ReactDOM from "react-dom/client"
+import { Loader2 } from "lucide-react"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -67,6 +69,8 @@ export function GeradorOrcamento() {
   // Adicionar estado para controlar a aba ativa
   // Adicionar o estado para os dados da empresa
   const [dadosEmpresa, setDadosEmpresa] = useState<DadosEmpresa | null>(null)
+  // Adicionar o estado para controlar a exportação da ficha técnica
+  const [exportandoFichaTecnica, setExportandoFichaTecnica] = useState(false)
 
   const documentoRef = useRef<HTMLDivElement>(null)
   const orcamentoRef = useRef<HTMLDivElement>(null)
@@ -135,9 +139,61 @@ export function GeradorOrcamento() {
   }
 
   // Atualizar o status padrão para "5" (Proposta) ao criar um novo orçamento
-  const criarNovoOrcamento = () => {
-    // Simplified for testing
-    setCriandoNovoOrcamento(true)
+  const criarNovoOrcamento = async () => {
+    try {
+      setIsLoading(true)
+
+      // Obter o próximo número de orçamento
+      const proximoNumero = await obterProximoNumeroOrcamento()
+
+      // Criar um novo orçamento em branco com o próximo número
+      // Obter a data atual no fuso horário local
+      const hoje = new Date()
+      const dataLocal =
+        hoje.getFullYear() +
+        "-" +
+        String(hoje.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(hoje.getDate()).padStart(2, "0")
+
+      setOrcamento({
+        numero: `${proximoNumero} - Novo Orçamento`,
+        data: dataLocal,
+        cliente: null,
+        itens: [],
+        observacoes: "",
+        condicoesPagamento: "45 DIAS FORA QUINZENA",
+        prazoEntrega: "45 DIAS",
+        validadeOrcamento: "15 DIAS",
+        status: "5", // Status padrão: Proposta
+        valorFrete: 0,
+        nomeContato: "",
+        telefoneContato: "",
+      })
+
+      // Limpar o ID do orçamento salvo para indicar que é um novo
+      setOrcamentoSalvo(null)
+      setCriandoNovoOrcamento(true)
+
+      // Mudar para a aba de orçamento
+      setAbaAtiva("orcamento")
+
+      // Mostrar feedback
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: "Novo orçamento criado! Preencha os dados e salve quando terminar.",
+      })
+    } catch (error) {
+      console.error("Erro ao criar novo orçamento:", error)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: false,
+        mensagem: `Erro ao criar novo orçamento: ${error instanceof Error ? error.message : "Tente novamente"}`,
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Adicionar esta função após a função criarNovoOrcamento:
@@ -153,11 +209,20 @@ export function GeradorOrcamento() {
       const novoNumero = `${proximoNumero} - ${itemDescricao} ${orcamento.cliente?.nome || ""} ${orcamento.cliente?.contato || ""}`
 
       // Criar uma cópia do orçamento atual com um novo número e sem ID
+      // Obter a data atual no fuso horário local
+      const hoje = new Date()
+      const dataLocal =
+        hoje.getFullYear() +
+        "-" +
+        String(hoje.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(hoje.getDate()).padStart(2, "0")
+
       const orcamentoCopia = {
         ...orcamento,
         id: undefined, // Remover o ID para que seja considerado um novo orçamento
         numero: novoNumero,
-        data: new Date().toISOString().split("T")[0], // Atualizar a data para hoje
+        data: dataLocal, // Atualizar a data para hoje no formato local
       }
 
       // Atualizar o estado com a cópia do orçamento
@@ -177,6 +242,356 @@ export function GeradorOrcamento() {
         visivel: true,
         sucesso: false,
         mensagem: `Erro ao copiar o orçamento: ${error instanceof Error ? error.message : "Tente novamente"}`,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Adicionar a função para exportar apenas a ficha técnica
+  const exportarFichaTecnica = async () => {
+    if (!orcamento) return
+
+    try {
+      setExportandoFichaTecnica(true)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: "Exportando ficha técnica, aguarde...",
+      })
+
+      // Importar dinamicamente as funções de PDF
+      const { generatePDF, formatPDFFilename } = await import("@/lib/pdf-utils")
+
+      // Encontrar apenas as fichas técnicas
+      const fichasTecnicas = document.querySelectorAll(".ficha-tecnica")
+
+      if (fichasTecnicas.length === 0) {
+        console.warn("Nenhuma ficha técnica encontrada")
+        setFeedbackSalvamento({
+          visivel: true,
+          sucesso: false,
+          mensagem: "Nenhuma ficha técnica encontrada para exportar",
+        })
+        return
+      }
+
+      // Criar um container temporário para as fichas técnicas
+      const container = document.createElement("div")
+      container.style.position = "absolute"
+      container.style.left = "-9999px"
+      container.style.width = "210mm" // Largura A4
+      container.style.backgroundColor = "#ffffff"
+      container.style.padding = "0"
+      container.style.margin = "0"
+      container.style.boxSizing = "border-box"
+      container.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
+
+      // Adicionar as fichas técnicas ao container
+      fichasTecnicas.forEach((ficha, index) => {
+        const fichaClone = ficha.cloneNode(true) as HTMLElement
+        // Remover a classe page-break-before da primeira ficha para evitar página em branco
+        if (index === 0) {
+          fichaClone.classList.remove("page-break-before")
+        }
+        container.appendChild(fichaClone)
+      })
+
+      // Adicionar ao DOM temporariamente
+      document.body.appendChild(container)
+
+      // Gerar o nome do arquivo
+      const nomeCliente = orcamento.cliente?.nome
+      const nomeContato = orcamento.nomeContato
+      const filename = formatPDFFilename(orcamento.numero, nomeCliente, nomeContato).replace(
+        "ORCAMENTO",
+        "FICHA_TECNICA",
+      )
+
+      // Gerar o PDF
+      await generatePDF(container, filename)
+
+      // Remover o container temporário
+      document.body.removeChild(container)
+
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: `Ficha técnica "${filename}" exportada com sucesso!`,
+      })
+    } catch (error) {
+      console.error("Erro ao exportar ficha técnica:", error)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: false,
+        mensagem: `Erro ao exportar ficha técnica: ${error instanceof Error ? error.message : "Tente novamente"}`,
+      })
+    } finally {
+      setExportandoFichaTecnica(false)
+    }
+  }
+
+  // Adicionar a função exportarOrcamento após a função exportarFichaTecnica
+
+  // Função para exportar orçamento (completo ou apenas ficha técnica)
+  const exportarOrcamento = async (orcamentoId: string, tipoExportacao: "completo" | "ficha") => {
+    try {
+      setIsLoading(true)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: `Exportando ${tipoExportacao === "completo" ? "orçamento completo" : "ficha técnica"}, aguarde...`,
+      })
+
+      // Primeiro, carregar o orçamento
+      const { data, error } = await supabase
+        .from("orcamentos")
+        .select("*, cliente:cliente_id(*)")
+        .eq("id", orcamentoId)
+        .single()
+
+      if (error) throw error
+
+      // Carregar itens do orçamento
+      const { data: itensData, error: itensError } = await supabase
+        .from("itens_orcamento")
+        .select("*, produto:produto_id(*)")
+        .eq("orcamento_id", orcamentoId)
+
+      if (itensError) throw itensError
+
+      // Converter para o formato da aplicação
+      const itensFormatados: ItemOrcamento[] = await Promise.all(
+        itensData
+          ? itensData.map(async (item) => {
+              // Buscar o produto completo com tecidos
+              let produto: Produto | undefined = undefined
+              if (item.produto) {
+                const { data: tecidosData, error: tecidosError } = await supabase
+                  .from("tecidos")
+                  .select("*")
+                  .eq("produto_id", item.produto.id)
+
+                if (tecidosError) throw tecidosError
+
+                produto = {
+                  id: item.produto.id,
+                  nome: item.produto.nome,
+                  valorBase: Number(item.produto.valor_base),
+                  tecidos: tecidosData
+                    ? tecidosData.map((t) => ({
+                        nome: t.nome,
+                        composicao: t.composicao || "",
+                      }))
+                    : [],
+                  cores: item.produto.cores || [],
+                  tamanhosDisponiveis: item.produto.tamanhos_disponiveis || [],
+                }
+              }
+
+              // Carregar estampas do item
+              const { data: estampasData, error: estampasError } = await supabase
+                .from("estampas")
+                .select("*")
+                .eq("item_orcamento_id", item.id)
+
+              if (estampasError) throw estampasError
+
+              // Converter estampas para o formato da aplicação
+              const estampas: Estampa[] = estampasData
+                ? estampasData.map((estampa) => ({
+                    id: estampa.id,
+                    posicao: estampa.posicao || undefined,
+                    tipo: estampa.tipo || undefined,
+                    largura: estampa.largura || undefined,
+                  }))
+                : []
+
+              return {
+                id: item.id,
+                produtoId: item.produto_id || "",
+                produto,
+                quantidade: item.quantidade,
+                valorUnitario: Number(item.valor_unitario),
+                tecidoSelecionado: item.tecido_nome
+                  ? {
+                      nome: item.tecido_nome,
+                      composicao: item.tecido_composicao || "",
+                    }
+                  : undefined,
+                corSelecionada: item.cor_selecionada || undefined,
+                estampas: estampas,
+                tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
+                imagem: item.imagem || undefined,
+                observacao: item.observacao || undefined,
+              }
+            })
+          : [],
+      )
+
+      // Extrair metadados do JSON de itens, se existirem
+      let valorFrete = 0
+      let nomeContato = ""
+      let telefoneContato = ""
+
+      try {
+        if (data.itens && typeof data.itens === "object") {
+          // Se itens já é um objeto (parseado automaticamente)
+          if (data.itens.metadados) {
+            if (data.itens.metadados.valorFrete !== undefined) {
+              valorFrete = Number(data.itens.metadados.valorFrete)
+            }
+            if (data.itens.metadados.nomeContato !== undefined) {
+              nomeContato = data.itens.metadados.nomeContato
+            }
+            if (data.itens.metadados.telefoneContato !== undefined) {
+              telefoneContato = data.itens.metadados.telefoneContato
+            }
+          }
+        } else if (data.itens && typeof data.itens === "string") {
+          // Se itens é uma string JSON
+          const itensObj = JSON.parse(data.itens)
+          if (itensObj.metadados) {
+            if (itensObj.metadados.valorFrete !== undefined) {
+              valorFrete = Number(itensObj.metadados.valorFrete)
+            }
+            if (itensObj.metadados.nomeContato !== undefined) {
+              nomeContato = itensObj.metadados.nomeContato
+            }
+            if (itensObj.metadados.telefoneContato !== undefined) {
+              telefoneContato = itensObj.metadados.telefoneContato
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao extrair metadados do JSON:", e)
+      }
+
+      // Converter cliente
+      const clienteFormatado = {
+        id: data.cliente.id,
+        nome: data.cliente.nome,
+        cnpj: data.cliente.cnpj || "",
+        endereco: data.cliente.endereco || "",
+        telefone: data.cliente.telefone || "",
+        email: data.cliente.email || "",
+        contato: data.cliente.contato || "",
+      }
+
+      // Criar o orçamento temporário para exportação
+      const orcamentoExportacao: Orcamento = {
+        id: data.id,
+        numero: data.numero,
+        data: data.data,
+        cliente: clienteFormatado,
+        itens: itensFormatados,
+        observacoes: data.observacoes || "",
+        condicoesPagamento: data.condicoes_pagamento || "À vista",
+        prazoEntrega: data.prazo_entrega || "15 dias",
+        validadeOrcamento: data.validade_orcamento || "15 dias",
+        status: data.status || "proposta",
+        valorFrete: valorFrete,
+        nomeContato: nomeContato,
+        telefoneContato: telefoneContato,
+      }
+
+      // Importar dinamicamente as funções de PDF
+      const { generatePDF, formatPDFFilename } = await import("@/lib/pdf-utils")
+
+      // Criar um container temporário para o documento
+      const container = document.createElement("div")
+      container.style.position = "absolute"
+      container.style.left = "-9999px"
+      container.style.width = "210mm" // Largura A4
+      container.style.backgroundColor = "#ffffff"
+      container.style.padding = "0"
+      container.style.margin = "0"
+      container.style.boxSizing = "border-box"
+
+      // Adicionar ao DOM temporariamente
+      document.body.appendChild(container)
+
+      // Renderizar o documento no container
+      const root = ReactDOM.createRoot(container)
+      root.render(
+        <VisualizacaoDocumento
+          orcamento={orcamentoExportacao}
+          calcularTotal={() =>
+            orcamentoExportacao.itens.reduce((total, item) => total + item.quantidade * item.valorUnitario, 0) +
+            (orcamentoExportacao.valorFrete || 0)
+          }
+          dadosEmpresa={dadosEmpresa || undefined}
+        />,
+      )
+
+      // Esperar um pouco para garantir que o documento seja renderizado
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      // Gerar o nome do arquivo
+      const nomeCliente = orcamentoExportacao.cliente?.nome
+      const nomeContatoExportacao = orcamentoExportacao.nomeContato
+      const filename = formatPDFFilename(orcamentoExportacao.numero, nomeCliente, nomeContatoExportacao).replace(
+        "ORCAMENTO",
+        tipoExportacao === "ficha" ? "FICHA_TECNICA" : "ORCAMENTO",
+      )
+
+      // Se for apenas ficha técnica, encontrar as fichas técnicas no container
+      if (tipoExportacao === "ficha") {
+        const fichasTecnicas = container.querySelectorAll(".ficha-tecnica")
+
+        if (fichasTecnicas.length === 0) {
+          throw new Error("Nenhuma ficha técnica encontrada para exportar")
+        }
+
+        // Criar um novo container apenas para as fichas técnicas
+        const fichasContainer = document.createElement("div")
+        fichasContainer.style.position = "absolute"
+        fichasContainer.style.left = "-9999px"
+        fichasContainer.style.width = "210mm" // Largura A4
+        fichasContainer.style.backgroundColor = "#ffffff"
+        fichasContainer.style.padding = "0"
+        fichasContainer.style.margin = "0"
+        fichasContainer.style.boxSizing = "border-box"
+        fichasContainer.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
+
+        // Adicionar as fichas técnicas ao container
+        fichasTecnicas.forEach((ficha, index) => {
+          const fichaClone = ficha.cloneNode(true) as HTMLElement
+          // Remover a classe page-break-before da primeira ficha para evitar página em branco
+          if (index === 0) {
+            fichaClone.classList.remove("page-break-before")
+          }
+          fichasContainer.appendChild(fichaClone)
+        })
+
+        // Substituir o container original pelo container de fichas
+        document.body.removeChild(container)
+        document.body.appendChild(fichasContainer)
+
+        // Gerar o PDF apenas com as fichas técnicas
+        await generatePDF(fichasContainer, filename)
+
+        // Remover o container de fichas
+        document.body.removeChild(fichasContainer)
+      } else {
+        // Gerar o PDF completo
+        await generatePDF(container, filename)
+
+        // Remover o container
+        document.body.removeChild(container)
+      }
+
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: true,
+        mensagem: `${tipoExportacao === "completo" ? "Orçamento" : "Ficha técnica"} "${filename}" exportado(a) com sucesso!`,
+      })
+    } catch (error) {
+      console.error(`Erro ao exportar ${tipoExportacao === "completo" ? "orçamento" : "ficha técnica"}:`, error)
+      setFeedbackSalvamento({
+        visivel: true,
+        sucesso: false,
+        mensagem: `Erro ao exportar: ${error instanceof Error ? error.message : "Tente novamente"}`,
       })
     } finally {
       setIsLoading(false)
@@ -1231,7 +1646,7 @@ export function GeradorOrcamento() {
     }
   }
 
-  const handleClienteChange = (clienteId: string) => {
+  const handleClienteSelection = (clienteId: string) => {
     const cliente = clientes.find((c) => c.id === clienteId) || null
 
     if (cliente) {
@@ -1518,6 +1933,16 @@ export function GeradorOrcamento() {
                     <FileDown className="h-4 w-4" />
                     {isLoading ? "Gerando PDF..." : "Gerar PDF"}
                   </Button>
+
+                  <Button
+                    onClick={exportarFichaTecnica}
+                    disabled={exportandoFichaTecnica || isLoading}
+                    variant="outline"
+                    className="flex items-center gap-2 border-primary text-primary hover:bg-primary/10 transition-all shadow-sm"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {exportandoFichaTecnica ? "Exportando..." : "Exportar Ficha Técnica"}
+                  </Button>
                 </>
               )}
             </div>
@@ -1552,7 +1977,7 @@ export function GeradorOrcamento() {
                           removerItem={removerItem}
                           atualizarItem={atualizarItem}
                           calcularTotal={calcularTotal}
-                          handleClienteChange={handleClienteChange}
+                          handleClienteChange={handleClienteSelection}
                         />
                       </CardContent>
                     </Card>
@@ -1581,6 +2006,7 @@ export function GeradorOrcamento() {
                         }}
                         onDeleteOrcamento={excluirOrcamento}
                         onUpdateStatus={atualizarStatusOrcamento}
+                        onExportOrcamento={exportarOrcamento}
                         reloadRef={recarregarOrcamentosRef}
                       />
                     </CardContent>
@@ -1668,7 +2094,7 @@ export function GeradorOrcamento() {
                           removerItem={removerItem}
                           atualizarItem={atualizarItem}
                           calcularTotal={calcularTotal}
-                          handleClienteChange={handleClienteChange}
+                          handleClienteSelection={handleClienteSelection}
                         />
                       </CardContent>
                     </Card>

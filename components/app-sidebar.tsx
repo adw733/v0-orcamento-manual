@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect } from "react"
-import { FileText, Users, ShoppingBag, Save, PlusCircle, Trash2, Table } from "lucide-react"
+import { FileText, Users, ShoppingBag, Save, Trash2, Table, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface AppSidebarProps {
   abaAtiva: string
@@ -52,13 +53,17 @@ export function AppSidebar({ abaAtiva, setAbaAtiva, criandoNovoOrcamento, criarN
         <div className="mb-6">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Orçamentos</h2>
           <div className="space-y-2">
-            <button
-              onClick={criarNovoOrcamento}
-              className="w-full flex items-center px-3 py-2.5 text-sm rounded-md text-secondary hover:bg-gray-100 transition-colors"
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => {
+                criarNovoOrcamento()
+                setAbaAtiva("orcamento")
+              }}
             >
-              <PlusCircle className="h-5 w-5 mr-3" />
-              <span>Criar Orçamento</span>
-            </button>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Orçamento
+            </Button>
 
             <button
               onClick={() => setAbaAtiva("orcamento")}

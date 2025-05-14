@@ -698,7 +698,11 @@ export default function FormularioOrcamento({
             id="data"
             type="date"
             value={orcamento.data}
-            onChange={(e) => atualizarOrcamento({ data: e.target.value })}
+            onChange={(e) => {
+              // Garantir que a data seja armazenada no formato YYYY-MM-DD
+              const dataFormatada = e.target.value
+              atualizarOrcamento({ data: dataFormatada })
+            }}
             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
           />
         </div>

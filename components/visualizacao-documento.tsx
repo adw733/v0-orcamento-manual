@@ -1,6 +1,10 @@
 "use client"
 
 import type { Orcamento, DadosEmpresa } from "@/types/types"
+import { Button } from "@/components/ui/button"
+import { Loader2, FileText } from "lucide-react"
+import { useState } from "react"
+import { toast } from "@/components/ui/use-toast"
 
 interface VisualizacaoDocumentoProps {
   orcamento: Orcamento
@@ -9,7 +13,22 @@ interface VisualizacaoDocumentoProps {
 }
 
 export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosEmpresa }: VisualizacaoDocumentoProps) {
-  const dataFormatada = orcamento.data ? new Date(orcamento.data).toLocaleDateString("pt-BR") : ""
+  const [exportandoPDF, setExportandoPDF] = useState(false)
+  // Função para formatar a data considerando o fuso horário
+  const formatarDataComFusoHorario = (dataString: string): string => {
+    // Adicionar o horário para evitar problemas de fuso horário
+    const data = new Date(`${dataString}T12:00:00`)
+    return data.toLocaleDateString("pt-BR")
+  }
+
+  // Modificar a função dataFormatada para corrigir o problema de fuso horário
+  // Localizar esta linha:
+  // const dataFormatada = orcamento.data ? new Date(orcamento.data).toLocaleDateString("pt-BR") : ""
+
+  // Substituir por:
+  const dataFormatada = orcamento.data ? formatarDataComFusoHorario(orcamento.data) : ""
+
+  // Adicionar esta função auxiliar logo após a declaração de dataFormatada:
 
   // Definição da ordem padrão dos tamanhos
   const tamanhosPadrao = {
@@ -305,6 +324,82 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
   }
 `
 
+  // Função para exportar apenas a ficha técnica
+  const exportarFichaTecnica = async () => {
+    if (!orcamento) return
+
+    try {
+      setExportandoPDF(true)
+
+      // Importar dinamicamente as funções de PDF
+      const { generatePDF, formatPDFFilename } = await import("@/lib/pdf-utils")
+
+      // Encontrar apenas as fichas técnicas
+      const fichasTecnicas = document.querySelectorAll(".ficha-tecnica")
+
+      if (fichasTecnicas.length === 0) {
+        toast({
+          title: "Nenhuma ficha técnica encontrada",
+          description: "Não foi possível encontrar fichas técnicas para exportar.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Criar um container temporário para as fichas técnicas
+      const container = document.createElement("div")
+      container.style.position = "absolute"
+      container.style.left = "-9999px"
+      container.style.width = "210mm" // Largura A4
+      container.style.backgroundColor = "#ffffff"
+      container.style.padding = "0"
+      container.style.margin = "0"
+      container.style.boxSizing = "border-box"
+      container.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
+
+      // Adicionar as fichas técnicas ao container
+      fichasTecnicas.forEach((ficha, index) => {
+        const fichaClone = ficha.cloneNode(true) as HTMLElement
+        // Remover a classe page-break-before da primeira ficha para evitar página em branco
+        if (index === 0) {
+          fichaClone.classList.remove("page-break-before")
+        }
+        container.appendChild(fichaClone)
+      })
+
+      // Adicionar ao DOM temporariamente
+      document.body.appendChild(container)
+
+      // Gerar o nome do arquivo
+      const nomeCliente = orcamento.cliente?.nome
+      const nomeContato = orcamento.nomeContato
+      const filename = formatPDFFilename(orcamento.numero, nomeCliente, nomeContato).replace(
+        "ORCAMENTO",
+        "FICHA_TECNICA",
+      )
+
+      // Gerar o PDF
+      await generatePDF(container, filename)
+
+      // Remover o container temporário
+      document.body.removeChild(container)
+
+      toast({
+        title: "Ficha técnica exportada com sucesso!",
+        description: `O arquivo ${filename} foi gerado.`,
+      })
+    } catch (error) {
+      console.error("Erro ao exportar ficha técnica:", error)
+      toast({
+        title: "Erro ao exportar ficha técnica",
+        description: "Ocorreu um erro ao gerar o PDF. Tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setExportandoPDF(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8 p-4 font-sans text-gray-800 pdf-container" style={{ margin: "10mm" }}>
       <style>{pdfStyles}</style>
@@ -513,6 +608,19 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="flex justify-end gap-2 mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportarFichaTecnica}
+          disabled={!orcamento || exportandoPDF}
+          className="flex items-center gap-1"
+        >
+          {exportandoPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+          {exportandoPDF ? "Exportando..." : "Exportar Ficha Técnica"}
+        </Button>
       </div>
 
       {/* Ficha Técnica */}
@@ -755,45 +863,12 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                 </div>
               </div>
 
-              <div className="mt-6">
-                <h4 className="font-bold mb-2 text-primary">Quantidades por Tamanho</h4>
-                <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm">
-                  <div className="p-3 bg-white overflow-x-auto">
-                    <table className="w-full border-collapse text-sm pdf-table">
-                      <thead>
-                        <tr>
-                          <th className="border border-gray-300 p-1 text-center bg-primary text-white">TAM.</th>
-                          {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, _]) => (
-                            <th
-                              key={`header-${item.id}-${tamanho}`}
-                              className="border border-gray-300 p-1 text-center bg-primary text-white"
-                            >
-                              {tamanho}
-                            </th>
-                          ))}
-                          <th className="border border-gray-300 p-1 text-center bg-primary text-white">TOTAL</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="border border-gray-300 p-1 text-center font-medium bg-white">QTD.</td>
-                          {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
-                            <td
-                              key={`${item.id}-${tamanho}`}
-                              className="border border-gray-300 p-1 text-center bg-white"
-                            >
-                              {quantidade}
-                            </td>
-                          ))}
-                          <td className="border border-gray-300 p-1 text-center font-medium bg-white">
-                            {item.quantidade}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+              {item.observacao && (
+                <div>
+                  <h4 className="font-bold mb-2 text-primary">Observações</h4>
+                  <p className="text-sm bg-accent p-3 rounded-md">{item.observacao}</p>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
