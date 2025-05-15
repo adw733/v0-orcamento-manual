@@ -37,7 +37,7 @@ const generateUUID = () => {
   })
 }
 
-export function GeradorOrcamento() {
+export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", setAbaAtiva: setAbaAtivaExterna }) {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [orcamento, setOrcamento] = useState<Orcamento>({
@@ -55,7 +55,7 @@ export function GeradorOrcamento() {
     telefoneContato: "",
   })
   const [isPrinting, setIsPrinting] = useState(false)
-  const [abaAtiva, setAbaAtiva] = useState<string>("orcamento")
+  const [abaAtiva, setAbaAtiva] = useState<string>(abaAtivaInicial)
   const [isLoading, setIsLoading] = useState(false)
   const [orcamentoSalvo, setOrcamentoSalvo] = useState<string | null>(null)
   // Adicionar um novo estado para controlar se estamos criando um novo orçamento
@@ -79,6 +79,13 @@ export function GeradorOrcamento() {
   const recarregarOrcamentosRef = useRef<(() => Promise<void>) | null>(null)
   // Adicionar após a declaração de recarregarOrcamentosRef
   const recarregarLixeiraRef = useRef(null)
+
+  // Sincronizar o estado interno com o externo
+  useEffect(() => {
+    if (setAbaAtivaExterna) {
+      setAbaAtivaExterna(abaAtiva)
+    }
+  }, [abaAtiva, setAbaAtivaExterna])
 
   // Função para obter o próximo número de orçamento
   const obterProximoNumeroOrcamento = async (): Promise<string> => {
@@ -598,188 +605,214 @@ export function GeradorOrcamento() {
     }
   }
 
-  // Iniciar sempre com um orçamento vazio ao carregar a página
-  useEffect(() => {
-    criarNovoOrcamento()
+  // REMOVER ESTE useEffect que estava criando um novo orçamento automaticamente
+  // useEffect(() => {
+  //   criarNovoOrcamento()
+  //
+  //   // Get hash from URL if available
+  //   if (typeof window !== "undefined") {
+  //     const hash = window.location.hash ? window.location.hash.substring(1) : "orcamento"
+  //     setAbaAtiva(hash)
+  //   }
+  // }, [])
 
-    // Get hash from URL if available
-    if (typeof window !== "undefined") {
-      const hash = window.location.hash ? window.location.hash.substring(1) : "orcamento"
-      setAbaAtiva(hash)
-    }
-  }, [])
-
-  // Initialize with mock data if empty
+  // Inicializar o aplicativo - VERSÃO CORRIGIDA
   useEffect(() => {
-    // Adicionar a função para carregar os dados da empresa
-    const carregarDadosEmpresa = async () => {
+    console.log("Inicializando com aba ativa:", abaAtivaInicial)
+
+    // Carregar dados iniciais sem criar um novo orçamento
+    const carregarDadosIniciais = async () => {
       try {
-        const { data, error } = await supabase.from("empresa").select("*").single()
-
-        if (error) {
-          if (error.code === "PGRST116") {
-            // Não encontrou registros
-            console.log("Nenhum dado de empresa encontrado.")
-            return
-          }
-          throw error
-        }
-
-        if (data) {
-          setDadosEmpresa(data)
-        }
+        await carregarDadosEmpresa()
+        await carregarClientes()
+        await carregarProdutos()
       } catch (error) {
-        console.error("Erro ao carregar dados da empresa:", error)
+        console.error("Erro ao carregar dados iniciais:", error)
       }
     }
 
-    const carregarDadosIniciais = async () => {
-      try {
-        setIsLoading(true)
+    carregarDadosIniciais()
 
-        // Carregar dados da empresa
-        await carregarDadosEmpresa()
+    // Verificar hash na URL
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash ? window.location.hash.substring(1) : ""
+      if (hash) {
+        console.log("Hash encontrado na URL:", hash)
+        setAbaAtiva(hash)
+      } else {
+        // Se não houver hash, usar o valor inicial
+        console.log("Nenhum hash encontrado, usando valor inicial:", abaAtivaInicial)
+        if (abaAtivaInicial && abaAtivaInicial !== "orcamento") {
+          window.location.hash = abaAtivaInicial
+        }
+      }
+    }
+  }, [abaAtivaInicial])
 
-        // Carregar clientes
-        const { data: clientesData, error: clientesError } = await supabase.from("clientes").select("*").order("nome")
+  // Adicionar a função para carregar os dados da empresa
+  const carregarDadosEmpresa = async () => {
+    try {
+      const { data, error } = await supabase.from("empresa").select("*").single()
 
-        if (clientesError) {
-          console.warn("Erro ao carregar clientes do Supabase, usando dados mock:", clientesError)
-          if (clientes.length === 0) {
-            setClientes(mockClientes)
-          }
-        } else if (clientesData && clientesData.length > 0) {
-          // Converter para o formato da aplicação
-          const clientesFormatados: Cliente[] = clientesData.map((cliente) => ({
-            id: cliente.id,
-            nome: cliente.nome,
-            cnpj: cliente.cnpj || "",
-            endereco: cliente.endereco || "",
-            telefone: cliente.telefone || "",
-            email: cliente.email || "",
-            contato: cliente.contato || "",
-          }))
+      if (error) {
+        if (error.code === "PGRST116") {
+          // Não encontrou registros
+          console.log("Nenhum dado de empresa encontrado.")
+          return
+        }
+        throw error
+      }
 
-          setClientes(clientesFormatados)
-        } else if (clientes.length === 0) {
+      if (data) {
+        setDadosEmpresa(data)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar dados da empresa:", error)
+    }
+  }
+
+  // Função para carregar clientes
+  const carregarClientes = async () => {
+    try {
+      const { data: clientesData, error: clientesError } = await supabase.from("clientes").select("*").order("nome")
+
+      if (clientesError) {
+        console.warn("Erro ao carregar clientes do Supabase, usando dados mock:", clientesError)
+        if (clientes.length === 0) {
           setClientes(mockClientes)
         }
+      } else if (clientesData && clientesData.length > 0) {
+        // Converter para o formato da aplicação
+        const clientesFormatados: Cliente[] = clientesData.map((cliente) => ({
+          id: cliente.id,
+          nome: cliente.nome,
+          cnpj: cliente.cnpj || "",
+          endereco: cliente.endereco || "",
+          telefone: cliente.telefone || "",
+          email: cliente.email || "",
+          contato: cliente.contato || "",
+        }))
 
-        // Carregar produtos
-        const { data: produtosData, error: produtosError } = await supabase.from("produtos").select("*").order("nome")
+        setClientes(clientesFormatados)
+      } else if (clientes.length === 0) {
+        setClientes(mockClientes)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar clientes:", error)
+      if (clientes.length === 0) {
+        setClientes(mockClientes)
+      }
+    }
+  }
 
-        if (produtosError) {
-          console.warn("Erro ao carregar produtos do Supabase, usando dados mock:", produtosError)
-          if (produtos.length === 0) {
-            setProdutos(mockProdutos)
-          }
-        } else if (produtosData && produtosData.length > 0) {
-          // Verificar se há produtos sem código e atualizar se necessário
-          const produtosSemCodigo = produtosData.filter((p) => !p.codigo)
-          if (produtosSemCodigo.length > 0) {
-            console.log(`Encontrados ${produtosSemCodigo.length} produtos sem código. Atualizando...`)
+  // Função para carregar produtos
+  const carregarProdutos = async () => {
+    try {
+      const { data: produtosData, error: produtosError } = await supabase.from("produtos").select("*").order("nome")
 
-            // Atualizar códigos sequencialmente
-            let contador = 1
-            const ultimoProdutoComCodigo = produtosData
-              .filter((p) => p.codigo)
-              .sort((a, b) => {
-                const numA = a.codigo ? Number.parseInt(a.codigo.replace(/\D/g, "")) : 0
-                const numB = b.codigo ? Number.parseInt(b.codigo.replace(/\D/g, "")) : 0
-                return numB - numA
-              })[0]
+      if (produtosError) {
+        console.warn("Erro ao carregar produtos do Supabase, usando dados mock:", produtosError)
+        if (produtos.length === 0) {
+          setProdutos(mockProdutos)
+        }
+      } else if (produtosData && produtosData.length > 0) {
+        // Verificar se há produtos sem código e atualizar se necessário
+        const produtosSemCodigo = produtosData.filter((p) => !p.codigo)
+        if (produtosSemCodigo.length > 0) {
+          console.log(`Encontrados ${produtosSemCodigo.length} produtos sem código. Atualizando...`)
 
-            if (ultimoProdutoComCodigo && ultimoProdutoComCodigo.codigo) {
-              const match = ultimoProdutoComCodigo.codigo.match(/^P?(\d+)$/)
-              if (match && match[1]) {
-                contador = Number.parseInt(match[1], 10) + 1
-              }
+          // Atualizar códigos sequencialmente
+          let contador = 1
+          const ultimoProdutoComCodigo = produtosData
+            .filter((p) => p.codigo)
+            .sort((a, b) => {
+              const numA = a.codigo ? Number.parseInt(a.codigo.replace(/\D/g, "")) : 0
+              const numB = b.codigo ? Number.parseInt(b.codigo.replace(/\D/g, "")) : 0
+              return numB - numA
+            })[0]
+
+          if (ultimoProdutoComCodigo && ultimoProdutoComCodigo.codigo) {
+            const match = ultimoProdutoComCodigo.codigo.match(/^P?(\d+)$/)
+            if (match && match[1]) {
+              contador = Number.parseInt(match[1], 10) + 1
             }
-
-            // Atualizar cada produto sem código
-            for (const produto of produtosSemCodigo) {
-              const novoCodigo = "P" + String(contador).padStart(4, "0")
-              contador++
-
-              await supabase.from("produtos").update({ codigo: novoCodigo }).eq("id", produto.id)
-
-              // Atualizar o código no objeto local
-              produto.codigo = novoCodigo
-            }
           }
 
-          // Para cada produto, buscar seus tecidos
-          const produtosCompletos = await Promise.all(
-            produtosData.map(async (produto) => {
-              // Buscar tecidos do produto
-              const { data: tecidosData, error: tecidosError } = await supabase
-                .from("tecidos")
-                .select("*")
-                .eq("produto_id", produto.id)
+          // Atualizar cada produto sem código
+          for (const produto of produtosSemCodigo) {
+            const novoCodigo = "P" + String(contador).padStart(4, "0")
+            contador++
 
-              if (tecidosError) {
-                console.error("Erro ao listar tecidos do produto:", tecidosError)
-                return {
-                  id: produto.id,
-                  codigo: produto.codigo || `P${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`, // Código aleatório se não existir
-                  nome: produto.nome,
-                  valorBase: Number(produto.valor_base),
-                  tecidos: [],
-                  cores: produto.cores || [],
-                  tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
-                  categoria: produto.categoria || "Outros",
-                }
-              }
+            await supabase.from("produtos").update({ codigo: novoCodigo }).eq("id", produto.id)
 
-              // Converter para o formato da aplicação
+            // Atualizar o código no objeto local
+            produto.codigo = novoCodigo
+          }
+        }
+
+        // Para cada produto, buscar seus tecidos
+        const produtosCompletos = await Promise.all(
+          produtosData.map(async (produto) => {
+            // Buscar tecidos do produto
+            const { data: tecidosData, error: tecidosError } = await supabase
+              .from("tecidos")
+              .select("*")
+              .eq("produto_id", produto.id)
+
+            if (tecidosError) {
+              console.error("Erro ao listar tecidos do produto:", tecidosError)
               return {
                 id: produto.id,
                 codigo: produto.codigo || `P${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`, // Código aleatório se não existir
                 nome: produto.nome,
                 valorBase: Number(produto.valor_base),
-                tecidos: tecidosData
-                  ? tecidosData.map((t) => ({
-                      nome: t.nome,
-                      composicao: t.composicao || "",
-                    }))
-                  : [],
+                tecidos: [],
                 cores: produto.cores || [],
                 tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
                 categoria: produto.categoria || "Outros",
-              } as Produto
-            }),
-          )
+              }
+            }
 
-          setProdutos(produtosCompletos)
-        } else if (produtos.length === 0) {
-          // Adicionar códigos aos produtos mock
-          const produtosComCodigo = mockProdutos.map((p, index) => ({
-            ...p,
-            codigo: `P${String(index + 1).padStart(4, "0")}`,
-          }))
-          setProdutos(produtosComCodigo)
-        }
-      } catch (error) {
-        console.error("Erro ao carregar dados iniciais:", error)
-        // Usar dados mock como fallback apenas se não houver dados
-        if (clientes.length === 0) {
-          setClientes(mockClientes)
-        }
-        if (produtos.length === 0) {
-          // Adicionar códigos aos produtos mock
-          const produtosComCodigo = mockProdutos.map((p, index) => ({
-            ...p,
-            codigo: `P${String(index + 1).padStart(4, "0")}`,
-          }))
-          setProdutos(produtosComCodigo)
-        }
-      } finally {
-        setIsLoading(false)
+            // Converter para o formato da aplicação
+            return {
+              id: produto.id,
+              codigo: produto.codigo || `P${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`, // Código aleatório se não existir
+              nome: produto.nome,
+              valorBase: Number(produto.valor_base),
+              tecidos: tecidosData
+                ? tecidosData.map((t) => ({
+                    nome: t.nome,
+                    composicao: t.composicao || "",
+                  }))
+                : [],
+              cores: produto.cores || [],
+              tamanhosDisponiveis: produto.tamanhos_disponiveis || [],
+              categoria: produto.categoria || "Outros",
+            } as Produto
+          }),
+        )
+
+        setProdutos(produtosCompletos)
+      } else if (produtos.length === 0) {
+        // Adicionar códigos aos produtos mock
+        const produtosComCodigo = mockProdutos.map((p, index) => ({
+          ...p,
+          codigo: `P${String(index + 1).padStart(4, "0")}`,
+        }))
+        setProdutos(produtosComCodigo)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar produtos:", error)
+      if (produtos.length === 0) {
+        // Adicionar códigos aos produtos mock
+        const produtosComCodigo = mockProdutos.map((p, index) => ({
+          ...p,
+          codigo: `P${String(index + 1).padStart(4, "0")}`,
+        }))
+        setProdutos(produtosComCodigo)
       }
     }
-
-    carregarDadosIniciais()
-  }, [])
+  }
 
   // Esconder feedback após 3 segundos
   useEffect(() => {
@@ -1420,6 +1453,7 @@ export function GeradorOrcamento() {
             // Em seguida, inserir as novas estampas com novos IDs
             const estampasParaInserir = itemAtualizado.estampas.map((estampa) => ({
               id: generateUUID(), // Sempre gerar um novo ID para evitar conflitos
+              item_orcamento_id: id, // Sempre gerar um novo ID para evitar conflitos
               item_orcamento_id: id,
               posicao: estampa.posicao,
               tipo: estampa.tipo,

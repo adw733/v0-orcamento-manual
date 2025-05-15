@@ -234,6 +234,43 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
       white-space: nowrap !important;
       font-size: 0.8rem !important;
     }
+
+    /* Estilos para a tabela de tamanhos */
+    .tamanhos-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      table-layout: auto;
+    }
+
+    .tamanhos-table th, .tamanhos-table td {
+      padding: 6px 8px;
+      text-align: center;
+      border: 1px solid #e5e7eb;
+    }
+
+    .tamanhos-table th {
+      background-color: #f3f4f6;
+      font-weight: 500;
+      color: #0f4c81;
+    }
+
+    .tamanhos-table th:first-child, .tamanhos-table td:first-child {
+      font-weight: 600;
+      background-color: #f3f4f6;
+      color: #0f4c81;
+      text-align: left;
+      width: 60px; /* Largura fixa para a coluna "Tam." */
+      min-width: 60px;
+      max-width: 60px;
+    }
+
+    /* Estilo específico para a segunda linha da tabela (Qtd.) */
+    .tamanhos-table tr:nth-child(2) td:first-child {
+      width: 60px; /* Largura fixa para a coluna "Qtd." */
+      min-width: 60px;
+      max-width: 60px;
+    }
   }
   
   /* Estilos para garantir que os elementos caibam na página A4 */

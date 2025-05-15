@@ -4,13 +4,16 @@ import { useState, useEffect } from "react"
 import { GeradorOrcamento } from "@/components/gerador-orcamento"
 
 export default function ClientPage() {
-  const [abaAtiva, setAbaAtiva] = useState("orcamento")
+  const [abaAtiva, setAbaAtiva] = useState("orcamentos")
   const [criandoNovoOrcamento, setCriandoNovoOrcamento] = useState(false)
 
-  // Check for hash in URL on initial load
+  // Check for hash in URL on initial load and set it to "orcamentos" if not present
   useEffect(() => {
     const hash = window.location.hash.replace("#", "")
-    if (hash) {
+    if (!hash) {
+      // Se não houver hash, definir como "orcamentos"
+      window.location.hash = "orcamentos"
+    } else {
       setAbaAtiva(hash)
     }
   }, [])
