@@ -340,14 +340,22 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
 
   // Adicionar a função exportarOrcamento após a função exportarFichaTecnica
 
-  // Função para exportar orçamento (completo ou apenas ficha técnica)
-  const exportarOrcamento = async (orcamentoId: string, tipoExportacao: "completo" | "ficha") => {
+  // Modificar a função exportarOrcamento para suportar os três tipos de exportação
+  // Localizar a função exportarOrcamento e substituir por:
+  // Função para exportar orçamento (completo, apenas orçamento ou apenas ficha técnica)
+  const exportarOrcamento = async (orcamentoId: string, tipoExportacao: "completo" | "ficha" | "orcamento") => {
     try {
       setIsLoading(true)
       setFeedbackSalvamento({
         visivel: true,
         sucesso: true,
-        mensagem: `Exportando ${tipoExportacao === "completo" ? "orçamento completo" : "ficha técnica"}, aguarde...`,
+        mensagem: `Exportando ${
+          tipoExportacao === "completo"
+            ? "orçamento completo"
+            : tipoExportacao === "ficha"
+              ? "ficha técnica"
+              : "orçamento"
+        }, aguarde...`,
       })
 
       // Primeiro, carregar o orçamento
@@ -534,16 +542,18 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
       // Esperar um pouco para garantir que o documento seja renderizado
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // Gerar o nome do arquivo
-      const nomeCliente = orcamentoExportacao.cliente?.nome
-      const nomeContatoExportacao = orcamentoExportacao.nomeContato
-      const filename = formatPDFFilename(orcamentoExportacao.numero, nomeCliente, nomeContatoExportacao).replace(
-        "ORCAMENTO",
-        tipoExportacao === "ficha" ? "FICHA_TECNICA" : "ORCAMENTO",
+      // Gerar o nome do arquivo com o tipo correto
+      const tipoDocumento = tipoExportacao === "ficha" ? "ficha-tecnica" : "orcamento"
+      const filename = formatPDFFilename(
+        orcamentoExportacao.numero,
+        tipoDocumento,
+        orcamentoExportacao.cliente?.nome,
+        orcamentoExportacao.nomeContato,
       )
 
-      // Se for apenas ficha técnica, encontrar as fichas técnicas no container
+      // Baseado no tipo de exportação, selecionar o conteúdo apropriado
       if (tipoExportacao === "ficha") {
+        // Exportar apenas as fichas técnicas
         const fichasTecnicas = container.querySelectorAll(".ficha-tecnica")
 
         if (fichasTecnicas.length === 0) {
@@ -560,6 +570,23 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
         fichasContainer.style.margin = "0"
         fichasContainer.style.boxSizing = "border-box"
         fichasContainer.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
+
+        // Adicionar estilos necessários
+        const style = document.createElement("style")
+        style.textContent = `
+      @media print {
+        @page {
+          size: A4;
+          margin: 10mm;
+        }
+        body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+      }
+    `
+        fichasContainer.appendChild(style)
 
         // Adicionar as fichas técnicas ao container
         fichasTecnicas.forEach((ficha, index) => {
@@ -580,8 +607,67 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
 
         // Remover o container de fichas
         document.body.removeChild(fichasContainer)
+      } else if (tipoExportacao === "orcamento") {
+        // Exportar apenas o orçamento principal
+        const orcamentoPrincipal = container.querySelector(".orcamento-principal")
+
+        if (!orcamentoPrincipal) {
+          throw new Error("Orçamento principal não encontrado para exportar")
+        }
+
+        // Criar um novo container apenas para o orçamento principal
+        const orcamentoContainer = document.createElement("div")
+        orcamentoContainer.style.position = "absolute"
+        orcamentoContainer.style.left = "-9999px"
+        orcamentoContainer.style.width = "210mm" // Largura A4
+        orcamentoContainer.style.backgroundColor = "#ffffff"
+        orcamentoContainer.style.padding = "0"
+        orcamentoContainer.style.margin = "0"
+        orcamentoContainer.style.boxSizing = "border-box"
+        orcamentoContainer.className = "orcamento-container" // Adicionar uma classe para identificação
+
+        // Adicionar estilos necessários
+        const style = document.createElement("style")
+        style.textContent = `
+      @media print {
+        @page {
+          size: A4;
+          margin: 10mm;
+        }
+        body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+        .bg-gradient-to-r, .bg-primary, .bg-accent, .bg-white, .bg-white\\/10 {
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
+        }
+        .text-white {
+          color: white !important;
+        }
+        .border, .border-t, .border-b, .border-l, .border-r {
+          border-color: inherit !important;
+        }
+      }
+    `
+        orcamentoContainer.appendChild(style)
+
+        // Adicionar o orçamento principal ao container
+        const orcamentoClone = orcamentoPrincipal.cloneNode(true) as HTMLElement
+        orcamentoContainer.appendChild(orcamentoClone)
+
+        // Substituir o container original pelo container do orçamento
+        document.body.removeChild(container)
+        document.body.appendChild(orcamentoContainer)
+
+        // Gerar o PDF apenas com o orçamento principal
+        await generatePDF(orcamentoContainer, filename)
+
+        // Remover o container do orçamento
+        document.body.removeChild(orcamentoContainer)
       } else {
-        // Gerar o PDF completo
+        // Exportar o documento completo (orçamento + fichas técnicas)
         await generatePDF(container, filename)
 
         // Remover o container
@@ -591,10 +677,25 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
       setFeedbackSalvamento({
         visivel: true,
         sucesso: true,
-        mensagem: `${tipoExportacao === "completo" ? "Orçamento" : "Ficha técnica"} "${filename}" exportado(a) com sucesso!`,
+        mensagem: `${
+          tipoExportacao === "completo"
+            ? "Documento completo"
+            : tipoExportacao === "ficha"
+              ? "Ficha técnica"
+              : "Orçamento"
+        } "${filename}" exportado com sucesso!`,
       })
     } catch (error) {
-      console.error(`Erro ao exportar ${tipoExportacao === "completo" ? "orçamento" : "ficha técnica"}:`, error)
+      console.error(
+        `Erro ao exportar ${
+          tipoExportacao === "completo"
+            ? "documento completo"
+            : tipoExportacao === "ficha"
+              ? "ficha técnica"
+              : "orçamento"
+        }:`,
+        error,
+      )
       setFeedbackSalvamento({
         visivel: true,
         sucesso: false,
@@ -1959,24 +2060,25 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                     {isPrinting ? "Imprimindo..." : "Imprimir"}
                   </Button>
 
-                  <Button
-                    onClick={handleGeneratePDF}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
-                  >
-                    <FileDown className="h-4 w-4" />
-                    {isLoading ? "Gerando PDF..." : "Gerar PDF"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => exportarOrcamento(orcamento.id || "", "orcamento")}
+                      disabled={isLoading || !orcamento.cliente}
+                      className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      {isLoading ? "Gerando..." : "Exportar Orçamento"}
+                    </Button>
 
-                  <Button
-                    onClick={exportarFichaTecnica}
-                    disabled={exportandoFichaTecnica || isLoading}
-                    variant="outline"
-                    className="flex items-center gap-2 border-primary text-primary hover:bg-primary/10 transition-all shadow-sm"
-                  >
-                    <FileText className="h-4 w-4" />
-                    {exportandoFichaTecnica ? "Exportando..." : "Exportar Ficha Técnica"}
-                  </Button>
+                    <Button
+                      onClick={() => exportarOrcamento(orcamento.id || "", "ficha")}
+                      disabled={isLoading || !orcamento.cliente || orcamento.itens.length === 0}
+                      className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
+                    >
+                      <FileText className="h-4 w-4" />
+                      {isLoading ? "Gerando..." : "Exportar Ficha Técnica"}
+                    </Button>
+                  </div>
                 </>
               )}
             </div>

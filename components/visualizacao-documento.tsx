@@ -2,7 +2,7 @@
 
 import type { Orcamento, DadosEmpresa } from "@/types/types"
 import { Button } from "@/components/ui/button"
-import { Loader2, FileText } from "lucide-react"
+import { Loader2, FileText, FileDown } from "lucide-react"
 import { useState } from "react"
 import { toast } from "@/components/ui/use-toast"
 
@@ -387,7 +387,80 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
   }
 `
 
-  // Função para exportar apenas a ficha técnica
+  // Corrigir a função exportarOrcamento para garantir que apenas o orçamento seja exportado
+  const exportarOrcamento = async () => {
+    if (!orcamento) return
+
+    try {
+      setExportandoPDF(true)
+
+      // Importar dinamicamente as funções de PDF
+      const { generatePDF, formatPDFFilename } = await import("@/lib/pdf-utils")
+
+      // Encontrar apenas o orçamento principal
+      const orcamentoPrincipal = document.querySelector(".orcamento-principal")
+
+      if (!orcamentoPrincipal) {
+        toast({
+          title: "Orçamento não encontrado",
+          description: "Não foi possível encontrar o orçamento para exportar.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Criar um container temporário para o orçamento
+      const container = document.createElement("div")
+      container.style.position = "absolute"
+      container.style.left = "-9999px"
+      container.style.width = "210mm" // Largura A4
+      container.style.backgroundColor = "#ffffff"
+      container.style.padding = "0"
+      container.style.margin = "0"
+      container.style.boxSizing = "border-box"
+      container.className = "orcamento-container" // Adicionar uma classe para identificação
+
+      // Adicionar o orçamento ao container
+      const orcamentoClone = orcamentoPrincipal.cloneNode(true) as HTMLElement
+
+      // Adicionar os estilos necessários
+      const style = document.createElement("style")
+      style.textContent = pdfStyles
+      container.appendChild(style)
+
+      container.appendChild(orcamentoClone)
+
+      // Adicionar ao DOM temporariamente
+      document.body.appendChild(container)
+
+      // Gerar o nome do arquivo
+      const nomeCliente = orcamento.cliente?.nome
+      const nomeContato = orcamento.nomeContato
+      const filename = formatPDFFilename(orcamento.numero, "orcamento", nomeCliente, nomeContato)
+
+      // Gerar o PDF
+      await generatePDF(container, filename)
+
+      // Remover o container temporário
+      document.body.removeChild(container)
+
+      toast({
+        title: "Orçamento exportado com sucesso!",
+        description: `O arquivo ${filename} foi gerado.`,
+      })
+    } catch (error) {
+      console.error("Erro ao exportar orçamento:", error)
+      toast({
+        title: "Erro ao exportar orçamento",
+        description: "Ocorreu um erro ao gerar o PDF. Tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setExportandoPDF(false)
+    }
+  }
+
+  // Modificar a função exportarFichaTecnica para usar o tipo correto
   const exportarFichaTecnica = async () => {
     if (!orcamento) return
 
@@ -436,10 +509,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
       // Gerar o nome do arquivo
       const nomeCliente = orcamento.cliente?.nome
       const nomeContato = orcamento.nomeContato
-      const filename = formatPDFFilename(orcamento.numero, nomeCliente, nomeContato).replace(
-        "ORCAMENTO",
-        "FICHA_TECNICA",
-      )
+      const filename = formatPDFFilename(orcamento.numero, "ficha-tecnica", nomeCliente, nomeContato)
 
       // Gerar o PDF
       await generatePDF(container, filename)
@@ -677,8 +747,19 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
         <Button
           variant="outline"
           size="sm"
-          onClick={exportarFichaTecnica}
+          onClick={() => exportarOrcamento()}
           disabled={!orcamento || exportandoPDF}
+          className="flex items-center gap-1"
+        >
+          {exportandoPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+          {exportandoPDF ? "Exportando..." : "Exportar Orçamento"}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => exportarFichaTecnica()}
+          disabled={!orcamento || exportandoPDF || orcamento.itens.length === 0}
           className="flex items-center gap-1"
         >
           {exportandoPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}

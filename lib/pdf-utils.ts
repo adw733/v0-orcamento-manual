@@ -171,11 +171,24 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
 /**
  * Função para formatar o nome do arquivo PDF
  */
-export function formatPDFFilename(numeroOrcamento: string, nomeCliente?: string, nomeContato?: string): string {
-  const clienteFormatado = nomeCliente ? nomeCliente.replace(/\s+/g, "_").substring(0, 20) : "sem_cliente"
-  const contatoFormatado = nomeContato ? nomeContato.replace(/\s+/g, "_").substring(0, 20) : "sem_contato"
+export function formatPDFFilename(
+  numeroOrcamento: string,
+  tipoDocumento: "orcamento" | "ficha-tecnica",
+  nomeCliente?: string,
+  nomeContato?: string,
+): string {
+  // Extrair apenas o número do orçamento (sem o nome do produto)
+  const numeroLimpo = numeroOrcamento.split(" - ")[0]
 
-  return `01 - ORCAMENTO_${numeroOrcamento}_${clienteFormatado.toUpperCase()}_${contatoFormatado.toUpperCase()}.pdf`
+  // Formatar o nome do cliente e contato
+  const clienteFormatado = nomeCliente ? nomeCliente.replace(/\s+/g, "_").substring(0, 20) : "SEM_CLIENTE"
+  const contatoFormatado = nomeContato ? nomeContato.replace(/\s+/g, "_").substring(0, 20) : "SEM_CONTATO"
+
+  // Definir o prefixo correto com base no tipo de documento
+  const prefixo = tipoDocumento === "orcamento" ? "01 - ORCAMENTO_" : "02 - FICHA_TECNICA_"
+
+  // Retornar o nome do arquivo formatado
+  return `${prefixo}${numeroLimpo}_${clienteFormatado.toUpperCase()}_${contatoFormatado.toUpperCase()}.pdf`
 }
 
 /**
