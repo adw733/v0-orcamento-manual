@@ -1,8 +1,6 @@
 "use client"
 
 import type { Orcamento, DadosEmpresa } from "@/types/types"
-import { Button } from "@/components/ui/button"
-import { Loader2, FileText, FileDown } from "lucide-react"
 import { useState } from "react"
 import { toast } from "@/components/ui/use-toast"
 
@@ -741,30 +739,6 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex justify-end gap-2 mb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => exportarOrcamento()}
-          disabled={!orcamento || exportandoPDF}
-          className="flex items-center gap-1"
-        >
-          {exportandoPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-          {exportandoPDF ? "Exportando..." : "Exportar Orçamento"}
-        </Button>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => exportarFichaTecnica()}
-          disabled={!orcamento || exportandoPDF || orcamento.itens.length === 0}
-          className="flex items-center gap-1"
-        >
-          {exportandoPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-          {exportandoPDF ? "Exportando..." : "Exportar Ficha Técnica"}
-        </Button>
       </div>
 
       {/* Ficha Técnica */}

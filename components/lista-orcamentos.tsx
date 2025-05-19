@@ -18,7 +18,9 @@ import {
   ChevronUp,
   ChevronDown,
   FileDown,
+  AlertCircle,
 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { supabase } from "@/lib/supabase"
 import type { Orcamento } from "@/types/types"
 
@@ -62,6 +64,15 @@ export default function ListaOrcamentos({
   useEffect(() => {
     carregarOrcamentos()
   }, [])
+
+  // Adicionar uma função para verificar se todos os itens têm imagens
+  // Adicionar esta função antes da função calcularTotal
+  const verificarImagensFaltantes = (orcamento: Partial<Orcamento>) => {
+    if (!orcamento.itens || !Array.isArray(orcamento.itens)) return false
+
+    // Verificar se algum item não tem imagem
+    return orcamento.itens.some((item) => !item.imagem)
+  }
 
   const carregarOrcamentos = async () => {
     try {
@@ -670,11 +681,26 @@ export default function ListaOrcamentos({
                 filtrarOrcamentos().map((orcamento) => (
                   <TableRow key={orcamento.id} className="border-t hover:bg-muted/50">
                     <TableCell className="px-4 py-3 align-middle">
-                      <span className="font-medium text-primary">
-                        {extrairNumeroOrcamento(orcamento.numero)} -{" "}
-                        {orcamento.cliente?.nome?.toUpperCase() || "SEM EMPRESA"}
-                        {orcamento.nomeContato ? ` - ${orcamento.nomeContato.toUpperCase()}` : ""}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium text-primary">
+                          {extrairNumeroOrcamento(orcamento.numero)} -{" "}
+                          {orcamento.cliente?.nome?.toUpperCase() || "SEM EMPRESA"}
+                          {orcamento.nomeContato ? ` - ${orcamento.nomeContato.toUpperCase()}` : ""}
+                        </span>
+
+                        {verificarImagensFaltantes(orcamento) && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertCircle className="h-4 w-4 text-amber-500 ml-1 flex-shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Há itens sem imagens na ficha técnica</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                       <div className="text-xs text-gray-500 mt-0.5">{resumirProdutosDoOrcamento(orcamento)}</div>
                     </TableCell>
                     <TableCell className="px-4 py-3 align-middle">
