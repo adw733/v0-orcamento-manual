@@ -661,7 +661,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                       <td className="p-3">
                         <div>
                           <p className="font-medium">{item.produto?.nome}</p>
-                          {item.observacao && <p className="text-xs mt-1 text-gray-600 italic">{item.observacao}</p>}
+                          {/* Remove the observation from here */}
                         </div>
                       </td>
                       <td className="p-1">
@@ -1011,7 +1011,9 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
               {item.observacao && (
                 <div>
                   <h4 className="font-bold mb-2 text-primary">Observações</h4>
-                  <p className="text-sm bg-accent p-3 rounded-md">{item.observacao}</p>
+                  <p className="text-sm bg-accent p-3 rounded-md" style={{ whiteSpace: "pre-wrap" }}>
+                    {item.observacao}
+                  </p>
                 </div>
               )}
             </div>
