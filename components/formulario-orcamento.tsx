@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Edit, Check, X, ImageIcon, DollarSign, Loader2 } from "lucide-react"
 import type { Cliente, Produto, Orcamento, ItemOrcamento, Estampa } from "@/types/types"
 import { supabase } from "@/lib/supabase"
+import { toast } from "@/components/ui/use-toast"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -78,6 +79,16 @@ const tamanhosPadrao = {
   "11": 0,
   "12": 0,
   "13": 0,
+}
+
+// Função para converter imagem para base64
+const converterImagemParaBase64 = (file: File, callback: (base64: string) => void) => {
+  const reader = new FileReader()
+  reader.onloadend = () => {
+    const base64String = reader.result as string
+    callback(base64String)
+  }
+  reader.readAsDataURL(file)
 }
 
 // Substituir o componente EstampaInput por um novo que suporta múltiplas estampas
@@ -272,6 +283,116 @@ const renderTabelaTamanhos = (
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+// Componente para gerenciar imagem (upload, prévia, remoção)
+const GerenciadorImagem = ({
+  imagem,
+  onChange,
+  inputRef,
+  isEditing = true,
+}: {
+  imagem?: string
+  onChange: (novaImagem: string) => void
+  inputRef: React.RefObject<HTMLInputElement>
+  isEditing?: boolean
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Adicionar event listener para o evento de colar
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (!isEditing) return
+
+      // Verificar se há itens na área de transferência
+      if (e.clipboardData && e.clipboardData.items) {
+        const items = e.clipboardData.items
+
+        // Procurar por uma imagem nos itens colados
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf("image") !== -1) {
+            // Encontrou uma imagem, obter o arquivo
+            const file = items[i].getAsFile()
+            if (file) {
+              e.preventDefault() // Prevenir o comportamento padrão
+
+              // Converter para base64 e atualizar o estado
+              converterImagemParaBase64(file, (base64) => {
+                onChange(base64)
+                toast({
+                  title: "Imagem colada com sucesso!",
+                  description: "A imagem da área de transferência foi adicionada.",
+                })
+              })
+              break
+            }
+          }
+        }
+      }
+    }
+
+    // Adicionar o event listener ao documento
+    document.addEventListener("paste", handlePaste)
+
+    // Remover o event listener quando o componente for desmontado
+    return () => {
+      document.removeEventListener("paste", handlePaste)
+    }
+  }, [isEditing, onChange])
+
+  if (!isEditing) return null
+
+  return (
+    <div className="mt-4" ref={containerRef}>
+      <Label className="text-primary">Imagem para Ficha Técnica</Label>
+      <div className="flex items-center gap-4 mt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => inputRef.current?.click()}
+          className="flex items-center gap-2 border-dashed border-2 hover:bg-accent transition-colors"
+        >
+          <ImageIcon className="h-4 w-4" />
+          {imagem ? "Trocar Imagem" : "Adicionar Imagem"}
+        </Button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              converterImagemParaBase64(file, (base64) => {
+                onChange(base64)
+              })
+            }
+          }}
+          className="hidden"
+        />
+        <div className="text-sm text-gray-500 italic">
+          Você também pode colar uma imagem diretamente da área de transferência (Ctrl+V)
+        </div>
+        {imagem && (
+          <div className="relative">
+            <img
+              src={imagem || "/placeholder.svg"}
+              alt="Prévia da imagem"
+              className="h-20 w-20 object-cover rounded-md border shadow-sm"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+              onClick={() => onChange("")}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -511,16 +632,6 @@ export default function FormularioOrcamento({
     })
   }
 
-  // Função para converter imagem para base64
-  const converterImagemParaBase64 = (file: File, callback: (base64: string) => void) => {
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      const base64String = reader.result as string
-      callback(base64String)
-    }
-    reader.readAsDataURL(file)
-  }
-
   // Manipulador para upload de imagem para novo item
   const handleNovaImagem = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -579,70 +690,6 @@ export default function FormularioOrcamento({
   const handleTextUppercase = (e: React.ChangeEvent<HTMLInputElement>, field: keyof Orcamento) => {
     const value = e.target.value.toUpperCase()
     atualizarOrcamento({ [field]: value })
-  }
-
-  // Componente para gerenciar imagem (upload, prévia, remoção)
-  const GerenciadorImagem = ({
-    imagem,
-    onChange,
-    inputRef,
-    isEditing = true,
-  }: {
-    imagem?: string
-    onChange: (novaImagem: string) => void
-    inputRef: React.RefObject<HTMLInputElement>
-    isEditing?: boolean
-  }) => {
-    if (!isEditing) return null
-
-    return (
-      <div className="mt-4">
-        <Label className="text-primary">Imagem para Ficha Técnica</Label>
-        <div className="flex items-center gap-4 mt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => inputRef.current?.click()}
-            className="flex items-center gap-2 border-dashed border-2 hover:bg-accent transition-colors"
-          >
-            <ImageIcon className="h-4 w-4" />
-            {imagem ? "Trocar Imagem" : "Adicionar Imagem"}
-          </Button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) {
-                converterImagemParaBase64(file, (base64) => {
-                  onChange(base64)
-                })
-              }
-            }}
-            className="hidden"
-          />
-          {imagem && (
-            <div className="relative">
-              <img
-                src={imagem || "/placeholder.svg"}
-                alt="Prévia da imagem"
-                className="h-20 w-20 object-cover rounded-md border shadow-sm"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
-                onClick={() => onChange("")}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    )
   }
 
   return (
