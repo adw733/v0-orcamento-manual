@@ -375,8 +375,55 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
 
       if (itensError) throw itensError
 
+      // Extrair metadados e ordem dos itens do JSON
+      let _valorFrete = 0
+      let _nomeContato = ""
+      let _telefoneContato = ""
+      let ordemItens: string[] = [] // Array para armazenar a ordem dos IDs dos itens
+
+      try {
+        if (data.itens && typeof data.itens === "object") {
+          // Se itens já é um objeto (parseado automaticamente)
+          if (data.itens.metadados) {
+            if (data.itens.metadados.valorFrete !== undefined) {
+              _valorFrete = Number(data.itens.metadados.valorFrete)
+            }
+            if (data.itens.metadados.nomeContato !== undefined) {
+              _nomeContato = data.itens.metadados.nomeContato
+            }
+            if (data.itens.metadados.telefoneContato !== undefined) {
+              _telefoneContato = data.itens.metadados.telefoneContato
+            }
+          }
+          // Extrair a ordem dos itens, se existir
+          if (data.itens.items && Array.isArray(data.itens.items)) {
+            ordemItens = data.itens.items.map((item) => item.id)
+          }
+        } else if (data.itens && typeof data.itens === "string") {
+          // Se itens é uma string JSON
+          const itensObj = JSON.parse(data.itens)
+          if (itensObj.metadados) {
+            if (itensObj.metadados.valorFrete !== undefined) {
+              _valorFrete = Number(itensObj.metadados.valorFrete)
+            }
+            if (itensObj.metadados.nomeContato !== undefined) {
+              _nomeContato = itensObj.metadados.nomeContato
+            }
+            if (itensObj.metadados.telefoneContato !== undefined) {
+              _telefoneContato = itensObj.metadados.telefoneContato
+            }
+          }
+          // Extrair a ordem dos itens, se existir
+          if (itensObj.items && Array.isArray(itensObj.items)) {
+            ordemItens = itensObj.items.map((item) => item.id)
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao extrair metadados do JSON:", e)
+      }
+
       // Converter para o formato da aplicação
-      const itensFormatados: ItemOrcamento[] = await Promise.all(
+      let itensFormatados: ItemOrcamento[] = await Promise.all(
         itensData
           ? itensData.map(async (item) => {
               // Buscar o produto completo com tecidos
@@ -444,6 +491,32 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
             })
           : [],
       )
+
+      // Ordenar os itens conforme a ordem salva no JSON
+      if (ordemItens.length > 0) {
+        // Criar um mapa para facilitar a busca por ID
+        const itensMap = new Map(itensFormatados.map((item) => [item.id, item]))
+
+        // Criar um novo array ordenado
+        const itensOrdenados: ItemOrcamento[] = []
+
+        // Adicionar os itens na ordem salva
+        ordemItens.forEach((id) => {
+          const item = itensMap.get(id)
+          if (item) {
+            itensOrdenados.push(item)
+            itensMap.delete(id) // Remover do mapa para não duplicar
+          }
+        })
+
+        // Adicionar quaisquer itens restantes que não estavam na ordem salva
+        itensMap.forEach((item) => {
+          itensOrdenados.push(item)
+        })
+
+        // Substituir o array original pelo ordenado
+        itensFormatados = itensOrdenados
+      }
 
       // Extrair metadados do JSON de itens, se existirem
       let valorFrete = 0
@@ -1412,12 +1485,66 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
     }
   }
 
+  // Modificar a função atualizarOrcamento para salvar a ordem dos itens no Supabase
+
+  // Localizar a função atualizarOrcamento e modificar a parte onde os itens são salvos
+  // Aproximadamente na linha 1000-1100
+
+  // Substituir o trecho que atualiza o orçamento no Supabase por:
+
   const atualizarOrcamento = async (novoOrcamento: Partial<Orcamento>) => {
     const orcamentoAtualizado = { ...orcamento, ...novoOrcamento }
     setOrcamento(orcamentoAtualizado)
+
+    // Se o orçamento estiver salvo e os itens foram atualizados, atualizar no Supabase
+    if (
+      orcamentoSalvo &&
+      (novoOrcamento.itens || novoOrcamento.valorFrete || novoOrcamento.nomeContato || novoOrcamento.telefoneContato)
+    ) {
+      try {
+        setIsLoading(true)
+
+        // Criar um objeto com metadados adicionais para incluir no JSON
+        const metadados = {
+          valorFrete: orcamentoAtualizado.valorFrete || 0,
+          nomeContato: orcamentoAtualizado.nomeContato || "",
+          telefoneContato: orcamentoAtualizado.telefoneContato || "",
+        }
+
+        // Atualizar o campo itens no Supabase, preservando a ordem atual dos itens
+        const { error } = await supabase
+          .from("orcamentos")
+          .update({
+            itens: JSON.stringify({
+              items: orcamentoAtualizado.itens || [],
+              metadados: metadados,
+            }),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", orcamentoSalvo)
+
+        if (error) {
+          console.error("Erro ao atualizar ordem dos itens:", error)
+          setFeedbackSalvamento({
+            visivel: true,
+            sucesso: false,
+            mensagem: `Erro ao atualizar ordem dos itens: ${error.message}`,
+          })
+        } else {
+          setFeedbackSalvamento({
+            visivel: true,
+            sucesso: true,
+            mensagem: "Ordem dos itens atualizada com sucesso!",
+          })
+        }
+      } catch (error) {
+        console.error("Erro ao atualizar ordem dos itens:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
-  // Update the adicionarItem function to include both observation fields
   const adicionarItem = async (item: ItemOrcamento) => {
     const itensAtualizados = [...orcamento.itens, item]
 

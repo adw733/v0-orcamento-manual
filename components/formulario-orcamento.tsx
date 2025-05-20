@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Trash2, Edit, Check, X, ImageIcon, DollarSign, Loader2 } from "lucide-react"
+import { Plus, Trash2, Edit, Check, X, ImageIcon, DollarSign, Loader2, ChevronUp, ChevronDown } from "lucide-react"
 import type { Cliente, Produto, Orcamento, ItemOrcamento, Estampa } from "@/types/types"
 import { supabase } from "@/lib/supabase"
 import { toast } from "@/components/ui/use-toast"
@@ -694,6 +694,33 @@ export default function FormularioOrcamento({
     atualizarOrcamento({ [field]: value })
   }
 
+  // Funções para mover itens para cima ou para baixo
+  const moverItemParaCima = (index: number) => {
+    if (index <= 0) return // Já está no topo
+
+    const novosItens = [...orcamento.itens]
+    // Trocar o item atual com o item acima
+    const temp = novosItens[index]
+    novosItens[index] = novosItens[index - 1]
+    novosItens[index - 1] = temp
+
+    // Atualizar o orçamento com a nova ordem
+    atualizarOrcamento({ itens: novosItens })
+  }
+
+  const moverItemParaBaixo = (index: number) => {
+    if (index >= orcamento.itens.length - 1) return // Já está no final
+
+    const novosItens = [...orcamento.itens]
+    // Trocar o item atual com o item abaixo
+    const temp = novosItens[index]
+    novosItens[index] = novosItens[index + 1]
+    novosItens[index + 1] = temp
+
+    // Atualizar o orçamento com a nova ordem
+    atualizarOrcamento({ itens: novosItens })
+  }
+
   return (
     <div className="space-y-6">
       {isLoading && (
@@ -825,7 +852,8 @@ export default function FormularioOrcamento({
           <table className="w-full">
             <thead className="bg-primary text-white">
               <tr>
-                <th className="text-left p-3 w-[45%] rounded-tl-md">Produto</th>
+                <th className="p-3 w-[5%]">#</th>
+                <th className="text-left p-3 w-[40%] rounded-tl-md">Produto</th>
                 <th className="text-center p-3 w-[15%]">Valor Unit.</th>
                 <th className="text-center p-3 w-[10%]">Qtd.</th>
                 <th className="text-right p-3 w-[15%]">Total</th>
@@ -833,9 +861,34 @@ export default function FormularioOrcamento({
               </tr>
             </thead>
             <tbody>
-              {orcamento.itens.map((item) => (
+              {orcamento.itens.map((item, index) => (
                 <React.Fragment key={item.id}>
                   <tr className="border-t hover:bg-accent/30 transition-colors">
+                    <td className="p-3 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => moverItemParaCima(index)}
+                          disabled={index === 0 || isLoading}
+                          className="h-6 w-6 rounded-full hover:bg-primary/10"
+                          title="Mover para cima"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <span className="text-xs font-medium">{index + 1}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => moverItemParaBaixo(index)}
+                          disabled={index === orcamento.itens.length - 1 || isLoading}
+                          className="h-6 w-6 rounded-full hover:bg-primary/10"
+                          title="Mover para baixo"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
                     <td className="p-3">
                       <div className="font-medium">{item.produto?.nome}</div>
                       {item.observacaoComercial && (
@@ -919,7 +972,7 @@ export default function FormularioOrcamento({
                   </tr>
                   {editandoItem === item.id && itemEmEdicao && (
                     <tr>
-                      <td colSpan={5} className="p-4 bg-accent/50 border-t border-b">
+                      <td colSpan={6} className="p-4 bg-accent/50 border-t border-b">
                         {/* Tabela de Tamanhos */}
                         {renderTabelaTamanhos(
                           itemEmEdicao.tamanhos,
@@ -1018,6 +1071,7 @@ export default function FormularioOrcamento({
 
               {/* Linha para adicionar novo item */}
               <tr className="border-t hover:bg-accent/30 transition-colors">
+                <td className="p-3"></td>
                 <td className="p-3" onClick={() => setLinhaAtiva("novo")}>
                   {linhaAtiva === "novo" ? (
                     <Select value={novoItem.produtoId || ""} onValueChange={handleProdutoChange}>
@@ -1084,111 +1138,17 @@ export default function FormularioOrcamento({
                   )}
                 </td>
               </tr>
-
-              {/* Linha para mostrar tamanhos do novo item - sempre visível quando um produto é selecionado */}
-              {linhaAtiva === "novo" && novoItem.produtoId && (
-                <tr>
-                  <td colSpan={5} className="p-4 bg-accent/50 border-t border-b">
-                    {/* Tabela de Tamanhos */}
-                    {renderTabelaTamanhos(
-                      novoItem.tamanhos || {},
-                      novoItem.quantidade || 0,
-                      true,
-                      (tamanho, valor) => handleNovoTamanhoChange(tamanho as keyof ItemOrcamento["tamanhos"], valor),
-                      produtoSelecionado?.tamanhosDisponiveis,
-                    )}
-
-                    {produtoSelecionado && (
-                      <div className="mt-4 space-y-4">
-                        {/* Tecido selection */}
-                        <div>
-                          <Label className="text-primary mb-1.5">Tecido</Label>
-                          <Select
-                            value={novoItem.tecidoSelecionado?.nome || ""}
-                            onValueChange={(value) => handleTecidoChange(value)}
-                          >
-                            <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                              <SelectValue placeholder="Selecione o tecido" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {produtoSelecionado.tecidos.map((tecido) => (
-                                <SelectItem key={tecido.nome} value={tecido.nome}>
-                                  {tecido.nome} - {tecido.composicao}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Cor selection */}
-                        <div>
-                          <Label className="text-primary mb-1.5">Cor</Label>
-                          <Select
-                            value={novoItem.corSelecionada || ""}
-                            onValueChange={(value) => handleCorChange(value)}
-                          >
-                            <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                              <SelectValue placeholder="Selecione a cor" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {produtoSelecionado.cores.map((cor) => (
-                                <SelectItem key={cor} value={cor}>
-                                  {cor}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Artes */}
-                        <div>
-                          <Label className="text-primary mb-1.5">Artes</Label>
-                          <EstampaInput estampas={novoItem.estampas || []} onChange={handleEstampasChange} />
-                        </div>
-
-                        {/* Observações */}
-                        <div className="space-y-3">
-                          <Label className="text-primary mb-1.5">Observação Comercial (Orçamento)</Label>
-                          <Textarea
-                            value={novoItem.observacaoComercial || ""}
-                            onChange={(e) => setNovoItem({ ...novoItem, observacaoComercial: e.target.value })}
-                            placeholder="Observações comerciais sobre o item (aparece no orçamento)"
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                            rows={2}
-                          />
-
-                          <Label className="text-primary mb-1.5">Observação Técnica (Ficha Técnica)</Label>
-                          <Textarea
-                            value={novoItem.observacaoTecnica || ""}
-                            onChange={(e) => setNovoItem({ ...novoItem, observacaoTecnica: e.target.value })}
-                            placeholder="Observações técnicas sobre o item (aparece na ficha técnica)"
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                            rows={2}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Gerenciador de imagem para o novo item */}
-                    <GerenciadorImagem
-                      imagem={novoItem.imagem}
-                      onChange={(novaImagem) => setNovoItem({ ...novoItem, imagem: novaImagem })}
-                      inputRef={novoImagemInputRef}
-                    />
-                  </td>
-                </tr>
-              )}
             </tbody>
             <tfoot className="bg-primary text-white">
               <tr>
-                <td colSpan={3} className="p-3 text-right font-medium">
+                <td colSpan={4} className="p-3 text-right font-medium">
                   Valor dos Produtos:
                 </td>
                 <td className="p-3 text-right font-medium">R$ {calcularTotal().toFixed(2)}</td>
                 <td></td>
               </tr>
               <tr>
-                <td colSpan={3} className="p-3 text-right font-medium">
+                <td colSpan={4} className="p-3 text-right font-medium">
                   Valor do Frete:
                 </td>
                 <td className="p-3 text-right font-medium">
@@ -1210,7 +1170,7 @@ export default function FormularioOrcamento({
                 <td></td>
               </tr>
               <tr>
-                <td colSpan={3} className="p-3 text-right font-bold">
+                <td colSpan={4} className="p-3 text-right font-bold">
                   Total do Orçamento:
                 </td>
                 <td className="p-3 text-right font-bold">
