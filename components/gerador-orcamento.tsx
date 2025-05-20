@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, Save, Check, AlertCircle, FileDown, FileText } from "lucide-react"
+import { Printer, Save, Check, AlertCircle, FileDown } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset } from "@/components/ui/sidebar"
@@ -438,7 +438,8 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                 estampas: estampas,
                 tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
                 imagem: item.imagem || undefined,
-                observacao: item.observacao || undefined,
+                observacaoComercial: item.observacao_comercial || undefined,
+                observacaoTecnica: item.observacao_tecnica || undefined,
               }
             })
           : [],
@@ -833,7 +834,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
             })[0]
 
           if (ultimoProdutoComCodigo && ultimoProdutoComCodigo.codigo) {
-            const match = ultimoProdutoComCodigo.codigo.match(/^P?(\d+)$/)
+            const match = ultimoProdutoComCodigo.codigo.match(/^P(\d+)$/)
             if (match && match[1]) {
               contador = Number.parseInt(match[1], 10) + 1
             }
@@ -1416,6 +1417,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
     setOrcamento(orcamentoAtualizado)
   }
 
+  // Update the adicionarItem function to include both observation fields
   const adicionarItem = async (item: ItemOrcamento) => {
     const itensAtualizados = [...orcamento.itens, item]
 
@@ -1452,7 +1454,8 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
             cor_selecionada: item.corSelecionada,
             tamanhos: item.tamanhos,
             imagem: item.imagem,
-            // Remover o campo observacao que está causando o erro
+            observacao_comercial: item.observacaoComercial,
+            observacao_tecnica: item.observacaoTecnica,
           })
           .select()
 
@@ -1514,6 +1517,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
     }
   }
 
+  // Update the atualizarItem function to include both observation fields
   const atualizarItem = async (id: string, novoItem: Partial<ItemOrcamento>) => {
     const itensAtualizados = orcamento.itens.map((item) => (item.id === id ? { ...item, ...novoItem } : item))
     setOrcamento({
@@ -1540,7 +1544,8 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
               cor_selecionada: itemAtualizado.corSelecionada,
               tamanhos: itemAtualizado.tamanhos,
               imagem: itemAtualizado.imagem,
-              // Remover o campo observacao que está causando o erro
+              observacao_comercial: itemAtualizado.observacaoComercial,
+              observacao_tecnica: itemAtualizado.observacaoTecnica,
             })
             .eq("id", id)
 
@@ -1554,7 +1559,6 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
             // Em seguida, inserir as novas estampas com novos IDs
             const estampasParaInserir = itemAtualizado.estampas.map((estampa) => ({
               id: generateUUID(), // Sempre gerar um novo ID para evitar conflitos
-              item_orcamento_id: id, // Sempre gerar um novo ID para evitar conflitos
               item_orcamento_id: id,
               posicao: estampa.posicao,
               tipo: estampa.tipo,
@@ -1664,6 +1668,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                   }))
                 : []
 
+              // Inside the carregarOrcamento function, in the itensFormatados mapping:
               return {
                 id: item.id,
                 produtoId: item.produto_id || "",
@@ -1680,7 +1685,8 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                 estampas: estampas,
                 tamanhos: (item.tamanhos as ItemOrcamento["tamanhos"]) || {},
                 imagem: item.imagem || undefined,
-                observacao: item.observacao || undefined,
+                observacaoComercial: item.observacao_comercial || undefined,
+                observacaoTecnica: item.observacao_tecnica || undefined,
               }
             })
           : [],
@@ -2060,25 +2066,20 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                     {isPrinting ? "Imprimindo..." : "Imprimir"}
                   </Button>
 
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => exportarOrcamento(orcamento.id || "", "orcamento")}
-                      disabled={isLoading || !orcamento.cliente}
-                      className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
-                    >
-                      <FileDown className="h-4 w-4" />
-                      {isLoading ? "Gerando..." : "Exportar Orçamento"}
-                    </Button>
-
-                    <Button
-                      onClick={() => exportarOrcamento(orcamento.id || "", "ficha")}
-                      disabled={isLoading || !orcamento.cliente || orcamento.itens.length === 0}
-                      className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
-                    >
-                      <FileText className="h-4 w-4" />
-                      {isLoading ? "Gerando..." : "Exportar Ficha Técnica"}
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={async () => {
+                      if (orcamento.id) {
+                        // Exportar ambos os arquivos sequencialmente
+                        await exportarOrcamento(orcamento.id, "orcamento")
+                        await exportarOrcamento(orcamento.id, "ficha")
+                      }
+                    }}
+                    disabled={isLoading || !orcamento.cliente || orcamento.itens.length === 0}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    {isLoading ? "Gerando..." : "Exportar PDF"}
+                  </Button>
                 </>
               )}
             </div>

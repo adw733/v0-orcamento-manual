@@ -59,7 +59,8 @@ export type ItemOrcamento = {
     [tamanho: string]: number
   }
   imagem?: string
-  observacao?: string
+  observacaoComercial?: string // Observação que aparece no orçamento
+  observacaoTecnica?: string // Observação que aparece na ficha técnica
 }
 
 // Atualizar o tipo Orcamento para incluir os campos de contato

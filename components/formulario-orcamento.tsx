@@ -418,7 +418,8 @@ export default function FormularioOrcamento({
     valorUnitario: 0,
     tamanhos: { ...tamanhosPadrao },
     imagem: "",
-    observacao: "",
+    observacaoComercial: "",
+    observacaoTecnica: "",
     estampas: [],
   })
   const [itemEmEdicao, setItemEmEdicao] = useState<ItemOrcamento | null>(null)
@@ -564,7 +565,8 @@ export default function FormularioOrcamento({
           valorUnitario: 0,
           tamanhos: { ...tamanhosPadrao },
           imagem: "",
-          observacao: "",
+          observacaoComercial: "",
+          observacaoTecnica: "",
           estampas: [],
         })
         setProdutoSelecionado(null)
@@ -836,7 +838,9 @@ export default function FormularioOrcamento({
                   <tr className="border-t hover:bg-accent/30 transition-colors">
                     <td className="p-3">
                       <div className="font-medium">{item.produto?.nome}</div>
-                      {item.observacao && <div className="text-xs mt-1 text-gray-600 italic">{item.observacao}</div>}
+                      {item.observacaoComercial && (
+                        <div className="text-xs mt-1 text-gray-600 italic">{item.observacaoComercial}</div>
+                      )}
                     </td>
                     <td className="p-3 text-center">
                       {editandoItem === item.id ? (
@@ -973,13 +977,26 @@ export default function FormularioOrcamento({
                               <EstampaInput estampas={itemEmEdicao?.estampas || []} onChange={handleEstampasChange} />
                             </div>
 
-                            {/* Observação */}
-                            <div>
-                              <Label className="text-primary mb-1.5">Observação</Label>
+                            {/* Observações */}
+                            <div className="space-y-3">
+                              <Label className="text-primary mb-1.5">Observação Comercial (Orçamento)</Label>
                               <Textarea
-                                value={itemEmEdicao?.observacao || ""}
-                                onChange={(e) => setItemEmEdicao({ ...itemEmEdicao!, observacao: e.target.value })}
-                                placeholder="Observações adicionais sobre o item"
+                                value={itemEmEdicao?.observacaoComercial || ""}
+                                onChange={(e) =>
+                                  setItemEmEdicao({ ...itemEmEdicao!, observacaoComercial: e.target.value })
+                                }
+                                placeholder="Observações comerciais sobre o item (aparece no orçamento)"
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                rows={2}
+                              />
+
+                              <Label className="text-primary mb-1.5">Observação Técnica (Ficha Técnica)</Label>
+                              <Textarea
+                                value={itemEmEdicao?.observacaoTecnica || ""}
+                                onChange={(e) =>
+                                  setItemEmEdicao({ ...itemEmEdicao!, observacaoTecnica: e.target.value })
+                                }
+                                placeholder="Observações técnicas sobre o item (aparece na ficha técnica)"
                                 className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                                 rows={2}
                               />
@@ -1129,13 +1146,22 @@ export default function FormularioOrcamento({
                           <EstampaInput estampas={novoItem.estampas || []} onChange={handleEstampasChange} />
                         </div>
 
-                        {/* Observação */}
-                        <div>
-                          <Label className="text-primary mb-1.5">Observação</Label>
+                        {/* Observações */}
+                        <div className="space-y-3">
+                          <Label className="text-primary mb-1.5">Observação Comercial (Orçamento)</Label>
                           <Textarea
-                            value={novoItem.observacao || ""}
-                            onChange={(e) => setNovoItem({ ...novoItem, observacao: e.target.value })}
-                            placeholder="Observações adicionais sobre o item"
+                            value={novoItem.observacaoComercial || ""}
+                            onChange={(e) => setNovoItem({ ...novoItem, observacaoComercial: e.target.value })}
+                            placeholder="Observações comerciais sobre o item (aparece no orçamento)"
+                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            rows={2}
+                          />
+
+                          <Label className="text-primary mb-1.5">Observação Técnica (Ficha Técnica)</Label>
+                          <Textarea
+                            value={novoItem.observacaoTecnica || ""}
+                            onChange={(e) => setNovoItem({ ...novoItem, observacaoTecnica: e.target.value })}
+                            placeholder="Observações técnicas sobre o item (aparece na ficha técnica)"
                             className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                             rows={2}
                           />

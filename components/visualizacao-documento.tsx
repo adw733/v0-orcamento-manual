@@ -269,6 +269,15 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
       min-width: 60px;
       max-width: 60px;
     }
+
+    .pdf-observacoes-comercial, .pdf-observacoes-tecnica {
+      min-height: 40px;
+      max-height: 80px;
+      overflow: hidden;
+      white-space: pre-wrap;
+      font-style: italic;
+      font-size: 0.85em;
+    }
   }
   
   /* Estilos para garantir que os elementos caibam na página A4 */
@@ -661,7 +670,11 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                       <td className="p-3">
                         <div>
                           <p className="font-medium">{item.produto?.nome}</p>
-                          {/* Remove the observation from here */}
+                          {item.observacaoComercial && (
+                            <div className="text-xs mt-1 text-gray-600 italic pdf-observacoes-comercial">
+                              {item.observacaoComercial}
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="p-1">
@@ -1008,11 +1021,14 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                 </div>
               </div>
 
-              {item.observacao && (
+              {item.observacaoTecnica && (
                 <div>
-                  <h4 className="font-bold mb-2 text-primary">Observações</h4>
-                  <p className="text-sm bg-accent p-3 rounded-md" style={{ whiteSpace: "pre-wrap" }}>
-                    {item.observacao}
+                  <h4 className="font-bold mb-2 text-primary">Observações Técnicas</h4>
+                  <p
+                    className="text-sm bg-accent p-3 rounded-md pdf-observacoes-tecnica"
+                    style={{ whiteSpace: "pre-wrap" }}
+                  >
+                    {item.observacaoTecnica}
                   </p>
                 </div>
               )}

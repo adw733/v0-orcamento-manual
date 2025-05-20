@@ -113,6 +113,18 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
               if (htmlEl.style) {
                 htmlEl.style.printColorAdjust = "exact"
                 htmlEl.style.WebkitPrintColorAdjust = "exact"
+
+                // Ensure text content is preserved
+                if (
+                  htmlEl.classList.contains("text-xs") ||
+                  htmlEl.classList.contains("pdf-observacoes") ||
+                  htmlEl.classList.contains("pdf-observacoes-comercial") ||
+                  htmlEl.classList.contains("pdf-observacoes-tecnica")
+                ) {
+                  htmlEl.style.whiteSpace = "pre-wrap"
+                  htmlEl.style.overflow = "visible"
+                  htmlEl.style.maxHeight = "none"
+                }
               }
             })
           },
