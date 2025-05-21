@@ -852,8 +852,8 @@ export default function FormularioOrcamento({
           <table className="w-full">
             <thead className="bg-primary text-white">
               <tr>
-                <th className="p-3 w-[5%]">#</th>
-                <th className="text-left p-3 w-[40%] rounded-tl-md">Produto</th>
+                <th className="p-3 w-[5%] rounded-tl-md"></th>
+                <th className="text-left p-3 w-[40%]">Produto</th>
                 <th className="text-center p-3 w-[15%]">Valor Unit.</th>
                 <th className="text-center p-3 w-[10%]">Qtd.</th>
                 <th className="text-right p-3 w-[15%]">Total</th>
@@ -876,7 +876,6 @@ export default function FormularioOrcamento({
                         >
                           <ChevronUp className="h-4 w-4" />
                         </Button>
-                        <span className="text-xs font-medium">{index + 1}</span>
                         <Button
                           variant="ghost"
                           size="icon"
