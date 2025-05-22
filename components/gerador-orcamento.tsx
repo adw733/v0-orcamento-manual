@@ -1741,7 +1741,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
       if (itensError) throw itensError
 
       // Converter para o formato da aplicação
-      const itensFormatados: ItemOrcamento[] = await Promise.all(
+      let itensFormatados: ItemOrcamento[] = await Promise.all(
         itensData
           ? itensData.map(async (item) => {
               // Buscar o produto completo com tecidos
@@ -1818,6 +1818,85 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
             })
           : [],
       )
+
+      // Agora, precisamos modificar a função carregarOrcamento para garantir que a ordem dos itens seja respeitada
+      // Localizar a função carregarOrcamento e adicionar o código para ordenar os itens conforme a ordem salva
+
+      // Adicionar este trecho de código dentro da função carregarOrcamento, após a linha onde os itensFormatados são criados:
+      // Aproximadamente na linha 1500-1600, após a criação de itensFormatados
+
+      // Extrair metadados e ordem dos itens do JSON
+      let _valorFrete = 0
+      let _nomeContato = ""
+      let _telefoneContato = ""
+      let ordemItens: string[] = [] // Array para armazenar a ordem dos IDs dos itens
+
+      try {
+        if (data.itens && typeof data.itens === "object") {
+          // Se itens já é um objeto (parseado automaticamente)
+          if (data.itens.metadados) {
+            if (data.itens.metadados.valorFrete !== undefined) {
+              _valorFrete = Number(data.itens.metadados.valorFrete)
+            }
+            if (data.itens.metadados.nomeContato !== undefined) {
+              _nomeContato = data.itens.metadados.nomeContato
+            }
+            if (data.itens.metadados.telefoneContato !== undefined) {
+              _telefoneContato = data.itens.metadados.telefoneContato
+            }
+          }
+          // Extrair a ordem dos itens, se existir
+          if (data.itens.items && Array.isArray(data.itens.items)) {
+            ordemItens = data.itens.items.map((item) => item.id)
+          }
+        } else if (data.itens && typeof data.itens === "string") {
+          // Se itens é uma string JSON
+          const itensObj = JSON.parse(data.itens)
+          if (itensObj.metadados) {
+            if (itensObj.metadados.valorFrete !== undefined) {
+              _valorFrete = Number(itensObj.metadados.valorFrete)
+            }
+            if (itensObj.metadados.nomeContato !== undefined) {
+              _nomeContato = itensObj.metadados.nomeContato
+            }
+            if (itensObj.metadados.telefoneContato !== undefined) {
+              _telefoneContato = itensObj.metadados.telefoneContato
+            }
+          }
+          // Extrair a ordem dos itens, se existir
+          if (itensObj.items && Array.isArray(itensObj.items)) {
+            ordemItens = itensObj.items.map((item) => item.id)
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao extrair metadados do JSON:", e)
+      }
+
+      // Ordenar os itens conforme a ordem salva no JSON
+      if (ordemItens.length > 0) {
+        // Criar um mapa para facilitar a busca por ID
+        const itensMap = new Map(itensFormatados.map((item) => [item.id, item]))
+
+        // Criar um novo array ordenado
+        const itensOrdenados: ItemOrcamento[] = []
+
+        // Adicionar os itens na ordem salva
+        ordemItens.forEach((id) => {
+          const item = itensMap.get(id)
+          if (item) {
+            itensOrdenados.push(item)
+            itensMap.delete(id) // Remover do mapa para não duplicar
+          }
+        })
+
+        // Adicionar quaisquer itens restantes que não estavam na ordem salva
+        itensMap.forEach((item) => {
+          itensOrdenados.push(item)
+        })
+
+        // Substituir o array original pelo ordenado
+        itensFormatados = itensOrdenados
+      }
 
       // Converter cliente
       const clienteFormatado = {
