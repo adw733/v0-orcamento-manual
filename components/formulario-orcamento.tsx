@@ -1032,8 +1032,119 @@ export default function FormularioOrcamento({
                   {editandoItem === item.id && itemEmEdicao && (
                     <tr>
                       <td colSpan={6} className="p-4 bg-accent/50 border-t border-b">
-                        {/* Conteúdo existente da edição */}
-                        {/* ... */}
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Seleção de tecido */}
+                            {produtoSelecionado?.tecidos && produtoSelecionado.tecidos.length > 0 && (
+                              <div>
+                                <Label htmlFor="tecido" className="text-primary mb-1.5">
+                                  Tecido
+                                </Label>
+                                <Select
+                                  value={itemEmEdicao.tecidoSelecionado?.nome || ""}
+                                  onValueChange={handleTecidoChange}
+                                >
+                                  <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                    <SelectValue placeholder="Selecione o tecido" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {produtoSelecionado.tecidos.map((tecido) => (
+                                      <SelectItem key={tecido.nome} value={tecido.nome}>
+                                        {tecido.nome} {tecido.composicao ? `- ${tecido.composicao}` : ""}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+
+                            {/* Seleção de cor */}
+                            {produtoSelecionado?.cores && produtoSelecionado.cores.length > 0 && (
+                              <div>
+                                <Label htmlFor="cor" className="text-primary mb-1.5">
+                                  Cor
+                                </Label>
+                                <Select value={itemEmEdicao.corSelecionada || ""} onValueChange={handleCorChange}>
+                                  <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                    <SelectValue placeholder="Selecione a cor" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {produtoSelecionado.cores.map((cor) => (
+                                      <SelectItem key={cor} value={cor}>
+                                        {cor}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Tabela de tamanhos */}
+                          {renderTabelaTamanhos(
+                            itemEmEdicao.tamanhos,
+                            itemEmEdicao.quantidade,
+                            true,
+                            handleTamanhoChange,
+                            produtoSelecionado?.tamanhosDisponiveis,
+                          )}
+
+                          {/* Observações */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="observacaoComercial" className="text-primary mb-1.5">
+                                Observação Comercial
+                              </Label>
+                              <Textarea
+                                id="observacaoComercial"
+                                value={itemEmEdicao.observacaoComercial || ""}
+                                onChange={(e) =>
+                                  setItemEmEdicao({
+                                    ...itemEmEdicao,
+                                    observacaoComercial: e.target.value,
+                                  })
+                                }
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                rows={3}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="observacaoTecnica" className="text-primary mb-1.5">
+                                Observação Técnica
+                              </Label>
+                              <Textarea
+                                id="observacaoTecnica"
+                                value={itemEmEdicao.observacaoTecnica || ""}
+                                onChange={(e) =>
+                                  setItemEmEdicao({
+                                    ...itemEmEdicao,
+                                    observacaoTecnica: e.target.value,
+                                  })
+                                }
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                rows={3}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Gerenciador de imagem */}
+                          <GerenciadorImagem
+                            imagem={itemEmEdicao.imagem}
+                            onChange={(novaImagem) =>
+                              setItemEmEdicao({
+                                ...itemEmEdicao,
+                                imagem: novaImagem,
+                              })
+                            }
+                            inputRef={editImagemInputRef}
+                          />
+
+                          {/* Estampas */}
+                          <div>
+                            <Label className="text-primary mb-1.5">Estampas</Label>
+                            <EstampaInput estampas={itemEmEdicao.estampas || []} onChange={handleEstampasChange} />
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )}

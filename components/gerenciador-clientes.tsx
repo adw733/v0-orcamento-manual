@@ -86,6 +86,60 @@ const obterProximoCodigoCliente = async (): Promise<string> => {
   }
 }
 
+// Função para atualizar códigos de clientes existentes
+const atualizarCodigosClientesExistentes = async (): Promise<{ success: boolean; message: string }> => {
+  try {
+    // Buscar todos os clientes sem código
+    const { data: clientesSemCodigo, error } = await supabase
+      .from("clientes")
+      .select("id, codigo")
+      .or("codigo.is.null,codigo.eq.")
+      .order("created_at", { ascending: true })
+
+    if (error) throw error
+
+    if (clientesSemCodigo && clientesSemCodigo.length > 0) {
+      // Buscar o último código existente para continuar a sequência
+      const { data: ultimoCliente, error: ultimoError } = await supabase
+        .from("clientes")
+        .select("codigo")
+        .not("codigo", "is", null)
+        .neq("codigo", "")
+        .order("codigo", { ascending: false })
+        .limit(1)
+
+      let contador = 1
+      if (!ultimoError && ultimoCliente && ultimoCliente.length > 0 && ultimoCliente[0].codigo) {
+        const match = ultimoCliente[0].codigo.match(/^C(\d+)$/)
+        if (match && match[1]) {
+          contador = Number.parseInt(match[1], 10) + 1
+        }
+      }
+
+      // Atualizar cada cliente sem código
+      for (const cliente of clientesSemCodigo) {
+        const novoCodigo = "C" + String(contador).padStart(4, "0")
+        contador++
+
+        await supabase.from("clientes").update({ codigo: novoCodigo }).eq("id", cliente.id)
+      }
+
+      return {
+        success: true,
+        message: `${clientesSemCodigo.length} clientes atualizados com códigos sequenciais.`,
+      }
+    }
+
+    return { success: true, message: "Todos os clientes já possuem códigos." }
+  } catch (error) {
+    console.error("Erro ao atualizar códigos de clientes:", error)
+    return {
+      success: false,
+      message: `Erro ao atualizar códigos: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+    }
+  }
+}
+
 // Tipo para ordenação
 type SortDirection = "asc" | "desc" | null
 type SortField = "codigo" | "nome" | "cnpj" | "telefone" | "email" | null
@@ -114,10 +168,9 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
   const [error, setError] = useState<string | null>(null)
   const [filtro, setFiltro] = useState("")
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
-
-  // Estados para ordenação
   const [sortField, setSortField] = useState<SortField>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>(null)
+  const [atualizandoCodigos, setAtualizandoCodigos] = useState(false)
 
   // Função para alternar ordenação
   const toggleSort = (field: SortField) => {
@@ -441,6 +494,23 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
         >
           <Plus className="h-4 w-4 mr-2" /> Novo Cliente
         </Button>
+        <Button
+          onClick={async () => {
+            setAtualizandoCodigos(true)
+            const resultado = await atualizarCodigosClientesExistentes()
+            if (resultado.success) {
+              // Recarregar dados
+              window.location.reload()
+            }
+            setAtualizandoCodigos(false)
+          }}
+          variant="outline"
+          className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+          disabled={atualizandoCodigos}
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          {atualizandoCodigos ? "Atualizando..." : "Atualizar Códigos"}
+        </Button>
       </div>
 
       {/* Tabela de clientes com ordenação */}
@@ -470,171 +540,188 @@ export default function GerenciadorClientes({ clientes, adicionarCliente, setCli
                 </TableCell>
               </TableRow>
             ) : (
-              clientesFiltradosEOrdenados.map((cliente) => (
-                <TableRow key={cliente.id} className="hover:bg-muted/30">
-                  {editandoId === cliente.id && clienteEditando ? (
-                    <TableCell colSpan={7}>
-                      <div className="p-4 space-y-4 bg-accent/50 rounded-md">
-                        <div className="grid grid-cols-2 gap-4">
+              clientesFiltradosEOrdenados.map((cliente) => {
+                // Garantir que o cliente tem todas as propriedades necessárias
+                const clienteSeguro = {
+                  id: cliente.id || "",
+                  codigo: cliente.codigo || "",
+                  nome: cliente.nome || "",
+                  cnpj: cliente.cnpj || "",
+                  endereco: cliente.endereco || "",
+                  telefone: cliente.telefone || "",
+                  email: cliente.email || "",
+                  contato: cliente.contato || "",
+                }
+
+                return (
+                  <TableRow key={clienteSeguro.id} className="hover:bg-muted/30">
+                    {editandoId === cliente.id && clienteEditando ? (
+                      <TableCell colSpan={7}>
+                        <div className="p-4 space-y-4 bg-accent/50 rounded-md">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label
+                                htmlFor={`edit-codigo-${cliente.id}`}
+                                className="text-primary flex items-center gap-2"
+                              >
+                                <FileText className="h-4 w-4" />
+                                Código
+                              </Label>
+                              <Input
+                                id={`edit-codigo-${cliente.id}`}
+                                value={clienteEditando.codigo}
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                                disabled={true}
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor={`edit-nome-${cliente.id}`}
+                                className="text-primary flex items-center gap-2"
+                              >
+                                <Building className="h-4 w-4" />
+                                Nome Empresa
+                              </Label>
+                              <Input
+                                id={`edit-nome-${cliente.id}`}
+                                value={clienteEditando.nome}
+                                onChange={(e) =>
+                                  setClienteEditando({
+                                    ...clienteEditando,
+                                    nome: e.target.value.toUpperCase(),
+                                  })
+                                }
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                          </div>
                           <div>
-                            <Label
-                              htmlFor={`edit-codigo-${cliente.id}`}
-                              className="text-primary flex items-center gap-2"
-                            >
+                            <Label htmlFor={`edit-cnpj-${cliente.id}`} className="text-primary flex items-center gap-2">
                               <FileText className="h-4 w-4" />
-                              Código
+                              CNPJ
                             </Label>
                             <Input
-                              id={`edit-codigo-${cliente.id}`}
-                              value={clienteEditando.codigo}
-                              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                              disabled={true}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`edit-nome-${cliente.id}`} className="text-primary flex items-center gap-2">
-                              <Building className="h-4 w-4" />
-                              Nome Empresa
-                            </Label>
-                            <Input
-                              id={`edit-nome-${cliente.id}`}
-                              value={clienteEditando.nome}
+                              id={`edit-cnpj-${cliente.id}`}
+                              value={clienteEditando.cnpj}
                               onChange={(e) =>
                                 setClienteEditando({
                                   ...clienteEditando,
-                                  nome: e.target.value.toUpperCase(),
+                                  cnpj: e.target.value.toUpperCase(),
                                 })
                               }
                               className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                             />
                           </div>
-                        </div>
-                        <div>
-                          <Label htmlFor={`edit-cnpj-${cliente.id}`} className="text-primary flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            CNPJ
-                          </Label>
-                          <Input
-                            id={`edit-cnpj-${cliente.id}`}
-                            value={clienteEditando.cnpj}
-                            onChange={(e) =>
-                              setClienteEditando({
-                                ...clienteEditando,
-                                cnpj: e.target.value.toUpperCase(),
-                              })
-                            }
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`edit-endereco-${cliente.id}`} className="text-primary">
-                            Endereço
-                          </Label>
-                          <Input
-                            id={`edit-endereco-${cliente.id}`}
-                            value={clienteEditando.endereco}
-                            onChange={(e) =>
-                              setClienteEditando({
-                                ...clienteEditando,
-                                endereco: e.target.value.toUpperCase(),
-                              })
-                            }
-                            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label
-                              htmlFor={`edit-telefone-${cliente.id}`}
-                              className="text-primary flex items-center gap-2"
+                            <Label htmlFor={`edit-endereco-${cliente.id}`} className="text-primary">
+                              Endereço
+                            </Label>
+                            <Input
+                              id={`edit-endereco-${cliente.id}`}
+                              value={clienteEditando.endereco}
+                              onChange={(e) =>
+                                setClienteEditando({
+                                  ...clienteEditando,
+                                  endereco: e.target.value.toUpperCase(),
+                                })
+                              }
+                              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label
+                                htmlFor={`edit-telefone-${cliente.id}`}
+                                className="text-primary flex items-center gap-2"
+                              >
+                                <Phone className="h-4 w-4" />
+                                Telefone
+                              </Label>
+                              <Input
+                                id={`edit-telefone-${cliente.id}`}
+                                value={clienteEditando.telefone}
+                                onChange={(e) =>
+                                  setClienteEditando({
+                                    ...clienteEditando,
+                                    telefone: e.target.value.toUpperCase(),
+                                  })
+                                }
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor={`edit-email-${cliente.id}`}
+                                className="text-primary flex items-center gap-2"
+                              >
+                                <Mail className="h-4 w-4" />
+                                Email
+                              </Label>
+                              <Input
+                                id={`edit-email-${cliente.id}`}
+                                value={clienteEditando.email}
+                                onChange={(e) =>
+                                  setClienteEditando({
+                                    ...clienteEditando,
+                                    email: e.target.value.toUpperCase(),
+                                  })
+                                }
+                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={cancelarEdicao}
+                              className="text-gray-500 hover:text-gray-700"
                             >
-                              <Phone className="h-4 w-4" />
-                              Telefone
-                            </Label>
-                            <Input
-                              id={`edit-telefone-${cliente.id}`}
-                              value={clienteEditando.telefone}
-                              onChange={(e) =>
-                                setClienteEditando({
-                                  ...clienteEditando,
-                                  telefone: e.target.value.toUpperCase(),
-                                })
-                              }
-                              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
-                          </div>
-                          <div>
-                            <Label
-                              htmlFor={`edit-email-${cliente.id}`}
-                              className="text-primary flex items-center gap-2"
+                              <X className="h-4 w-4 mr-2" /> Cancelar
+                            </Button>
+                            <Button
+                              onClick={salvarEdicao}
+                              className="bg-primary hover:bg-primary-dark text-white"
+                              disabled={isLoading}
                             >
-                              <Mail className="h-4 w-4" />
-                              Email
-                            </Label>
-                            <Input
-                              id={`edit-email-${cliente.id}`}
-                              value={clienteEditando.email}
-                              onChange={(e) =>
-                                setClienteEditando({
-                                  ...clienteEditando,
-                                  email: e.target.value.toUpperCase(),
-                                })
-                              }
-                              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
+                              <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
+                            </Button>
                           </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={cancelarEdicao}
-                            className="text-gray-500 hover:text-gray-700"
-                          >
-                            <X className="h-4 w-4 mr-2" /> Cancelar
-                          </Button>
-                          <Button
-                            onClick={salvarEdicao}
-                            className="bg-primary hover:bg-primary-dark text-white"
-                            disabled={isLoading}
-                          >
-                            <Save className="h-4 w-4 mr-2" /> {isLoading ? "Salvando..." : "Salvar"}
-                          </Button>
-                        </div>
-                      </div>
-                    </TableCell>
-                  ) : (
-                    <>
-                      <TableCell className="font-medium">{cliente.codigo}</TableCell>
-                      <TableCell>{cliente.nome}</TableCell>
-                      <TableCell className="hidden md:table-cell">{cliente.cnpj}</TableCell>
-                      <TableCell className="hidden md:table-cell">{cliente.telefone}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{cliente.email}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => iniciarEdicao(cliente)}
-                            className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
-                            disabled={isLoading}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoverCliente(cliente.id)}
-                            className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                            disabled={isLoading}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
                       </TableCell>
-                    </>
-                  )}
-                </TableRow>
-              ))
+                    ) : (
+                      <>
+                        <TableCell className="font-medium">{cliente.codigo || "-"}</TableCell>
+                        <TableCell>{clienteSeguro.nome}</TableCell>
+                        <TableCell className="hidden md:table-cell">{clienteSeguro.cnpj}</TableCell>
+                        <TableCell className="hidden md:table-cell">{clienteSeguro.telefone}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{clienteSeguro.email}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => iniciarEdicao(cliente)}
+                              className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
+                              disabled={isLoading}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoverCliente(cliente.id)}
+                              className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                              disabled={isLoading}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </>
+                    )}
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>
