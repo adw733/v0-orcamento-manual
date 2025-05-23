@@ -10,7 +10,6 @@ import {
   FileText,
   Search,
   Calendar,
-  Building,
   Loader2,
   PlusCircle,
   Eye,
@@ -74,6 +73,58 @@ export default function ListaOrcamentos({
     return orcamento.itens.some((item) => !item.imagem)
   }
 
+  // Modificar a função calcularDataEntrega para incluir a classe de cor
+  const calcularDataEntrega = (dataOrcamento?: string, prazoEntrega?: string): { data: string; className: string } => {
+    if (!dataOrcamento) return { data: "-", className: "" }
+
+    // Converter a data do orçamento para um objeto Date
+    const data = new Date(`${dataOrcamento}T12:00:00`)
+
+    // Extrair o número de dias do prazo de entrega
+    let diasAdicionais = 0
+    if (prazoEntrega) {
+      // Tentar extrair o número de dias do prazo (ex: "45 DIAS", "30 DIAS ÚTEIS", etc.)
+      const match = prazoEntrega.match(/(\d+)/)
+      if (match && match[1]) {
+        diasAdicionais = Number.parseInt(match[1], 10)
+      }
+    }
+
+    // Se não conseguir extrair um número válido, usar 30 dias como padrão
+    if (isNaN(diasAdicionais) || diasAdicionais <= 0) {
+      diasAdicionais = 30
+    }
+
+    // Adicionar os dias ao objeto Date
+    data.setDate(data.getDate() + diasAdicionais)
+
+    // Determinar a classe de cor com base na proximidade da data
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0) // Resetar horas para comparação apenas de datas
+
+    const umaSemanaDepois = new Date(hoje)
+    umaSemanaDepois.setDate(hoje.getDate() + 7)
+
+    let className = ""
+
+    if (data < hoje) {
+      // Data de entrega já passou
+      className = "text-red-600 font-medium"
+    } else if (data <= umaSemanaDepois) {
+      // Faltam menos de 7 dias
+      className = "text-amber-600 font-medium"
+    } else {
+      // Mais de 7 dias
+      className = "text-green-600 font-medium"
+    }
+
+    // Formatar a data de entrega
+    return {
+      data: data.toLocaleDateString("pt-BR"),
+      className,
+    }
+  }
+
   const carregarOrcamentos = async () => {
     try {
       setIsLoading(true)
@@ -81,7 +132,9 @@ export default function ListaOrcamentos({
 
       const { data, error } = await supabase
         .from("orcamentos")
-        .select("id, numero, data, cliente:cliente_id(nome, cnpj), itens, created_at, updated_at, status")
+        .select(
+          "id, numero, data, cliente:cliente_id(nome, cnpj), itens, created_at, updated_at, status, prazo_entrega",
+        )
         .is("deleted_at", null) // Adicionar esta linha para filtrar orçamentos excluídos
         .order("numero", { ascending: false })
 
@@ -150,6 +203,7 @@ export default function ListaOrcamentos({
           id: orcamento.id,
           numero: orcamento.numero,
           data: orcamento.data,
+          prazoEntrega: orcamento.prazo_entrega || "30 DIAS", // Incluir o prazo de entrega
           cliente: orcamento.cliente
             ? {
                 id: orcamento.cliente.id,
@@ -264,6 +318,13 @@ export default function ListaOrcamentos({
           valorA = a.data || ""
           valorB = b.data || ""
           break
+        case "dataEntrega":
+          // Calcular as datas de entrega para comparação
+          const dataEntregaA = calcularDataEntregaParaOrdenacao(a.data, a.prazoEntrega)
+          const dataEntregaB = calcularDataEntregaParaOrdenacao(b.data, b.prazoEntrega)
+          valorA = dataEntregaA
+          valorB = dataEntregaB
+          break
         case "cliente":
           valorA = a.cliente?.nome || ""
           valorB = b.cliente?.nome || ""
@@ -306,6 +367,34 @@ export default function ListaOrcamentos({
     // Adicionar o horário para evitar problemas de fuso horário
     const data = new Date(`${dataString}T12:00:00`)
     return data.toLocaleDateString("pt-BR")
+  }
+
+  // Função para calcular a data de entrega para ordenação (retorna um objeto Date)
+  const calcularDataEntregaParaOrdenacao = (dataOrcamento?: string, prazoEntrega?: string): Date => {
+    if (!dataOrcamento) return new Date(0) // Data mínima se não houver data
+
+    // Converter a data do orçamento para um objeto Date
+    const data = new Date(`${dataOrcamento}T12:00:00`)
+
+    // Extrair o número de dias do prazo de entrega
+    let diasAdicionais = 0
+    if (prazoEntrega) {
+      // Tentar extrair o número de dias do prazo
+      const match = prazoEntrega.match(/(\d+)/)
+      if (match && match[1]) {
+        diasAdicionais = Number.parseInt(match[1], 10)
+      }
+    }
+
+    // Se não conseguir extrair um número válido, usar 30 dias como padrão
+    if (isNaN(diasAdicionais) || diasAdicionais <= 0) {
+      diasAdicionais = 30
+    }
+
+    // Adicionar os dias ao objeto Date
+    data.setDate(data.getDate() + diasAdicionais)
+
+    return data
   }
 
   // Modificar a função getStatusClassName para incluir os novos status
@@ -605,10 +694,23 @@ export default function ListaOrcamentos({
                 </TableHead>
                 <TableHead
                   className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                  onClick={() => alternarOrdenacao("dataEntrega")}
+                >
+                  <div className="flex items-center">
+                    Data Entrega
+                    {ordenacao.campo === "dataEntrega" &&
+                      (ordenacao.direcao === "asc" ? (
+                        <ChevronUp className="ml-1 h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="ml-1 h-4 w-4" />
+                      ))}
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
                   onClick={() => alternarOrdenacao("cliente")}
                 >
                   <div className="flex items-center">
-                    Cliente / Contato
                     {ordenacao.campo === "cliente" &&
                       (ordenacao.direcao === "asc" ? (
                         <ChevronUp className="ml-1 h-4 w-4" />
@@ -654,7 +756,7 @@ export default function ListaOrcamentos({
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
                     <div className="flex justify-center items-center py-8">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
@@ -662,7 +764,7 @@ export default function ListaOrcamentos({
                 </TableRow>
               ) : filtrarOrcamentos().length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
                     <div className="text-center py-8 bg-accent/30 rounded-lg">
                       <FileText className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                       <h4 className="text-lg font-medium text-gray-600">Nenhum orçamento encontrado</h4>
@@ -709,19 +811,17 @@ export default function ListaOrcamentos({
                         <span>{formatarData(orcamento.data)}</span>
                       </div>
                     </TableCell>
+                    {/* Atualizar a célula da tabela que exibe a data de entrega */}
                     <TableCell className="px-4 py-3 align-middle">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1">
-                          <Building className="h-3 w-3 text-gray-500" />
-                          <span>{orcamento.cliente?.nome || "Cliente não especificado"}</span>
-                        </div>
-                        {orcamento.nomeContato && (
-                          <div className="flex items-center gap-1 mt-1 text-xs text-gray-600">
-                            <span className="font-medium">Contato:</span> {orcamento.nomeContato}
-                          </div>
-                        )}
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-gray-500" />
+                        {(() => {
+                          const { data, className } = calcularDataEntrega(orcamento.data, orcamento.prazoEntrega)
+                          return <span className={className}>{data}</span>
+                        })()}
                       </div>
                     </TableCell>
+
                     <TableCell className="px-4 py-3 align-middle hidden md:table-cell">
                       {orcamento.cliente?.cnpj || "-"}
                     </TableCell>
