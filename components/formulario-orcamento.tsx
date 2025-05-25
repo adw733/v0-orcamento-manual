@@ -137,34 +137,31 @@ const EstampaInput = ({
   const tipos = ["Bordado", "Silk", "DTF", "Sublimação"]
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {estampas.map((estampa, index) => (
-        <div key={estampa.id} className="border rounded-md p-3 bg-accent/30 relative">
+        <div key={estampa.id} className="border rounded p-2 bg-white relative text-xs">
           <button
             type="button"
             onClick={() => removerEstampa(estampa.id!)}
-            className="absolute top-2 right-2 text-gray-500 hover:text-red-500 bg-white rounded-full p-1 shadow-sm"
+            className="absolute top-1 right-1 text-gray-500 hover:text-red-500 bg-white rounded-full p-0.5 shadow-sm"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3 w-3" />
           </button>
 
-          <h4 className="font-medium mb-3 text-primary">Arte {index + 1}</h4>
+          <h5 className="font-medium mb-2 text-primary text-xs">Arte {index + 1}</h5>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label htmlFor={`estampa-posicao-${estampa.id}`} className="text-primary mb-1.5">
-                Posição
-              </Label>
               <Select
                 value={estampa.posicao || ""}
                 onValueChange={(value) => atualizarEstampa(estampa.id!, "posicao", value)}
               >
-                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                  <SelectValue placeholder="Selecione a posição" />
+                <SelectTrigger className="h-6 text-xs border-gray-300 focus:border-primary">
+                  <SelectValue placeholder="Posição" />
                 </SelectTrigger>
                 <SelectContent>
                   {posicoes.map((posicao) => (
-                    <SelectItem key={posicao} value={posicao}>
+                    <SelectItem key={posicao} value={posicao} className="text-xs">
                       {posicao}
                     </SelectItem>
                   ))}
@@ -173,19 +170,16 @@ const EstampaInput = ({
             </div>
 
             <div>
-              <Label htmlFor={`estampa-tipo-${estampa.id}`} className="text-primary mb-1.5">
-                Tipo
-              </Label>
               <Select
                 value={estampa.tipo || ""}
                 onValueChange={(value) => atualizarEstampa(estampa.id!, "tipo", value)}
               >
-                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                  <SelectValue placeholder="Selecione o tipo" />
+                <SelectTrigger className="h-6 text-xs border-gray-300 focus:border-primary">
+                  <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
                   {tipos.map((tipo) => (
-                    <SelectItem key={tipo} value={tipo}>
+                    <SelectItem key={tipo} value={tipo} className="text-xs">
                       {tipo}
                     </SelectItem>
                   ))}
@@ -194,16 +188,12 @@ const EstampaInput = ({
             </div>
 
             <div>
-              <Label htmlFor={`estampa-largura-${estampa.id}`} className="text-primary mb-1.5">
-                Largura (cm)
-              </Label>
               <Input
-                id={`estampa-largura-${estampa.id}`}
                 type="number"
                 value={estampa.largura || ""}
                 onChange={(e) => atualizarEstampa(estampa.id!, "largura", Number(e.target.value))}
-                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                placeholder="0"
+                className="h-6 text-xs border-gray-300 focus:border-primary"
+                placeholder="Largura (cm)"
                 min="0"
                 step="0.5"
               />
@@ -216,9 +206,10 @@ const EstampaInput = ({
         type="button"
         onClick={adicionarEstampa}
         variant="outline"
-        className="w-full mt-2 border-dashed border-2 hover:bg-accent/20"
+        size="sm"
+        className="w-full h-6 text-xs border-dashed border-2 hover:bg-accent/20"
       >
-        <Plus className="h-4 w-4 mr-2" /> Adicionar Arte
+        <Plus className="h-3 w-3 mr-1" /> Adicionar Arte
       </Button>
     </div>
   )
@@ -1031,20 +1022,20 @@ export default function FormularioOrcamento({
                   </tr>
                   {editandoItem === item.id && itemEmEdicao && (
                     <tr>
-                      <td colSpan={6} className="p-4 bg-accent/50 border-t border-b">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            {/* Seleção de tecido */}
+                      <td colSpan={6} className="p-3 bg-accent/50 border-t border-b">
+                        <div className="space-y-3">
+                          {/* Linha 1: Tecido e Cor */}
+                          <div className="grid grid-cols-2 gap-3">
                             {produtoSelecionado?.tecidos && produtoSelecionado.tecidos.length > 0 && (
                               <div>
-                                <Label htmlFor="tecido" className="text-primary mb-1.5">
+                                <Label htmlFor="tecido" className="text-primary text-xs mb-1">
                                   Tecido
                                 </Label>
                                 <Select
                                   value={itemEmEdicao.tecidoSelecionado?.nome || ""}
                                   onValueChange={handleTecidoChange}
                                 >
-                                  <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                  <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
                                     <SelectValue placeholder="Selecione o tecido" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1058,14 +1049,13 @@ export default function FormularioOrcamento({
                               </div>
                             )}
 
-                            {/* Seleção de cor */}
                             {produtoSelecionado?.cores && produtoSelecionado.cores.length > 0 && (
                               <div>
-                                <Label htmlFor="cor" className="text-primary mb-1.5">
+                                <Label htmlFor="cor" className="text-primary text-xs mb-1">
                                   Cor
                                 </Label>
                                 <Select value={itemEmEdicao.corSelecionada || ""} onValueChange={handleCorChange}>
-                                  <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                  <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
                                     <SelectValue placeholder="Selecione a cor" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1080,19 +1070,70 @@ export default function FormularioOrcamento({
                             )}
                           </div>
 
-                          {/* Tabela de tamanhos */}
-                          {renderTabelaTamanhos(
-                            itemEmEdicao.tamanhos,
-                            itemEmEdicao.quantidade,
-                            true,
-                            handleTamanhoChange,
-                            produtoSelecionado?.tamanhosDisponiveis,
-                          )}
+                          {/* Linha 2: Tabela de tamanhos compacta */}
+                          <div>
+                            <Label className="text-primary text-xs mb-1">Tamanhos</Label>
+                            <div className="border border-gray-200 rounded-md bg-white">
+                              <table className="w-full border-collapse text-xs">
+                                <thead>
+                                  <tr className="bg-accent">
+                                    <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
+                                      TAM.
+                                    </th>
+                                    {Object.keys(tamanhosPadrao)
+                                      .filter(
+                                        (tamanho) =>
+                                          !produtoSelecionado?.tamanhosDisponiveis ||
+                                          produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
+                                      )
+                                      .map((tamanho) => (
+                                        <th
+                                          key={`header-${tamanho}`}
+                                          className="border-b p-1 text-center font-medium text-xs text-primary min-w-8"
+                                        >
+                                          {tamanho}
+                                        </th>
+                                      ))}
+                                    <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
+                                      TOT.
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr>
+                                    <td className="border-b p-1 text-center font-medium text-xs bg-accent">QTD.</td>
+                                    {Object.keys(tamanhosPadrao)
+                                      .filter(
+                                        (tamanho) =>
+                                          !produtoSelecionado?.tamanhosDisponiveis ||
+                                          produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
+                                      )
+                                      .map((tamanho) => (
+                                        <td key={`cell-${tamanho}`} className="border-b p-1 text-center">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            value={itemEmEdicao.tamanhos[tamanho] || 0}
+                                            onChange={(e) =>
+                                              handleTamanhoChange(tamanho, Number.parseInt(e.target.value) || 0)
+                                            }
+                                            className="w-full h-6 text-center text-xs border border-gray-300 rounded focus:border-primary focus:ring-1 focus:ring-primary"
+                                          />
+                                        </td>
+                                      ))}
+                                    <td className="border-b p-1 text-center font-medium text-xs bg-accent">
+                                      {itemEmEdicao.quantidade}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
 
-                          {/* Observações */}
-                          <div className="grid grid-cols-2 gap-4">
+                          {/* Linha 3: Observações lado a lado */}
+                          <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label htmlFor="observacaoComercial" className="text-primary mb-1.5">
+                              <Label htmlFor="observacaoComercial" className="text-primary text-xs mb-1">
                                 Observação Comercial
                               </Label>
                               <Textarea
@@ -1104,12 +1145,12 @@ export default function FormularioOrcamento({
                                     observacaoComercial: e.target.value,
                                   })
                                 }
-                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                                rows={3}
+                                className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                                placeholder="Observações para o cliente..."
                               />
                             </div>
                             <div>
-                              <Label htmlFor="observacaoTecnica" className="text-primary mb-1.5">
+                              <Label htmlFor="observacaoTecnica" className="text-primary text-xs mb-1">
                                 Observação Técnica
                               </Label>
                               <Textarea
@@ -1121,28 +1162,61 @@ export default function FormularioOrcamento({
                                     observacaoTecnica: e.target.value,
                                   })
                                 }
-                                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                                rows={3}
+                                className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                                placeholder="Observações técnicas..."
                               />
                             </div>
                           </div>
 
-                          {/* Gerenciador de imagem */}
-                          <GerenciadorImagem
-                            imagem={itemEmEdicao.imagem}
-                            onChange={(novaImagem) =>
-                              setItemEmEdicao({
-                                ...itemEmEdicao,
-                                imagem: novaImagem,
-                              })
-                            }
-                            inputRef={editImagemInputRef}
-                          />
+                          {/* Linha 4: Imagem e Estampas lado a lado */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-primary text-xs mb-1">Imagem para Ficha Técnica</Label>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => editImagemInputRef.current?.click()}
+                                  className="text-xs h-7 border-dashed border-2 hover:bg-accent transition-colors"
+                                >
+                                  <ImageIcon className="h-3 w-3 mr-1" />
+                                  {itemEmEdicao.imagem ? "Trocar" : "Adicionar"}
+                                </Button>
+                                <input
+                                  ref={editImagemInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleEditarImagem}
+                                  className="hidden"
+                                />
+                                {itemEmEdicao.imagem && (
+                                  <div className="relative">
+                                    <img
+                                      src={itemEmEdicao.imagem || "/placeholder.svg"}
+                                      alt="Prévia"
+                                      className="h-12 w-12 object-cover rounded border shadow-sm"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white hover:bg-red-600"
+                                      onClick={() => setItemEmEdicao({ ...itemEmEdicao, imagem: "" })}
+                                    >
+                                      <X className="h-2 w-2" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
 
-                          {/* Estampas */}
-                          <div>
-                            <Label className="text-primary mb-1.5">Estampas</Label>
-                            <EstampaInput estampas={itemEmEdicao.estampas || []} onChange={handleEstampasChange} />
+                            <div>
+                              <Label className="text-primary text-xs mb-1">Estampas</Label>
+                              <div className="max-h-20 overflow-y-auto">
+                                <EstampaInput estampas={itemEmEdicao.estampas || []} onChange={handleEstampasChange} />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </td>

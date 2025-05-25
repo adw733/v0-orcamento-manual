@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Printer, Save, Check, AlertCircle, FileDown } from "lucide-react"
+import { Save, Check, AlertCircle, FileDown, Eye } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset } from "@/components/ui/sidebar"
@@ -27,6 +27,8 @@ import TabelaProdutos from "@/components/tabela-produtos"
 // Adicionar a importação do componente LixeiraOrcamentos
 import * as ReactDOM from "react-dom/client"
 import { Loader2 } from "lucide-react"
+// Adicionar os imports necessários para o modal no início do arquivo:
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 // Helper function to generate UUID
 const generateUUID = () => {
@@ -71,6 +73,8 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
   const [dadosEmpresa, setDadosEmpresa] = useState<DadosEmpresa | null>(null)
   // Adicionar o estado para controlar a exportação da ficha técnica
   const [exportandoFichaTecnica, setExportandoFichaTecnica] = useState(false)
+  // Adicionar um estado para controlar o modal de visualização após os outros estados:
+  const [modalVisualizacaoAberto, setModalVisualizacaoAberto] = useState(false)
 
   const documentoRef = useRef<HTMLDivElement>(null)
   const orcamentoRef = useRef<HTMLDivElement>(null)
@@ -351,14 +355,14 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
         sucesso: true,
         mensagem: `Exportando ${
           tipoExportacao === "completo"
-            ? "orçamento completo"
+            ? "documento completo"
             : tipoExportacao === "ficha"
               ? "ficha técnica"
               : "orçamento"
         }, aguarde...`,
       })
 
-      // Primeiro, carregar o orçamento
+      // Carregar o orçamento do banco de dados
       const { data, error } = await supabase
         .from("orcamentos")
         .select("*, cliente:cliente_id(*)")
@@ -584,192 +588,93 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
         telefoneContato: telefoneContato,
       }
 
-      // Importar dinamicamente as funções de PDF
+      // Importar as funções de PDF
       const { generatePDF, formatPDFFilename } = await import("@/lib/pdf-utils")
 
-      // Criar um container temporário para o documento
+      // Criar um container temporário
       const container = document.createElement("div")
       container.style.position = "absolute"
       container.style.left = "-9999px"
-      container.style.width = "210mm" // Largura A4
+      container.style.width = "210mm"
       container.style.backgroundColor = "#ffffff"
-      container.style.padding = "0"
-      container.style.margin = "0"
-      container.style.boxSizing = "border-box"
-
-      // Adicionar ao DOM temporariamente
       document.body.appendChild(container)
 
-      // Renderizar o documento no container
+      // Renderizar o documento
       const root = ReactDOM.createRoot(container)
-      root.render(
-        <VisualizacaoDocumento
-          orcamento={orcamentoExportacao}
-          calcularTotal={() =>
-            orcamentoExportacao.itens.reduce((total, item) => total + item.quantidade * item.valorUnitario, 0) +
-            (orcamentoExportacao.valorFrete || 0)
-          }
-          dadosEmpresa={dadosEmpresa || undefined}
-        />,
-      )
 
-      // Esperar um pouco para garantir que o documento seja renderizado
+      // Renderizar o conteúdo apropriado com base no tipo de exportação
+      if (tipoExportacao === "orcamento") {
+        // Renderizar apenas o orçamento
+        root.render(
+          <div className="orcamento-container">
+            <VisualizacaoDocumento
+              orcamento={{
+                ...orcamentoExportacao,
+                itens: orcamentoExportacao.itens, // Manter todos os itens para o cabeçalho
+              }}
+              calcularTotal={() =>
+                orcamentoExportacao.itens.reduce((total, item) => total + item.quantidade * item.valorUnitario, 0) +
+                (orcamentoExportacao.valorFrete || 0)
+              }
+              dadosEmpresa={dadosEmpresa || undefined}
+              modoExportacao="orcamento" // Adicionar prop para indicar que é apenas o orçamento
+            />
+          </div>,
+        )
+      } else if (tipoExportacao === "ficha") {
+        // Renderizar apenas as fichas técnicas
+        root.render(
+          <div className="fichas-tecnicas-container">
+            <VisualizacaoDocumento
+              orcamento={orcamentoExportacao}
+              calcularTotal={() =>
+                orcamentoExportacao.itens.reduce((total, item) => total + item.quantidade * item.valorUnitario, 0) +
+                (orcamentoExportacao.valorFrete || 0)
+              }
+              dadosEmpresa={dadosEmpresa || undefined}
+              modoExportacao="ficha" // Adicionar prop para indicar que são apenas as fichas
+            />
+          </div>,
+        )
+      } else {
+        // Renderizar o documento completo
+        root.render(
+          <VisualizacaoDocumento
+            orcamento={orcamentoExportacao}
+            calcularTotal={() =>
+              orcamentoExportacao.itens.reduce((total, item) => total + item.quantidade * item.valorUnitario, 0) +
+              (orcamentoExportacao.valorFrete || 0)
+            }
+            dadosEmpresa={dadosEmpresa || undefined}
+            modoExportacao="completo" // Adicionar prop para indicar que é o documento completo
+          />,
+        )
+      }
+
+      // Aguardar renderização
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // Gerar o nome do arquivo com o tipo correto
-      const tipoDocumento = tipoExportacao === "ficha" ? "ficha-tecnica" : "orcamento"
+      // Gerar o nome do arquivo
       const filename = formatPDFFilename(
         orcamentoExportacao.numero,
-        tipoDocumento,
+        tipoExportacao === "ficha" ? "ficha-tecnica" : tipoExportacao === "orcamento" ? "orcamento" : "completo",
         orcamentoExportacao.cliente?.nome,
         orcamentoExportacao.nomeContato,
       )
 
-      // Baseado no tipo de exportação, selecionar o conteúdo apropriado
-      if (tipoExportacao === "ficha") {
-        // Exportar apenas as fichas técnicas
-        const fichasTecnicas = container.querySelectorAll(".ficha-tecnica")
+      // Gerar o PDF
+      await generatePDF(container, filename, tipoExportacao)
 
-        if (fichasTecnicas.length === 0) {
-          throw new Error("Nenhuma ficha técnica encontrada para exportar")
-        }
-
-        // Criar um novo container apenas para as fichas técnicas
-        const fichasContainer = document.createElement("div")
-        fichasContainer.style.position = "absolute"
-        fichasContainer.style.left = "-9999px"
-        fichasContainer.style.width = "210mm" // Largura A4
-        fichasContainer.style.backgroundColor = "#ffffff"
-        fichasContainer.style.padding = "0"
-        fichasContainer.style.margin = "0"
-        fichasContainer.style.boxSizing = "border-box"
-        fichasContainer.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
-
-        // Adicionar estilos necessários
-        const style = document.createElement("style")
-        style.textContent = `
-      @media print {
-        @page {
-          size: A4;
-          margin: 10mm;
-        }
-        body {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-      }
-    `
-        fichasContainer.appendChild(style)
-
-        // Adicionar as fichas técnicas ao container
-        fichasTecnicas.forEach((ficha, index) => {
-          const fichaClone = ficha.cloneNode(true) as HTMLElement
-          // Remover a classe page-break-before da primeira ficha para evitar página em branco
-          if (index === 0) {
-            fichaClone.classList.remove("page-break-before")
-          }
-          fichasContainer.appendChild(fichaClone)
-        })
-
-        // Substituir o container original pelo container de fichas
-        document.body.removeChild(container)
-        document.body.appendChild(fichasContainer)
-
-        // Gerar o PDF apenas com as fichas técnicas
-        await generatePDF(fichasContainer, filename)
-
-        // Remover o container de fichas
-        document.body.removeChild(fichasContainer)
-      } else if (tipoExportacao === "orcamento") {
-        // Exportar apenas o orçamento principal
-        const orcamentoPrincipal = container.querySelector(".orcamento-principal")
-
-        if (!orcamentoPrincipal) {
-          throw new Error("Orçamento principal não encontrado para exportar")
-        }
-
-        // Criar um novo container apenas para o orçamento principal
-        const orcamentoContainer = document.createElement("div")
-        orcamentoContainer.style.position = "absolute"
-        orcamentoContainer.style.left = "-9999px"
-        orcamentoContainer.style.width = "210mm" // Largura A4
-        orcamentoContainer.style.backgroundColor = "#ffffff"
-        orcamentoContainer.style.padding = "0"
-        orcamentoContainer.style.margin = "0"
-        orcamentoContainer.style.boxSizing = "border-box"
-        orcamentoContainer.className = "orcamento-container" // Adicionar uma classe para identificação
-
-        // Adicionar estilos necessários
-        const style = document.createElement("style")
-        style.textContent = `
-      @media print {
-        @page {
-          size: A4;
-          margin: 10mm;
-        }
-        body {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-        .bg-gradient-to-r, .bg-primary, .bg-accent, .bg-white, .bg-white\\/10 {
-          print-color-adjust: exact !important;
-          -webkit-print-color-adjust: exact !important;
-        }
-        .text-white {
-          color: white !important;
-        }
-        .border, .border-t, .border-b, .border-l, .border-r {
-          border-color: inherit !important;
-        }
-      }
-    `
-        orcamentoContainer.appendChild(style)
-
-        // Adicionar o orçamento principal ao container
-        const orcamentoClone = orcamentoPrincipal.cloneNode(true) as HTMLElement
-        orcamentoContainer.appendChild(orcamentoClone)
-
-        // Substituir o container original pelo container do orçamento
-        document.body.removeChild(container)
-        document.body.appendChild(orcamentoContainer)
-
-        // Gerar o PDF apenas com o orçamento principal
-        await generatePDF(orcamentoContainer, filename)
-
-        // Remover o container do orçamento
-        document.body.removeChild(orcamentoContainer)
-      } else {
-        // Exportar o documento completo (orçamento + fichas técnicas)
-        await generatePDF(container, filename)
-
-        // Remover o container
-        document.body.removeChild(container)
-      }
+      // Remover o container
+      document.body.removeChild(container)
 
       setFeedbackSalvamento({
         visivel: true,
         sucesso: true,
-        mensagem: `${
-          tipoExportacao === "completo"
-            ? "Documento completo"
-            : tipoExportacao === "ficha"
-              ? "Ficha técnica"
-              : "Orçamento"
-        } "${filename}" exportado com sucesso!`,
+        mensagem: `Documento exportado com sucesso!`,
       })
     } catch (error) {
-      console.error(
-        `Erro ao exportar ${
-          tipoExportacao === "completo"
-            ? "documento completo"
-            : tipoExportacao === "ficha"
-              ? "ficha técnica"
-              : "orçamento"
-        }:`,
-        error,
-      )
+      console.error("Erro ao exportar:", error)
       setFeedbackSalvamento({
         visivel: true,
         sucesso: false,
@@ -2264,19 +2169,21 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                   )}
 
                   <Button
-                    onClick={handlePrint}
-                    disabled={isPrinting || isLoading}
+                    onClick={async () => {
+                      if (orcamento.id) {
+                        await exportarOrcamento(orcamento.id, "orcamento")
+                      }
+                    }}
+                    disabled={isLoading || !orcamento.cliente || orcamento.itens.length === 0}
                     className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
                   >
-                    <Printer className="h-4 w-4" />
-                    {isPrinting ? "Imprimindo..." : "Imprimir"}
+                    <FileDown className="h-4 w-4" />
+                    {isLoading ? "Gerando..." : "PDF Orçamento"}
                   </Button>
 
                   <Button
                     onClick={async () => {
                       if (orcamento.id) {
-                        // Exportar ambos os arquivos sequencialmente
-                        await exportarOrcamento(orcamento.id, "orcamento")
                         await exportarOrcamento(orcamento.id, "ficha")
                       }
                     }}
@@ -2284,7 +2191,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                     className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
                   >
                     <FileDown className="h-4 w-4" />
-                    {isLoading ? "Gerando..." : "Exportar PDF"}
+                    {isLoading ? "Gerando..." : "PDF Ficha Técnica"}
                   </Button>
                 </>
               )}
@@ -2308,9 +2215,42 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
             switch (abaAtiva) {
               case "orcamento":
                 return (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-6">
+                    {/* Formulário ocupando toda a largura */}
                     <Card className="shadow-sm border-0">
                       <CardContent className="p-6">
+                        <div className="flex justify-between items-center mb-6">
+                          <h2 className="text-xl font-semibold text-primary">Dados do Orçamento</h2>
+                          <Dialog open={modalVisualizacaoAberto} onOpenChange={setModalVisualizacaoAberto}>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="flex items-center gap-2 border-primary text-primary hover:bg-primary hover:text-white"
+                              >
+                                <Eye className="h-4 w-4" />
+                                Visualizar Documento
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
+                              <DialogHeader className="p-4 border-b">
+                                <DialogTitle className="text-primary">
+                                  Visualização do Documento - {orcamento.numero}
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div className="flex-1 overflow-auto p-4 bg-gray-50">
+                                <div className="max-w-[210mm] mx-auto bg-white shadow-lg">
+                                  <div ref={documentoRef}>
+                                    <VisualizacaoDocumento
+                                      orcamento={orcamento}
+                                      calcularTotal={calcularTotal}
+                                      dadosEmpresa={dadosEmpresa || undefined}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
                         <FormularioOrcamento
                           orcamento={orcamento}
                           clientes={clientes}
@@ -2324,17 +2264,6 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                         />
                       </CardContent>
                     </Card>
-                    <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
-                      <div className="p-4 h-[calc(100vh-250px)] overflow-auto">
-                        <div ref={documentoRef}>
-                          <VisualizacaoDocumento
-                            orcamento={orcamento}
-                            calcularTotal={calcularTotal}
-                            dadosEmpresa={dadosEmpresa || undefined}
-                          />
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )
               case "orcamentos":

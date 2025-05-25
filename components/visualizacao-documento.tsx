@@ -2,15 +2,20 @@
 
 import type { Orcamento, DadosEmpresa } from "@/types/types"
 import { useState } from "react"
-import { toast } from "@/components/ui/use-toast"
 
 interface VisualizacaoDocumentoProps {
   orcamento: Orcamento
   calcularTotal: () => number
   dadosEmpresa?: DadosEmpresa
+  modoExportacao?: "orcamento" | "ficha" | "completo" // Adicionar esta prop
 }
 
-export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosEmpresa }: VisualizacaoDocumentoProps) {
+export default function VisualizacaoDocumento({
+  orcamento,
+  calcularTotal,
+  dadosEmpresa,
+  modoExportacao = "completo", // Valor padrão é mostrar tudo
+}: VisualizacaoDocumentoProps) {
   const [exportandoPDF, setExportandoPDF] = useState(false)
   // Função para formatar a data considerando o fuso horário
   const formatarDataComFusoHorario = (dataString: string): string => {
@@ -176,9 +181,11 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     
     /* Controle de tamanho de imagens */
     img {
-      max-height: 350px;
+      max-height: 600px; /* Aumentado de 450px para 600px */
       max-width: 100%;
       object-fit: contain;
+      border: 1px solid #e5e7eb !important;
+      padding: 20px !important;
     }
     
     /* Configurações para fichas técnicas */
@@ -315,7 +322,7 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
   }
   
   .pdf-image {
-    max-height: 350px;
+    max-height: 550px; /* Aumentado de 350px para 550px */
     max-width: 100%;
     object-fit: contain;
   }
@@ -392,377 +399,219 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
     color: #0f4c81;
     text-align: left;
   }
+
+  /* Estilos para os cards de especificações */
+  .spec-card {
+    font-size: 0.85rem;
+    page-break-inside: avoid;
+  }
+
+  .spec-card h5 {
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    margin: 0;
+    padding: 8px 12px;
+  }
+
+  .spec-card h5 svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .spec-card .spec-content {
+    padding: 12px;
+    background-color: white;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .spec-card .spec-content p {
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .spec-card .spec-content .font-medium {
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+  }
+
+  .spec-card .spec-content .text-sm {
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  /* Estilos específicos para o card de cor */
+  .spec-card .cor-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .spec-card .cor-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid #d1d5db;
+    flex-shrink: 0;
+  }
+
+  .spec-card .cor-nome {
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  /* Estilos específicos para o card de artes */
+  .spec-card .artes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .spec-card .arte-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .spec-card .arte-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .spec-card .arte-numero {
+    background-color: rgba(15, 76, 129, 0.1);
+    color: #0f4c81;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .spec-card .arte-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .spec-card .arte-posicao {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    margin-bottom: 2px;
+  }
+
+  .spec-card .arte-detalhes {
+    font-size: 0.75rem;
+    color: #6b7280;
+    line-height: 1.2;
+  }
+
+  @media print {
+    .spec-card {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    
+    .spec-card h5 {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    
+    .spec-card .spec-content {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+  }
 `
 
-  // Corrigir a função exportarOrcamento para garantir que apenas o orçamento seja exportado
-  const exportarOrcamento = async () => {
-    if (!orcamento) return
-
-    try {
-      setExportandoPDF(true)
-
-      // Importar dinamicamente as funções de PDF
-      const { generatePDF, formatPDFFilename } = await import("@/lib/pdf-utils")
-
-      // Encontrar apenas o orçamento principal
-      const orcamentoPrincipal = document.querySelector(".orcamento-principal")
-
-      if (!orcamentoPrincipal) {
-        toast({
-          title: "Orçamento não encontrado",
-          description: "Não foi possível encontrar o orçamento para exportar.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Criar um container temporário para o orçamento
-      const container = document.createElement("div")
-      container.style.position = "absolute"
-      container.style.left = "-9999px"
-      container.style.width = "210mm" // Largura A4
-      container.style.backgroundColor = "#ffffff"
-      container.style.padding = "0"
-      container.style.margin = "0"
-      container.style.boxSizing = "border-box"
-      container.className = "orcamento-container" // Adicionar uma classe para identificação
-
-      // Adicionar o orçamento ao container
-      const orcamentoClone = orcamentoPrincipal.cloneNode(true) as HTMLElement
-
-      // Adicionar os estilos necessários
-      const style = document.createElement("style")
-      style.textContent = pdfStyles
-      container.appendChild(style)
-
-      container.appendChild(orcamentoClone)
-
-      // Adicionar ao DOM temporariamente
-      document.body.appendChild(container)
-
-      // Gerar o nome do arquivo
-      const nomeCliente = orcamento.cliente?.nome
-      const nomeContato = orcamento.nomeContato
-      const filename = formatPDFFilename(orcamento.numero, "orcamento", nomeCliente, nomeContato)
-
-      // Gerar o PDF
-      await generatePDF(container, filename)
-
-      // Remover o container temporário
-      document.body.removeChild(container)
-
-      toast({
-        title: "Orçamento exportado com sucesso!",
-        description: `O arquivo ${filename} foi gerado.`,
-      })
-    } catch (error) {
-      console.error("Erro ao exportar orçamento:", error)
-      toast({
-        title: "Erro ao exportar orçamento",
-        description: "Ocorreu um erro ao gerar o PDF. Tente novamente.",
-        variant: "destructive",
-      })
-    } finally {
-      setExportandoPDF(false)
+  // Adicionar estilos específicos para controlar o tamanho das imagens
+  const imageStyles = `
+  <style>
+    /* Estilos para imagens no PDF */
+    .pdf-image-container {
+      width: 100%;
+      text-align: center;
+      margin: 1rem 0;
     }
-  }
 
-  // Modificar a função exportarFichaTecnica para usar o tipo correto
-  const exportarFichaTecnica = async () => {
-    if (!orcamento) return
-
-    try {
-      setExportandoPDF(true)
-
-      // Importar dinamicamente as funções de PDF
-      const { generatePDF, formatPDFFilename } = await import("@/lib/pdf-utils")
-
-      // Encontrar apenas as fichas técnicas
-      const fichasTecnicas = document.querySelectorAll(".ficha-tecnica")
-
-      if (fichasTecnicas.length === 0) {
-        toast({
-          title: "Nenhuma ficha técnica encontrada",
-          description: "Não foi possível encontrar fichas técnicas para exportar.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Criar um container temporário para as fichas técnicas
-      const container = document.createElement("div")
-      container.style.position = "absolute"
-      container.style.left = "-9999px"
-      container.style.width = "210mm" // Largura A4
-      container.style.backgroundColor = "#ffffff"
-      container.style.padding = "0"
-      container.style.margin = "0"
-      container.style.boxSizing = "border-box"
-      container.className = "fichas-tecnicas-container" // Adicionar uma classe para identificação
-
-      // Adicionar as fichas técnicas ao container
-      fichasTecnicas.forEach((ficha, index) => {
-        const fichaClone = ficha.cloneNode(true) as HTMLElement
-        // Remover a classe page-break-before da primeira ficha para evitar página em branco
-        if (index === 0) {
-          fichaClone.classList.remove("page-break-before")
-        }
-        container.appendChild(fichaClone)
-      })
-
-      // Adicionar ao DOM temporariamente
-      document.body.appendChild(container)
-
-      // Gerar o nome do arquivo
-      const nomeCliente = orcamento.cliente?.nome
-      const nomeContato = orcamento.nomeContato
-      const filename = formatPDFFilename(orcamento.numero, "ficha-tecnica", nomeCliente, nomeContato)
-
-      // Gerar o PDF
-      await generatePDF(container, filename)
-
-      // Remover o container temporário
-      document.body.removeChild(container)
-
-      toast({
-        title: "Ficha técnica exportada com sucesso!",
-        description: `O arquivo ${filename} foi gerado.`,
-      })
-    } catch (error) {
-      console.error("Erro ao exportar ficha técnica:", error)
-      toast({
-        title: "Erro ao exportar ficha técnica",
-        description: "Ocorreu um erro ao gerar o PDF. Tente novamente.",
-        variant: "destructive",
-      })
-    } finally {
-      setExportandoPDF(false)
+    .pdf-image-container img {
+      max-width: 100%;
+      max-height: 600px; /* Aumentado de 450px para 600px */
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 20px;
     }
-  }
+    
+    /* Ajustes para garantir que o conteúdo caiba em uma página A4 */
+    .orcamento-principal,
+    .ficha-tecnica {
+      max-height: 277mm; /* A4 height - margins */
+      overflow: hidden;
+    }
+    
+    /* Ajustar tamanho de fonte para caber melhor */
+    .pdf-section {
+      font-size: 0.9rem;
+    }
+    
+    .pdf-section h1 {
+      font-size: 1.25rem;
+    }
+    
+    .pdf-section h3 {
+      font-size: 1.1rem;
+    }
+    
+    .pdf-section h4 {
+      font-size: 1rem;
+    }
+    
+    /* Compactar tabelas */
+    .pdf-table th,
+    .pdf-table td {
+      padding: 0.4rem;
+      font-size: 0.8rem;
+    }
+    
+    /* Ajustar cards de especificações */
+    .spec-card {
+      font-size: 0.85rem;
+    }
+    
+    .spec-card h5 {
+      font-size: 0.9rem;
+    }
+  </style>
+`
 
   return (
     <div className="flex flex-col gap-8 p-4 font-sans text-gray-800 pdf-container" style={{ margin: "10mm" }}>
       <style>{pdfStyles}</style>
-      {/* Orçamento */}
-      <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm page-break-inside-avoid pdf-section orcamento-principal">
-        <div className="bg-gradient-to-r from-primary to-primary-dark p-4 pdf-header w-full">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              {dadosEmpresa?.logo_url ? (
-                <div
-                  className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
-                  style={{ width: "50px", height: "50px" }}
-                >
-                  <img
-                    src={dadosEmpresa.logo_url || "/placeholder.svg"}
-                    alt={nomeEmpresa}
-                    className="max-w-full max-h-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div
-                  className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
-                  style={{ width: "50px", height: "50px" }}
-                >
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M12 2L4 5v14.5c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5V5l-8-3z"
-                      fill="#0f4c81"
-                      stroke="#0f4c81"
-                      strokeWidth="1.5"
-                    />
-                    <path
-                      d="M12 6.5c-1.93 0-3.5 1.57-3.5 3.5v1.5h7v-1.5c0-1.93-1.57-3.5-3.5-3.5z"
-                      fill="white"
-                      stroke="white"
-                      strokeWidth="0.5"
-                    />
-                    <path
-                      d="M12 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"
-                      fill="white"
-                      stroke="white"
-                      strokeWidth="0.5"
-                    />
-                  </svg>
-                </div>
-              )}
-              <div>
-                <div>
-                  <h1 className="text-xl font-bold text-white font-sans tracking-tight uppercase">
-                    ORÇAMENTO - {orcamento.numero.split(" - ")[0]}
-                  </h1>
-                  <p className="text-white/90 text-sm uppercase">
-                    {orcamento.cliente?.nome || "EMPRESA"} -{" "}
-                    {orcamento.nomeContato || orcamento.cliente?.contato || "CONTATO"}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="text-right bg-white/10 p-2 rounded-md backdrop-blur-sm">
-              <h2 className="text-lg font-bold text-white font-sans tracking-tight">{nomeEmpresa}</h2>
-              <p className="text-white/80 text-xs">CNPJ: {cnpjEmpresa}</p>
-              <p className="text-white/80 text-xs">{emailEmpresa}</p>
-              <p className="text-white/80 text-xs">{telefoneEmpresa}</p>
-            </div>
-          </div>
-        </div>
+      <style>{imageStyles}</style>
 
-        <div className="p-6 space-y-6 pdf-content">
-          <div className="border-b pb-4 page-break-inside-avoid">
-            <h3 className="font-bold mb-2 text-primary text-lg">DADOS DO CLIENTE</h3>
-            {orcamento.cliente ? (
-              <div className="pdf-cliente-info bg-accent p-3 rounded-md">
-                <p>
-                  <span className="font-medium">Nome:</span> {orcamento.cliente.nome}
-                </p>
-                <p>
-                  <span className="font-medium">CNPJ:</span> {orcamento.cliente.cnpj}
-                </p>
-                <p>
-                  <span className="font-medium">Endereço:</span> {orcamento.cliente.endereco}
-                </p>
-                <p>
-                  <span className="font-medium">Email:</span> {orcamento.cliente.email}
-                </p>
-                {orcamento.nomeContato && (
-                  <p>
-                    <span className="font-medium">Contato:</span> {orcamento.nomeContato}
-                  </p>
-                )}
-                {orcamento.telefoneContato && (
-                  <p>
-                    <span className="font-medium">Telefone Contato:</span> {orcamento.telefoneContato}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 italic">Nenhum cliente selecionado</p>
-            )}
-          </div>
-
-          <div className="page-break-inside-avoid">
-            <div className="flex justify-between mb-3">
-              <h3 className="font-bold text-lg text-primary">ITENS DO ORÇAMENTO</h3>
-              <p className="text-sm bg-accent px-3 py-1 rounded-full font-medium">Data: {dataFormatada}</p>
-            </div>
-
-            <table className="w-full text-sm pdf-table">
-              <colgroup>
-                <col style={{ width: "30%" }} />
-                <col style={{ width: "35%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "15%" }} />
-              </colgroup>
-              <thead className="bg-primary text-white">
-                <tr>
-                  <th className="p-3 text-left rounded-tl-md">Item</th>
-                  <th className="p-3 text-left">Tamanhos</th>
-                  <th className="p-3 text-center">Qtd.</th>
-                  <th className="p-3 text-right">Valor Unit.</th>
-                  <th className="p-3 text-right rounded-tr-md">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orcamento.itens.length > 0 ? (
-                  orcamento.itens.map((item, index) => (
-                    <tr key={item.id} className="border-b hover:bg-gray-50 transition-colors">
-                      <td className="p-3">
-                        <div>
-                          <p className="font-medium">{item.produto?.nome}</p>
-                          {item.observacaoComercial && (
-                            <div className="text-xs mt-1 text-gray-600 italic pdf-observacoes-comercial">
-                              {item.observacaoComercial}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-1">
-                        <div className="tamanhos-container">
-                          {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
-                            <span key={tamanho} className="tamanho-texto" title={`${tamanho}: ${quantidade} unidades`}>
-                              {tamanho}-{quantidade}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-3 text-center">{item.quantidade}</td>
-                      <td className="p-3 text-right">R$ {item.valorUnitario.toFixed(2)}</td>
-                      <td className="p-3 text-right font-medium">
-                        R$ {(item.quantidade * item.valorUnitario).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="p-3 text-center text-gray-500 italic">
-                      Nenhum item adicionado
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              <tfoot className="bg-accent font-medium">
-                <tr>
-                  <td colSpan={4} className="p-3 text-right border-t-2 border-primary">
-                    Valor dos Produtos:
-                  </td>
-                  <td className="p-3 text-right border-t-2 border-primary">R$ {calcularTotal().toFixed(2)}</td>
-                </tr>
-                {orcamento.valorFrete !== undefined && orcamento.valorFrete > 0 && (
-                  <tr>
-                    <td colSpan={4} className="p-3 text-right">
-                      Valor do Frete:
-                    </td>
-                    <td className="p-3 text-right">R$ {orcamento.valorFrete.toFixed(2)}</td>
-                  </tr>
-                )}
-                <tr>
-                  <td colSpan={4} className="p-3 text-right border-t-2 border-primary">
-                    TOTAL:
-                  </td>
-                  <td className="p-3 text-right border-t-2 border-primary whitespace-nowrap">
-                    R$ {(calcularTotal() + (orcamento.valorFrete || 0)).toFixed(2)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <div className="space-y-4 page-break-inside-avoid">
-            <div>
-              <h3 className="font-bold mb-2 text-primary">OBSERVAÇÕES</h3>
-              <p className="text-sm bg-accent p-3 rounded-md pdf-observacoes">
-                {orcamento.observacoes || "Nenhuma observação."}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 text-sm mt-3 pdf-grid">
-              <div className="bg-accent p-2 rounded-md">
-                <h4 className="font-bold text-primary mb-1 text-sm">Condições de Pagamento</h4>
-                <p className="text-sm">{orcamento.condicoesPagamento}</p>
-              </div>
-              <div className="bg-accent p-2 rounded-md">
-                <h4 className="font-bold text-primary mb-1 text-sm">Prazo de Entrega</h4>
-                <p className="text-sm">{orcamento.prazoEntrega}</p>
-              </div>
-              <div className="bg-accent p-2 rounded-md">
-                <h4 className="font-bold text-primary mb-1 text-sm">Validade do Orçamento</h4>
-                <p className="text-sm">{orcamento.validadeOrcamento}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Ficha Técnica */}
-      {orcamento.itens.map((item, index) => (
-        <div
-          key={`ficha-${item.id}`}
-          id={`ficha-${item.id}`}
-          className={`border border-gray-300 rounded-md overflow-hidden shadow-sm ${
-            index > 0 ? "mt-8" : ""
-          } page-break-before ficha-tecnica pdf-section`}
-        >
+      {/* Orçamento - Renderizar apenas se for modo completo ou modo orçamento */}
+      {(modoExportacao === "completo" || modoExportacao === "orcamento") && (
+        <div className="border border-gray-300 rounded-md overflow-hidden shadow-sm page-break-inside-avoid pdf-section orcamento-principal">
           <div className="bg-gradient-to-r from-primary to-primary-dark p-4 pdf-header w-full">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
@@ -805,13 +654,15 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
                   </div>
                 )}
                 <div>
-                  <h1 className="text-xl font-bold text-white font-sans tracking-tight uppercase">
-                    FICHA TÉCNICA - {orcamento.numero.split(" - ")[0]}
-                  </h1>
-                  <p className="text-white/90 text-sm uppercase">
-                    {orcamento.cliente?.nome || "EMPRESA"} -{" "}
-                    {orcamento.nomeContato || orcamento.cliente?.contato || "CONTATO"}
-                  </p>
+                  <div>
+                    <h1 className="text-xl font-bold text-white font-sans tracking-tight uppercase">
+                      ORÇAMENTO - {orcamento.numero.split(" - ")[0]}
+                    </h1>
+                    <p className="text-white/90 text-sm uppercase">
+                      {orcamento.cliente?.nome || "EMPRESA"} -{" "}
+                      {orcamento.nomeContato || orcamento.cliente?.contato || "CONTATO"}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="text-right bg-white/10 p-2 rounded-md backdrop-blur-sm">
@@ -824,218 +675,435 @@ export default function VisualizacaoDocumento({ orcamento, calcularTotal, dadosE
           </div>
 
           <div className="p-6 space-y-6 pdf-content">
-            <h3 className="font-bold text-lg mb-4 text-primary border-b-2 border-primary pb-2">{item.produto?.nome}</h3>
-
-            <div className="space-y-4">
-              {item.imagem && (
-                <div className="flex justify-center mb-4">
-                  <img
-                    src={item.imagem || "/placeholder.svg"}
-                    alt={item.produto?.nome || "Imagem do produto"}
-                    className="object-contain border rounded-md shadow-sm pdf-image"
-                    style={{ maxHeight: "350px", maxWidth: "100%", display: "block", margin: "0 auto" }}
-                  />
+            <div className="border-b pb-4 page-break-inside-avoid">
+              <h3 className="font-bold mb-2 text-primary text-lg">DADOS DO CLIENTE</h3>
+              {orcamento.cliente ? (
+                <div className="pdf-cliente-info bg-accent p-3 rounded-md">
+                  <p>
+                    <span className="font-medium">Nome:</span> {orcamento.cliente.nome}
+                  </p>
+                  <p>
+                    <span className="font-medium">CNPJ:</span> {orcamento.cliente.cnpj}
+                  </p>
+                  <p>
+                    <span className="font-medium">Endereço:</span> {orcamento.cliente.endereco}
+                  </p>
+                  <p>
+                    <span className="font-medium">Email:</span> {orcamento.cliente.email}
+                  </p>
+                  {orcamento.nomeContato && (
+                    <p>
+                      <span className="font-medium">Contato:</span> {orcamento.nomeContato}
+                    </p>
+                  )}
+                  {orcamento.telefoneContato && (
+                    <p>
+                      <span className="font-medium">Telefone Contato:</span> {orcamento.telefoneContato}
+                    </p>
+                  )}
                 </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">Nenhum cliente selecionado</p>
               )}
+            </div>
 
-              <div>
-                <h4 className="font-bold mb-2 text-primary">Especificações do Produto</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Card para Tecido */}
-                  <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
-                    <div className="bg-primary/10 p-2 border-b border-primary/10">
-                      <h5 className="font-medium text-primary flex items-center">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="mr-2"
-                        >
-                          <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16v-3"></path>
-                          <path d="m7.5 4.27 9 5.15"></path>
-                          <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                          <line x1="12" y1="22" x2="12" y2="12"></line>
-                        </svg>
-                        Tecido
-                      </h5>
-                    </div>
-                    <div className="p-3 bg-white">
-                      {item.tecidoSelecionado ? (
-                        <div>
-                          <p className="font-medium text-gray-800">{item.tecidoSelecionado.nome}</p>
-                          <p className="text-sm text-gray-600">{item.tecidoSelecionado.composicao}</p>
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 italic">Não especificado</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card para Cor */}
-                  <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
-                    <div className="bg-primary/10 p-2 border-b border-primary/10">
-                      <h5 className="font-medium text-primary flex items-center">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="mr-2"
-                        >
-                          <circle cx="13.5" cy="6.5" r="2.5"></circle>
-                          <circle cx="19" cy="17" r="2"></circle>
-                          <circle cx="9" cy="17" r="2.5"></circle>
-                          <circle cx="4.5" cy="12" r="1.5"></circle>
-                          <path d="M8 7c0-2.21 1.79-4 4-4"></path>
-                          <path d="M13.5 19c1.38 0 2.5-1.12 2.5-2.5S14.88 14 13.5 14 11 15.12 11 16.5s1.12 2.5 2.5 2.5Z"></path>
-                          <path d="M4.5 16.5c0-3.15 2.85-5.5 6-5.5"></path>
-                        </svg>
-                        Cor
-                      </h5>
-                    </div>
-                    <div className="p-3 bg-white">
-                      {item.corSelecionada ? (
-                        <div className="flex items-center">
-                          <div
-                            className="w-6 h-6 rounded-full mr-2 border border-gray-300"
-                            style={{
-                              backgroundColor: item.corSelecionada.toLowerCase().includes("azul")
-                                ? "#1e40af"
-                                : item.corSelecionada.toLowerCase().includes("verde")
-                                  ? "#15803d"
-                                  : item.corSelecionada.toLowerCase().includes("vermelho")
-                                    ? "#b91c1c"
-                                    : item.corSelecionada.toLowerCase().includes("amarelo")
-                                      ? "#eab308"
-                                      : item.corSelecionada.toLowerCase().includes("preto")
-                                        ? "#171717"
-                                        : item.corSelecionada.toLowerCase().includes("branco")
-                                          ? "#ffffff"
-                                          : item.corSelecionada.toLowerCase().includes("cinza")
-                                            ? "#6b7280"
-                                            : item.corSelecionada.toLowerCase().includes("marrom")
-                                              ? "#78350f"
-                                              : item.corSelecionada.toLowerCase().includes("laranja")
-                                                ? "#ea580c"
-                                                : item.corSelecionada.toLowerCase().includes("roxo")
-                                                  ? "#7e22ce"
-                                                  : item.corSelecionada.toLowerCase().includes("rosa")
-                                                    ? "#be185d"
-                                                    : "#9ca3af",
-                            }}
-                          ></div>
-                          <span className="font-medium text-gray-800">{item.corSelecionada}</span>
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 italic">Não especificada</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card para Artes */}
-                  <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
-                    <div className="bg-primary/10 p-2 border-b border-primary/10">
-                      <h5 className="font-medium text-primary flex items-center">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="mr-2"
-                        >
-                          <path d="M12 19c.5 0 1-.1 1.4-.4l5.3-5.3c.4-.4.4-1 0-1.4l-5.3-5.3c-.4-.3-.9-.4-1.4-.4s-1 .1-1.4.4L5.3 11.9c-.4.4-.4 1 0 1.4l5.3 5.3c.4.3.9.4 1.4.4Z"></path>
-                          <path d="M7.5 10.5 12 6l4.5 4.5"></path>
-                          <path d="M7.5 13.5 12 18l4.5-4.5"></path>
-                        </svg>
-                        Artes
-                      </h5>
-                    </div>
-                    <div className="p-3 bg-white">
-                      {item.estampas && item.estampas.length > 0 ? (
-                        <div className="space-y-2">
-                          {item.estampas.map((estampa, index) => (
-                            <div key={estampa.id} className="border-b border-gray-100 pb-1 last:border-0 last:pb-0">
-                              <div className="flex items-center">
-                                <span className="bg-primary/10 text-primary text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center mr-2">
-                                  {index + 1}
-                                </span>
-                                <span className="font-medium text-gray-800 text-sm">
-                                  {estampa.posicao || "Posição não especificada"}
-                                </span>
-                              </div>
-                              <div className="text-xs ml-7 text-gray-600">
-                                {estampa.tipo}
-                                {estampa.largura ? `, ${estampa.largura} cm` : ""}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 italic">Sem artes aplicadas</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tabela de Tamanhos */}
-                <div className="mt-6">
-                  <h4 className="font-bold mb-2 text-primary">Tabela de Tamanhos</h4>
-                  <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-                    {ordenarTamanhos(item.tamanhos || {}).length > 0 ? (
-                      <table className="tamanhos-table">
-                        <tbody>
-                          <tr>
-                            <th>Tam.</th>
-                            {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, _]) => (
-                              <th key={`header-${tamanho}`}>{tamanho}</th>
-                            ))}
-                          </tr>
-                          <tr>
-                            <td>Qtd.</td>
-                            {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
-                              <td key={`qty-${tamanho}`}>{quantidade}</td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div className="py-3 px-3 text-center text-gray-500 italic">Nenhum tamanho especificado</div>
-                    )}
-                  </div>
-                </div>
+            <div className="page-break-inside-avoid">
+              <div className="flex justify-between mb-3">
+                <h3 className="font-bold text-lg text-primary">ITENS DO ORÇAMENTO</h3>
+                <p className="text-sm bg-accent px-3 py-1 rounded-full font-medium">Data: {dataFormatada}</p>
               </div>
 
-              {item.observacaoTecnica && (
-                <div>
-                  <h4 className="font-bold mb-2 text-primary">Observações Técnicas</h4>
-                  <p
-                    className="text-sm bg-accent p-3 rounded-md pdf-observacoes-tecnica"
-                    style={{ whiteSpace: "pre-wrap" }}
-                  >
-                    {item.observacaoTecnica}
-                  </p>
+              <table className="w-full text-sm pdf-table">
+                <colgroup>
+                  <col style={{ width: "30%" }} />
+                  <col style={{ width: "35%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "15%" }} />
+                </colgroup>
+                <thead className="bg-primary text-white">
+                  <tr>
+                    <th className="p-3 text-left rounded-tl-md">Item</th>
+                    <th className="p-3 text-left">Tamanhos</th>
+                    <th className="p-3 text-center">Qtd.</th>
+                    <th className="p-3 text-right">Valor Unit.</th>
+                    <th className="p-3 text-right rounded-tr-md">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orcamento.itens.length > 0 ? (
+                    orcamento.itens.map((item, index) => (
+                      <tr key={item.id} className="border-b hover:bg-gray-50 transition-colors">
+                        <td className="p-3">
+                          <div>
+                            <p className="font-medium">{item.produto?.nome}</p>
+                            {item.observacaoComercial && (
+                              <div className="text-xs mt-1 text-gray-600 italic pdf-observacoes-comercial">
+                                {item.observacaoComercial}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-1">
+                          <div className="tamanhos-container">
+                            {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
+                              <span
+                                key={tamanho}
+                                className="tamanho-texto"
+                                title={`${tamanho}: ${quantidade} unidades`}
+                              >
+                                {tamanho}-{quantidade}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">{item.quantidade}</td>
+                        <td className="p-3 text-right">R$ {item.valorUnitario.toFixed(2)}</td>
+                        <td className="p-3 text-right font-medium">
+                          R$ {(item.quantidade * item.valorUnitario).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="p-3 text-center text-gray-500 italic">
+                        Nenhum item adicionado
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot className="bg-accent font-medium">
+                  <tr>
+                    <td colSpan={4} className="p-3 text-right border-t-2 border-primary">
+                      Valor dos Produtos:
+                    </td>
+                    <td className="p-3 text-right border-t-2 border-primary">R$ {calcularTotal().toFixed(2)}</td>
+                  </tr>
+                  {orcamento.valorFrete !== undefined && orcamento.valorFrete > 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-3 text-right">
+                        Valor do Frete:
+                      </td>
+                      <td className="p-3 text-right">R$ {orcamento.valorFrete.toFixed(2)}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td colSpan={4} className="p-3 text-right border-t-2 border-primary">
+                      TOTAL:
+                    </td>
+                    <td className="p-3 text-right border-t-2 border-primary whitespace-nowrap">
+                      R$ {(calcularTotal() + (orcamento.valorFrete || 0)).toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="space-y-4 page-break-inside-avoid">
+              <div>
+                <h3 className="font-bold mb-2 text-primary">OBSERVAÇÕES</h3>
+                <p className="text-sm bg-accent p-3 rounded-md pdf-observacoes">
+                  {orcamento.observacoes || "Nenhuma observação."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-sm mt-3 pdf-grid">
+                <div className="bg-accent p-2 rounded-md">
+                  <h4 className="font-bold text-primary mb-1 text-sm">Condições de Pagamento</h4>
+                  <p className="text-sm">{orcamento.condicoesPagamento}</p>
                 </div>
-              )}
+                <div className="bg-accent p-2 rounded-md">
+                  <h4 className="font-bold text-primary mb-1 text-sm">Prazo de Entrega</h4>
+                  <p className="text-sm">{orcamento.prazoEntrega}</p>
+                </div>
+                <div className="bg-accent p-2 rounded-md">
+                  <h4 className="font-bold text-primary mb-1 text-sm">Validade do Orçamento</h4>
+                  <p className="text-sm">{orcamento.validadeOrcamento}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      ))}
+      )}
+
+      {/* Ficha Técnica - Renderizar apenas se for modo completo ou modo ficha */}
+      {(modoExportacao === "completo" || modoExportacao === "ficha") &&
+        orcamento.itens.map((item, index) => (
+          <div
+            key={`ficha-${item.id}`}
+            id={`ficha-${item.id}`}
+            className={`border border-gray-300 rounded-md overflow-hidden shadow-sm ${
+              index > 0 || modoExportacao === "completo" ? "mt-8" : ""
+            } ${modoExportacao === "completo" ? "page-break-before" : ""} ficha-tecnica pdf-section`}
+          >
+            <div className="bg-gradient-to-r from-primary to-primary-dark p-4 pdf-header w-full">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  {dadosEmpresa?.logo_url ? (
+                    <div
+                      className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
+                      style={{ width: "50px", height: "50px" }}
+                    >
+                      <img
+                        src={dadosEmpresa.logo_url || "/placeholder.svg"}
+                        alt={nomeEmpresa}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className="bg-white p-2 rounded-md shadow-md flex items-center justify-center"
+                      style={{ width: "50px", height: "50px" }}
+                    >
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                          d="M12 2L4 5v14.5c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5V5l-8-3z"
+                          fill="#0f4c81"
+                          stroke="#0f4c81"
+                          strokeWidth="1.5"
+                        />
+                        <path
+                          d="M12 6.5c-1.93 0-3.5 1.57-3.5 3.5v1.5h7v-1.5c0-1.93-1.57-3.5-3.5-3.5z"
+                          fill="white"
+                          stroke="white"
+                          strokeWidth="0.5"
+                        />
+                        <path
+                          d="M12 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"
+                          fill="white"
+                          stroke="white"
+                          strokeWidth="0.5"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-xl font-bold text-white font-sans tracking-tight uppercase">
+                      FICHA TÉCNICA - {orcamento.numero.split(" - ")[0]}
+                    </h1>
+                    <p className="text-white/90 text-sm uppercase">
+                      {orcamento.cliente?.nome || "EMPRESA"} -{" "}
+                      {orcamento.nomeContato || orcamento.cliente?.contato || "CONTATO"}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right bg-white/10 p-2 rounded-md backdrop-blur-sm">
+                  <h2 className="text-lg font-bold text-white font-sans tracking-tight">{nomeEmpresa}</h2>
+                  <p className="text-white/80 text-xs">CNPJ: {cnpjEmpresa}</p>
+                  <p className="text-white/80 text-xs">{emailEmpresa}</p>
+                  <p className="text-white/80 text-xs">{telefoneEmpresa}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6 pdf-content">
+              <h3 className="font-bold text-lg mb-4 text-primary border-b-2 border-primary pb-2">
+                {item.produto?.nome}
+              </h3>
+
+              <div className="space-y-4">
+                {item.imagem && (
+                  <div className="pdf-image-container text-center">
+                    <img
+                      src={item.imagem || "/placeholder.svg"}
+                      alt={item.produto?.nome || "Imagem do produto"}
+                      className="pdf-image mx-auto"
+                      style={{ maxWidth: "100%", maxHeight: "550px", objectFit: "contain" }}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <h4 className="font-bold mb-2 text-primary">Especificações do Produto</h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* Card para Tecido */}
+                    <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
+                      <div className="bg-primary/10 p-2 border-b border-primary/10">
+                        <h5 className="font-medium text-primary">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16v-3"></path>
+                            <path d="m7.5 4.27 9 5.15"></path>
+                            <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                            <line x1="12" y1="22" x2="12" y2="12"></line>
+                          </svg>
+                          Tecido
+                        </h5>
+                      </div>
+                      <div className="spec-content">
+                        {item.tecidoSelecionado ? (
+                          <div>
+                            <p className="font-medium">{item.tecidoSelecionado.nome}</p>
+                            <p className="text-sm">{item.tecidoSelecionado.composicao}</p>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 italic">Não especificado</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card para Cor */}
+                    <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
+                      <div className="bg-primary/10 p-2 border-b border-primary/10">
+                        <h5 className="font-medium text-primary">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="13.5" cy="6.5" r="2.5"></circle>
+                            <circle cx="19" cy="17" r="2"></circle>
+                            <circle cx="9" cy="17" r="2.5"></circle>
+                            <circle cx="4.5" cy="12" r="1.5"></circle>
+                            <path d="M8 7c0-2.21 1.79-4 4-4"></path>
+                            <path d="M13.5 19c1.38 0 2.5-1.12 2.5-2.5S14.88 14 13.5 14 11 15.12 11 16.5s1.12 2.5 2.5 2.5Z"></path>
+                            <path d="M4.5 16.5c0-3.15 2.85-5.5 6-5.5"></path>
+                          </svg>
+                          Cor
+                        </h5>
+                      </div>
+                      <div className="spec-content">
+                        {item.corSelecionada ? (
+                          <div className="cor-container">
+                            <div
+                              className="cor-circle"
+                              style={{
+                                backgroundColor: item.corSelecionada.toLowerCase().includes("azul")
+                                  ? "#1e40af"
+                                  : item.corSelecionada.toLowerCase().includes("verde")
+                                    ? "#15803d"
+                                    : item.corSelecionada.toLowerCase().includes("vermelho")
+                                      ? "#b91c1c"
+                                      : item.corSelecionada.toLowerCase().includes("amarelo")
+                                        ? "#eab308"
+                                        : item.corSelecionada.toLowerCase().includes("preto")
+                                          ? "#171717"
+                                          : item.corSelecionada.toLowerCase().includes("branco")
+                                            ? "#ffffff"
+                                            : item.corSelecionada.toLowerCase().includes("cinza")
+                                              ? "#6b7280"
+                                              : item.corSelecionada.toLowerCase().includes("marrom")
+                                                ? "#78350f"
+                                                : item.corSelecionada.toLowerCase().includes("laranja")
+                                                  ? "#ea580c"
+                                                  : item.corSelecionada.toLowerCase().includes("roxo")
+                                                    ? "#7e22ce"
+                                                    : item.corSelecionada.toLowerCase().includes("rosa")
+                                                      ? "#be185d"
+                                                      : "#9ca3af",
+                              }}
+                            ></div>
+                            <span className="cor-nome">{item.corSelecionada}</span>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 italic">Não especificada</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card para Artes */}
+                    <div className="bg-accent/30 rounded-lg overflow-hidden border border-primary/10 shadow-sm spec-card">
+                      <div className="bg-primary/10 p-2 border-b border-primary/10">
+                        <h5 className="font-medium text-primary">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M12 19c.5 0 1-.1 1.4-.4l5.3-5.3c.4-.4.4-1 0-1.4l-5.3-5.3c-.4-.3-.9-.4-1.4-.4s-1 .1-1.4.4L5.3 11.9c-.4.4-.4 1 0 1.4l5.3 5.3c.4.3.9.4 1.4.4Z"></path>
+                            <path d="M7.5 10.5 12 6l4.5 4.5"></path>
+                            <path d="M7.5 13.5 12 18l4.5-4.5"></path>
+                          </svg>
+                          Artes
+                        </h5>
+                      </div>
+                      <div className="spec-content">
+                        {item.estampas && item.estampas.length > 0 ? (
+                          <div className="artes-list">
+                            {item.estampas.map((estampa, index) => (
+                              <div key={estampa.id} className="arte-item">
+                                <span className="arte-numero">{index + 1}</span>
+                                <div className="arte-info">
+                                  <div className="arte-posicao">{estampa.posicao || "Posição não especificada"}</div>
+                                  <div className="arte-detalhes">
+                                    {estampa.tipo}
+                                    {estampa.largura ? `, ${estampa.largura} cm` : ""}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 italic">Sem artes aplicadas</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabela de Tamanhos */}
+                  <div className="mt-6">
+                    <h4 className="font-bold mb-2 text-primary">Tabela de Tamanhos</h4>
+                    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+                      {ordenarTamanhos(item.tamanhos || {}).length > 0 ? (
+                        <table className="tamanhos-table">
+                          <tbody>
+                            <tr>
+                              <th>Tam.</th>
+                              {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, _]) => (
+                                <th key={`header-${tamanho}`}>{tamanho}</th>
+                              ))}
+                            </tr>
+                            <tr>
+                              <td>Qtd.</td>
+                              {ordenarTamanhos(item.tamanhos || {}).map(([tamanho, quantidade]) => (
+                                <td key={`qty-${tamanho}`}>{quantidade}</td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      ) : (
+                        <div className="py-3 px-3 text-center text-gray-500 italic">Nenhum tamanho especificado</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {item.observacaoTecnica && (
+                  <div>
+                    <h4 className="font-bold mb-2 text-primary">Observações Técnicas</h4>
+                    <p
+                      className="text-sm bg-accent p-3 rounded-md pdf-observacoes-tecnica"
+                      style={{ whiteSpace: "pre-wrap" }}
+                    >
+                      {item.observacaoTecnica}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
     </div>
   )
 }

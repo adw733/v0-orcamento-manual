@@ -548,6 +548,12 @@ export default function ListaOrcamentos({
     return categoriasArray.join(" / ")
   }
 
+  const exportarOrcamento = async (orcamentoId: string, tipoExportacao: string) => {
+    if (onExportOrcamento) {
+      await onExportOrcamento(orcamentoId, tipoExportacao as "completo" | "ficha")
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -876,35 +882,7 @@ export default function ListaOrcamentos({
                                   className="justify-start text-xs"
                                   onClick={() => {
                                     if (orcamento.id && onExportOrcamento) {
-                                      onExportOrcamento(orcamento.id, "orcamento")
-                                      setOpenDropdownId(null)
-                                    }
-                                  }}
-                                >
-                                  <FileDown className="h-3.5 w-3.5 mr-2" />
-                                  Exportar apenas orçamento
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="justify-start text-xs"
-                                  onClick={() => {
-                                    if (orcamento.id && onExportOrcamento) {
-                                      onExportOrcamento(orcamento.id, "ficha")
-                                      setOpenDropdownId(null)
-                                    }
-                                  }}
-                                >
-                                  <FileText className="h-3.5 w-3.5 mr-2" />
-                                  Exportar apenas ficha técnica
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="justify-start text-xs"
-                                  onClick={() => {
-                                    if (orcamento.id && onExportOrcamento) {
-                                      onExportOrcamento(orcamento.id, "completo")
+                                      exportarOrcamento(orcamento.id, "completo")
                                       setOpenDropdownId(null)
                                     }
                                   }}
