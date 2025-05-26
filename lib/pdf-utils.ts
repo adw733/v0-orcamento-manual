@@ -84,7 +84,7 @@ export async function generatePDF(
       const imagens = paginaClone.querySelectorAll("img")
       imagens.forEach((img) => {
         img.style.maxWidth = "100%"
-        img.style.maxHeight = "600px" // Aumentado de 300px para 600px
+        img.style.maxHeight = "507px" // Aumentado de 300px para 507px (30% maior)
         img.style.width = "auto"
         img.style.height = "auto"
         img.style.objectFit = "contain"
@@ -103,18 +103,42 @@ export async function generatePDF(
       // Adicionar ao DOM temporariamente
       document.body.appendChild(paginaClone)
 
+      // Ajustar especificamente as fichas técnicas para caber melhor
+      if (pagina.classList.contains("ficha-tecnica")) {
+        paginaClone.style.fontSize = "0.85rem"
+
+        // Compactar ainda mais as imagens nas fichas técnicas
+        const imagensFicha = paginaClone.querySelectorAll("img")
+        imagensFicha.forEach((img) => {
+          img.style.maxHeight = "422px" // Aumentado de 250px para 422px (30% maior)
+          img.style.padding = "10px" // Reduzir padding
+        })
+
+        // Compactar cards de especificações
+        const cards = paginaClone.querySelectorAll(".spec-card")
+        cards.forEach((card) => {
+          card.style.fontSize = "0.75rem"
+        })
+
+        // Compactar tabela de tamanhos
+        const tabelaTamanhos = paginaClone.querySelector(".tamanhos-table")
+        if (tabelaTamanhos) {
+          tabelaTamanhos.style.fontSize = "0.8rem"
+        }
+      }
+
       // Aguardar renderização
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       // Capturar a página
       const canvas = await html2canvas(paginaClone, {
-        scale: 2.5, // Aumentado de 2 para 2.5 para melhor qualidade
+        scale: 2, // Reduzido de 2.5 para 2 para melhor performance e tamanho
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
         windowWidth: paginaClone.scrollWidth,
         windowHeight: paginaClone.scrollHeight,
-        allowTaint: true, // Adicionar para permitir imagens externas
+        allowTaint: true,
       })
 
       // Remover o clone

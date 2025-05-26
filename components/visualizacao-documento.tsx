@@ -181,7 +181,7 @@ export default function VisualizacaoDocumento({
     
     /* Controle de tamanho de imagens */
     img {
-      max-height: 600px; /* Aumentado de 450px para 600px */
+      max-height: 400px; /* Reduzido de 600px para 400px */
       max-width: 100%;
       object-fit: contain;
       border: 1px solid #e5e7eb !important;
@@ -322,7 +322,7 @@ export default function VisualizacaoDocumento({
   }
   
   .pdf-image {
-    max-height: 550px; /* Aumentado de 350px para 550px */
+    max-height: 400px; /* Reduzido de 550px para 400px */
     max-width: 100%;
     object-fit: contain;
   }
@@ -551,7 +551,7 @@ export default function VisualizacaoDocumento({
 
     .pdf-image-container img {
       max-width: 100%;
-      max-height: 600px; /* Aumentado de 450px para 600px */
+      max-height: 400px; /* Reduzido de 600px para 400px */
       width: auto;
       height: auto;
       object-fit: contain;
@@ -908,7 +908,7 @@ export default function VisualizacaoDocumento({
                       src={item.imagem || "/placeholder.svg"}
                       alt={item.produto?.nome || "Imagem do produto"}
                       className="pdf-image mx-auto"
-                      style={{ maxWidth: "100%", maxHeight: "550px", objectFit: "contain" }}
+                      style={{ maxWidth: "100%", maxHeight: "400px", objectFit: "contain" }}
                     />
                   </div>
                 )}
