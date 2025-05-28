@@ -270,7 +270,7 @@ const renderTabelaTamanhos = (
                   </div>
                 </td>
               ))}
-              <td className="border-b p-1 text-center font-medium text-sm bg-accent">{quantidade}</td>
+              <th className="border-b p-1 text-center font-medium text-sm bg-accent">{quantidade}</th>
             </tr>
           </tbody>
         </table>
@@ -297,6 +297,15 @@ const GerenciadorImagem = ({
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       if (!isEditing) return
+
+      // Verificar se o container está em foco ou se algum elemento dentro dele está em foco
+      const activeElement = document.activeElement
+      const isContainerOrChild =
+        containerRef.current &&
+        (containerRef.current === activeElement || containerRef.current.contains(activeElement as Node))
+
+      // Se o container ou um filho dele não estiver em foco, verificar se o documento está em foco
+      if (!isContainerOrChild && activeElement !== document.body) return
 
       // Verificar se há itens na área de transferência
       if (e.clipboardData && e.clipboardData.items) {
@@ -334,10 +343,12 @@ const GerenciadorImagem = ({
     }
   }, [isEditing, onChange])
 
+  // Também modifique o retorno do componente para adicionar um tabIndex ao containerRef:
+
   if (!isEditing) return null
 
   return (
-    <div className="mt-4" ref={containerRef}>
+    <div className="mt-4" ref={containerRef} tabIndex={0} onClick={() => containerRef.current?.focus()}>
       <Label className="text-primary">Imagem para Ficha Técnica</Label>
       <div className="flex items-center gap-4 mt-2">
         <Button
@@ -730,136 +741,374 @@ export default function FormularioOrcamento({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      {/* Layout dividido em duas colunas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Coluna da direita - Tabela de produtos */}
         <div>
-          <Label htmlFor="numero" className="text-primary mb-1.5">
-            Número do Orçamento
-          </Label>
-          <Input
-            id="numero"
-            value={orcamento.numero.split(" - ")[0]} // Extrair apenas o número
-            onChange={(e) => {
-              // Preservar o restante do formato ao atualizar apenas o número
-              const numeroAtual = e.target.value
-              const partes = orcamento.numero.split(" - ")
+          <div className="bg-white p-6 rounded-lg border shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-medium text-lg text-primary">Itens do Orçamento</h3>
+              <p className="text-sm text-gray-500">
+                <span className="inline-block mr-1">💡</span>
+                Arraste os itens para reordená-los
+              </p>
+            </div>
 
-              // Se tiver o formato padrão, manter a parte após o número
-              if (partes.length > 1) {
-                atualizarOrcamento({ numero: `${numeroAtual} - ${partes.slice(1).join(" - ")}` })
-              } else {
-                // Caso não tenha o formato padrão, usar apenas o número
-                atualizarOrcamento({ numero: numeroAtual })
-              }
-            }}
-            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-            placeholder="Apenas o número"
-          />
-          {orcamento.numero.includes(" - ") && (
-            <p className="text-xs text-gray-500 mt-1">Formato completo: {orcamento.numero}</p>
-          )}
-        </div>
-        <div>
-          <Label htmlFor="data" className="text-primary mb-1.5">
-            Data
-          </Label>
-          <Input
-            id="data"
-            type="date"
-            value={orcamento.data}
-            onChange={(e) => {
-              // Garantir que a data seja armazenada no formato YYYY-MM-DD
-              const dataFormatada = e.target.value
-              atualizarOrcamento({ data: dataFormatada })
-            }}
-            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <Label htmlFor="status" className="text-primary mb-1.5">
-            Status
-          </Label>
-          <Select value={orcamento.status || "5"} onValueChange={(value) => atualizarOrcamento({ status: value })}>
-            <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-              <SelectValue placeholder="Selecione o status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="5">5 - Proposta</SelectItem>
-              <SelectItem value="4">4 - Execução</SelectItem>
-              <SelectItem value="3">3 - Emitir Cobrança</SelectItem>
-              <SelectItem value="2">2 - Entregue</SelectItem>
-              <SelectItem value="1">1 - Finalizada</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+            <div className="border rounded-md overflow-hidden shadow-sm">
+              <table className="w-full">
+                <thead className="bg-primary text-white">
+                  <tr>
+                    <th className="p-3 w-[5%] rounded-tl-md"></th>
+                    <th className="text-left p-3 w-[40%]">Produto</th>
+                    <th className="text-center p-3 w-[15%]">Valor Unit.</th>
+                    <th className="text-center p-3 w-[10%]">Qtd.</th>
+                    <th className="text-right p-3 w-[15%]">Total</th>
+                    <th className="p-3 w-[15%] rounded-tr-md text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orcamento.itens.map((item, index) => (
+                    <React.Fragment key={item.id}>
+                      {dragOverItemId === item.id && (
+                        <tr className="border-t">
+                          <td colSpan={6} className="p-0">
+                            <div className="h-1 bg-primary animate-pulse rounded-full mx-2"></div>
+                          </td>
+                        </tr>
+                      )}
+                      <tr
+                        className={`border-t hover:bg-accent/30 transition-colors ${
+                          editandoItem === item.id ? "bg-accent/50" : ""
+                        }`}
+                        draggable={true}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", item.id)
+                          e.currentTarget.classList.add("opacity-50")
+                        }}
+                        onDragEnd={(e) => {
+                          e.currentTarget.classList.remove("opacity-50")
+                          setDragOverItemId(null)
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          e.dataTransfer.dropEffect = "move"
+                          if (dragOverItemId !== item.id) {
+                            setDragOverItemId(item.id)
+                          }
+                        }}
+                        onDragLeave={(e) => {
+                          // Verificar se realmente saiu do elemento (e não apenas entrou em um filho)
+                          const relatedTarget = e.relatedTarget as Node
+                          if (!e.currentTarget.contains(relatedTarget)) {
+                            setDragOverItemId(null)
+                          }
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          setDragOverItemId(null)
+                          const draggedItemId = e.dataTransfer.getData("text/plain")
+                          const draggedIndex = orcamento.itens.findIndex((i) => i.id === draggedItemId)
+                          const targetIndex = index
 
-      <div>
-        <Label htmlFor="cliente" className="text-primary mb-1.5">
-          Selecione o Cliente
-        </Label>
-        <Select value={orcamento.cliente?.id || ""} onValueChange={handleClienteChange}>
-          <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-            <SelectValue placeholder="Selecione um cliente" />
-          </SelectTrigger>
-          <SelectContent>
-            {clientes.map((cliente) => (
-              <SelectItem key={cliente.id} value={cliente.id}>
-                {cliente.cnpj} - {cliente.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div>
-            <Label htmlFor="nomeContato" className="text-primary mb-1.5">
-              Nome do Contato
-            </Label>
-            <Input
-              id="nomeContato"
-              value={orcamento.nomeContato || ""}
-              onChange={(e) => atualizarOrcamento({ nomeContato: e.target.value })}
-              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-              placeholder="Nome da pessoa de contato"
-            />
-          </div>
-          <div>
-            <Label htmlFor="telefoneContato" className="text-primary mb-1.5">
-              Telefone do Contato
-            </Label>
-            <Input
-              id="telefoneContato"
-              value={orcamento.telefoneContato || ""}
-              onChange={(e) => atualizarOrcamento({ telefoneContato: e.target.value })}
-              className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-              placeholder="(00) 00000-0000"
-            />
-          </div>
-        </div>
-      </div>
+                          if (draggedIndex !== targetIndex) {
+                            const novosItens = [...orcamento.itens]
+                            const [itemRemovido] = novosItens.splice(draggedIndex, 1)
+                            novosItens.splice(targetIndex, 0, itemRemovido)
+                            atualizarOrcamento({ itens: novosItens })
 
-      <div className="space-y-4">
-        <h3 className="font-medium text-lg text-primary">Itens do Orçamento</h3>
-        <p className="text-sm text-gray-500 mb-2">
-          <span className="inline-block mr-1">💡</span>
-          Dica: Você pode arrastar os itens para reordená-los. Uma linha azul indicará onde o item será posicionado.
-        </p>
+                            // Mostrar toast de confirmação
+                            toast({
+                              title: "Item reordenado",
+                              description: "A ordem dos itens foi atualizada e salva com sucesso.",
+                              duration: 2000,
+                            })
+                          }
+                        }}
+                      >
+                        <td className="p-3 text-center">
+                          <div className="flex flex-col items-center gap-1 cursor-grab" title="Arraste para reordenar">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => moverItemParaCima(index)}
+                              disabled={index === 0 || isLoading}
+                              className="h-6 w-6 rounded-full hover:bg-primary/10"
+                              title="Mover para cima"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => moverItemParaBaixo(index)}
+                              disabled={index === orcamento.itens.length - 1 || isLoading}
+                              className="h-6 w-6 rounded-full hover:bg-primary/10"
+                              title="Mover para baixo"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-medium">{item.produto?.nome}</div>
+                          {item.observacaoComercial && (
+                            <div className="text-xs mt-1 text-gray-600 italic">{item.observacaoComercial}</div>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          {editandoItem === item.id ? (
+                            <Input
+                              type="number"
+                              value={itemEmEdicao?.valorUnitario || 0}
+                              onChange={(e) =>
+                                setItemEmEdicao({
+                                  ...itemEmEdicao!,
+                                  valorUnitario: Number.parseFloat(e.target.value) || 0,
+                                })
+                              }
+                              className="h-9 text-center w-28 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          ) : (
+                            <span className="flex items-center justify-center gap-1">
+                              <DollarSign className="h-3 w-3 text-gray-500" />
+                              {item.valorUnitario.toFixed(2)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-center font-medium">{item.quantidade}</td>
+                        <td className="p-3 text-right font-medium">
+                          <span className="flex items-center justify-end gap-1">
+                            <DollarSign className="h-3 w-3 text-gray-500" />
+                            {(item.quantidade * item.valorUnitario).toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {editandoItem === item.id ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
+                                  onClick={salvarEdicaoItem}
+                                  disabled={isLoading}
+                                >
+                                  {isLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="h-4 w-4" />
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                  onClick={cancelarEdicaoItem}
+                                  disabled={isLoading}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
+                                  onClick={() => iniciarEdicaoItem(item)}
+                                  disabled={isLoading}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removerItem(item.id)}
+                                  className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                                  disabled={isLoading}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {editandoItem === item.id && itemEmEdicao && (
+                        <tr>
+                          <td colSpan={6} className="p-3 bg-accent/50 border-t border-b">
+                            <div className="space-y-3">
+                              {/* Linha 1: Tecido e Cor */}
+                              <div className="grid grid-cols-2 gap-3">
+                                {produtoSelecionado?.tecidos && produtoSelecionado.tecidos.length > 0 && (
+                                  <div>
+                                    <Label htmlFor="tecido" className="text-primary text-xs mb-1">
+                                      Tecido
+                                    </Label>
+                                    <Select
+                                      value={itemEmEdicao.tecidoSelecionado?.nome || ""}
+                                      onValueChange={handleTecidoChange}
+                                    >
+                                      <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                        <SelectValue placeholder="Selecione o tecido" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {produtoSelecionado.tecidos.map((tecido) => (
+                                          <SelectItem key={tecido.nome} value={tecido.nome}>
+                                            {tecido.nome} {tecido.composicao ? `- ${tecido.composicao}` : ""}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
 
-        <div className="border rounded-md overflow-hidden shadow-sm">
-          <table className="w-full">
-            <thead className="bg-primary text-white">
-              <tr>
-                <th className="p-3 w-[5%] rounded-tl-md"></th>
-                <th className="text-left p-3 w-[40%]">Produto</th>
-                <th className="text-center p-3 w-[15%]">Valor Unit.</th>
-                <th className="text-center p-3 w-[10%]">Qtd.</th>
-                <th className="text-right p-3 w-[15%]">Total</th>
-                <th className="p-3 w-[15%] rounded-tr-md text-center">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orcamento.itens.map((item, index) => (
-                <React.Fragment key={item.id}>
-                  {dragOverItemId === item.id && (
+                                {produtoSelecionado?.cores && produtoSelecionado.cores.length > 0 && (
+                                  <div>
+                                    <Label htmlFor="cor" className="text-primary text-xs mb-1">
+                                      Cor
+                                    </Label>
+                                    <Select value={itemEmEdicao.corSelecionada || ""} onValueChange={handleCorChange}>
+                                      <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                        <SelectValue placeholder="Selecione a cor" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {produtoSelecionado.cores.map((cor) => (
+                                          <SelectItem key={cor} value={cor}>
+                                            {cor}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Linha 2: Tabela de tamanhos compacta */}
+                              <div>
+                                <Label className="text-primary text-xs mb-1">Tamanhos</Label>
+                                <div className="border border-gray-200 rounded-md bg-white">
+                                  <table className="w-full border-collapse text-xs">
+                                    <thead>
+                                      <tr className="bg-accent">
+                                        <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
+                                          TAM.
+                                        </th>
+                                        {Object.keys(tamanhosPadrao)
+                                          .filter(
+                                            (tamanho) =>
+                                              !produtoSelecionado?.tamanhosDisponiveis ||
+                                              produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
+                                          )
+                                          .map((tamanho) => (
+                                            <th
+                                              key={`header-${tamanho}`}
+                                              className="border-b p-1 text-center font-medium text-xs text-primary min-w-8"
+                                            >
+                                              {tamanho}
+                                            </th>
+                                          ))}
+                                        <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
+                                          TOT.
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      <tr>
+                                        <td className="border-b p-1 text-center font-medium text-xs bg-accent">QTD.</td>
+                                        {Object.keys(tamanhosPadrao)
+                                          .filter(
+                                            (tamanho) =>
+                                              !produtoSelecionado?.tamanhosDisponiveis ||
+                                              produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
+                                          )
+                                          .map((tamanho) => (
+                                            <td key={`cell-${tamanho}`} className="border-b p-1 text-center">
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                value={itemEmEdicao.tamanhos[tamanho] || 0}
+                                                onChange={(e) =>
+                                                  handleTamanhoChange(tamanho, Number.parseInt(e.target.value) || 0)
+                                                }
+                                                className="w-full h-6 text-center text-xs border border-gray-300 rounded focus:border-primary focus:ring-1 focus:ring-primary"
+                                              />
+                                            </td>
+                                          ))}
+                                        <td className="border-b p-1 text-center font-medium text-xs bg-accent">
+                                          {itemEmEdicao.quantidade}
+                                        </td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+
+                              {/* Linha 3: Observações lado a lado */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label htmlFor="observacaoComercial" className="text-primary text-xs mb-1">
+                                    Observação Comercial
+                                  </Label>
+                                  <Textarea
+                                    id="observacaoComercial"
+                                    value={itemEmEdicao.observacaoComercial || ""}
+                                    onChange={(e) =>
+                                      setItemEmEdicao({
+                                        ...itemEmEdicao,
+                                        observacaoComercial: e.target.value,
+                                      })
+                                    }
+                                    className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                                    placeholder="Observações para o cliente..."
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="observacaoTecnica" className="text-primary text-xs mb-1">
+                                    Observação Técnica
+                                  </Label>
+                                  <Textarea
+                                    id="observacaoTecnica"
+                                    value={itemEmEdicao.observacaoTecnica || ""}
+                                    onChange={(e) =>
+                                      setItemEmEdicao({
+                                        ...itemEmEdicao,
+                                        observacaoTecnica: e.target.value,
+                                      })
+                                    }
+                                    className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                                    placeholder="Observações técnicas..."
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Linha 4: Estampas com largura total */}
+                              <div>
+                                <Label className="text-primary text-xs mb-1">Estampas</Label>
+                                <div className="max-h-32 overflow-y-auto">
+                                  <EstampaInput
+                                    estampas={itemEmEdicao.estampas || []}
+                                    onChange={handleEstampasChange}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Linha 5: Imagem para Ficha Técnica */}
+                              <GerenciadorImagem
+                                imagem={itemEmEdicao.imagem}
+                                onChange={(novaImagem) => setItemEmEdicao({ ...itemEmEdicao, imagem: novaImagem })}
+                                inputRef={editImagemInputRef}
+                                isEditing={true}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+
+                  {/* Adicionar linha de destaque no final da lista */}
+                  {dragOverItemId === "end-of-list" && (
                     <tr className="border-t">
                       <td colSpan={6} className="p-0">
                         <div className="h-1 bg-primary animate-pulse rounded-full mx-2"></div>
@@ -867,27 +1116,15 @@ export default function FormularioOrcamento({
                     </tr>
                   )}
                   <tr
-                    className={`border-t hover:bg-accent/30 transition-colors ${
-                      editandoItem === item.id ? "bg-accent/50" : ""
-                    }`}
-                    draggable={true}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/plain", item.id)
-                      e.currentTarget.classList.add("opacity-50")
-                    }}
-                    onDragEnd={(e) => {
-                      e.currentTarget.classList.remove("opacity-50")
-                      setDragOverItemId(null)
-                    }}
+                    className="border-t hover:bg-accent/30 transition-colors"
                     onDragOver={(e) => {
                       e.preventDefault()
                       e.dataTransfer.dropEffect = "move"
-                      if (dragOverItemId !== item.id) {
-                        setDragOverItemId(item.id)
+                      if (dragOverItemId !== "end-of-list") {
+                        setDragOverItemId("end-of-list")
                       }
                     }}
                     onDragLeave={(e) => {
-                      // Verificar se realmente saiu do elemento (e não apenas entrou em um filho)
                       const relatedTarget = e.relatedTarget as Node
                       if (!e.currentTarget.contains(relatedTarget)) {
                         setDragOverItemId(null)
@@ -898,536 +1135,418 @@ export default function FormularioOrcamento({
                       setDragOverItemId(null)
                       const draggedItemId = e.dataTransfer.getData("text/plain")
                       const draggedIndex = orcamento.itens.findIndex((i) => i.id === draggedItemId)
-                      const targetIndex = index
 
-                      if (draggedIndex !== targetIndex) {
+                      // Mover para o final da lista
+                      if (draggedIndex !== -1 && draggedIndex !== orcamento.itens.length - 1) {
                         const novosItens = [...orcamento.itens]
                         const [itemRemovido] = novosItens.splice(draggedIndex, 1)
-                        novosItens.splice(targetIndex, 0, itemRemovido)
+                        novosItens.push(itemRemovido)
                         atualizarOrcamento({ itens: novosItens })
 
                         // Mostrar toast de confirmação
                         toast({
                           title: "Item reordenado",
-                          description: "A ordem dos itens foi atualizada e salva com sucesso.",
+                          description: "O item foi movido para o final da lista.",
                           duration: 2000,
                         })
                       }
                     }}
                   >
-                    <td className="p-3 text-center">
-                      <div className="flex flex-col items-center gap-1 cursor-grab" title="Arraste para reordenar">
+                    <td className="p-3"></td>
+                    <td className="p-3" onClick={() => setLinhaAtiva("novo")}>
+                      {linhaAtiva === "novo" ? (
+                        <Select value={novoItem.produtoId || ""} onValueChange={handleProdutoChange}>
+                          <SelectTrigger className="h-9 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                            <SelectValue placeholder="Selecione um produto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {produtos.map((produto) => (
+                              <SelectItem key={produto.id} value={produto.id}>
+                                {produto.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
                         <Button
                           variant="ghost"
-                          size="icon"
-                          onClick={() => moverItemParaCima(index)}
-                          disabled={index === 0 || isLoading}
-                          className="h-6 w-6 rounded-full hover:bg-primary/10"
-                          title="Mover para cima"
+                          className="w-full justify-start text-primary h-9 hover:bg-primary/10 hover:text-primary-dark"
+                          onClick={() => setLinhaAtiva("novo")}
+                          disabled={isLoading}
                         >
-                          <ChevronUp className="h-4 w-4" />
+                          <Plus className="h-4 w-4 mr-2" />
+                          Adicionar item...
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => moverItemParaBaixo(index)}
-                          disabled={index === orcamento.itens.length - 1 || isLoading}
-                          className="h-6 w-6 rounded-full hover:bg-primary/10"
-                          title="Mover para baixo"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      )}
                     </td>
                     <td className="p-3">
-                      <div className="font-medium">{item.produto?.nome}</div>
-                      {item.observacaoComercial && (
-                        <div className="text-xs mt-1 text-gray-600 italic">{item.observacaoComercial}</div>
-                      )}
-                    </td>
-                    <td className="p-3 text-center">
-                      {editandoItem === item.id ? (
+                      {linhaAtiva === "novo" && (
                         <Input
                           type="number"
-                          value={itemEmEdicao?.valorUnitario || 0}
+                          value={novoItem.valorUnitario || ""}
                           onChange={(e) =>
-                            setItemEmEdicao({
-                              ...itemEmEdicao!,
-                              valorUnitario: Number.parseFloat(e.target.value) || 0,
-                            })
+                            setNovoItem({ ...novoItem, valorUnitario: Number.parseFloat(e.target.value) })
                           }
-                          className="h-9 text-center w-28 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          className="h-9 text-center border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          placeholder="0,00"
                         />
-                      ) : (
-                        <span className="flex items-center justify-center gap-1">
-                          <DollarSign className="h-3 w-3 text-gray-500" />
-                          {item.valorUnitario.toFixed(2)}
-                        </span>
                       )}
                     </td>
-                    <td className="p-3 text-center font-medium">{item.quantidade}</td>
-                    <td className="p-3 text-right font-medium">
-                      <span className="flex items-center justify-end gap-1">
-                        <DollarSign className="h-3 w-3 text-gray-500" />
-                        {(item.quantidade * item.valorUnitario).toFixed(2)}
-                      </span>
-                    </td>
                     <td className="p-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {editandoItem === item.id ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
-                              onClick={salvarEdicaoItem}
-                              disabled={isLoading}
-                            >
-                              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                              onClick={cancelarEdicaoItem}
-                              disabled={isLoading}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
-                              onClick={() => iniciarEdicaoItem(item)}
-                              disabled={isLoading}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removerItem(item.id)}
-                              className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                              disabled={isLoading}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                      {linhaAtiva === "novo" && (
+                        <div className="text-center font-medium">{novoItem.quantidade || 0}</div>
+                      )}
                     </td>
-                  </tr>
-                  {editandoItem === item.id && itemEmEdicao && (
-                    <tr>
-                      <td colSpan={6} className="p-3 bg-accent/50 border-t border-b">
-                        <div className="space-y-3">
-                          {/* Linha 1: Tecido e Cor */}
-                          <div className="grid grid-cols-2 gap-3">
-                            {produtoSelecionado?.tecidos && produtoSelecionado.tecidos.length > 0 && (
-                              <div>
-                                <Label htmlFor="tecido" className="text-primary text-xs mb-1">
-                                  Tecido
-                                </Label>
-                                <Select
-                                  value={itemEmEdicao.tecidoSelecionado?.nome || ""}
-                                  onValueChange={handleTecidoChange}
-                                >
-                                  <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                                    <SelectValue placeholder="Selecione o tecido" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {produtoSelecionado.tecidos.map((tecido) => (
-                                      <SelectItem key={tecido.nome} value={tecido.nome}>
-                                        {tecido.nome} {tecido.composicao ? `- ${tecido.composicao}` : ""}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                    {linhaAtiva === "novo" && novoItem.produtoId && (
+                      <tr>
+                        <td colSpan={6} className="p-3 bg-accent/20 border-t">
+                          <div className="space-y-3">
+                            {/* Linha 1: Tecido e Cor */}
+                            <div className="grid grid-cols-2 gap-3">
+                              {produtoSelecionado?.tecidos && produtoSelecionado.tecidos.length > 0 && (
+                                <div>
+                                  <Label htmlFor="tecido-novo" className="text-primary text-xs mb-1">
+                                    Tecido
+                                  </Label>
+                                  <Select
+                                    value={novoItem.tecidoSelecionado?.nome || ""}
+                                    onValueChange={handleTecidoChange}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary">
+                                      <SelectValue placeholder="Selecione o tecido" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {produtoSelecionado.tecidos.map((tecido) => (
+                                        <SelectItem key={tecido.nome} value={tecido.nome}>
+                                          {tecido.nome} {tecido.composicao ? `- ${tecido.composicao}` : ""}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+
+                              {produtoSelecionado?.cores && produtoSelecionado.cores.length > 0 && (
+                                <div>
+                                  <Label htmlFor="cor-novo" className="text-primary text-xs mb-1">
+                                    Cor
+                                  </Label>
+                                  <Select value={novoItem.corSelecionada || ""} onValueChange={handleCorChange}>
+                                    <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary">
+                                      <SelectValue placeholder="Selecione a cor" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {produtoSelecionado.cores.map((cor) => (
+                                        <SelectItem key={cor} value={cor}>
+                                          {cor}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Linha 2: Tabela de tamanhos */}
+                            {renderTabelaTamanhos(
+                              novoItem.tamanhos || tamanhosPadrao,
+                              novoItem.quantidade || 0,
+                              true,
+                              handleNovoTamanhoChange,
+                              produtoSelecionado?.tamanhosDisponiveis,
                             )}
 
-                            {produtoSelecionado?.cores && produtoSelecionado.cores.length > 0 && (
+                            {/* Linha 3: Observações */}
+                            <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <Label htmlFor="cor" className="text-primary text-xs mb-1">
-                                  Cor
+                                <Label htmlFor="observacaoComercial-novo" className="text-primary text-xs mb-1">
+                                  Observação Comercial
                                 </Label>
-                                <Select value={itemEmEdicao.corSelecionada || ""} onValueChange={handleCorChange}>
-                                  <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                                    <SelectValue placeholder="Selecione a cor" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {produtoSelecionado.cores.map((cor) => (
-                                      <SelectItem key={cor} value={cor}>
-                                        {cor}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Linha 2: Tabela de tamanhos compacta */}
-                          <div>
-                            <Label className="text-primary text-xs mb-1">Tamanhos</Label>
-                            <div className="border border-gray-200 rounded-md bg-white">
-                              <table className="w-full border-collapse text-xs">
-                                <thead>
-                                  <tr className="bg-accent">
-                                    <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
-                                      TAM.
-                                    </th>
-                                    {Object.keys(tamanhosPadrao)
-                                      .filter(
-                                        (tamanho) =>
-                                          !produtoSelecionado?.tamanhosDisponiveis ||
-                                          produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
-                                      )
-                                      .map((tamanho) => (
-                                        <th
-                                          key={`header-${tamanho}`}
-                                          className="border-b p-1 text-center font-medium text-xs text-primary min-w-8"
-                                        >
-                                          {tamanho}
-                                        </th>
-                                      ))}
-                                    <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
-                                      TOT.
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <tr>
-                                    <td className="border-b p-1 text-center font-medium text-xs bg-accent">QTD.</td>
-                                    {Object.keys(tamanhosPadrao)
-                                      .filter(
-                                        (tamanho) =>
-                                          !produtoSelecionado?.tamanhosDisponiveis ||
-                                          produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
-                                      )
-                                      .map((tamanho) => (
-                                        <td key={`cell-${tamanho}`} className="border-b p-1 text-center">
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            value={itemEmEdicao.tamanhos[tamanho] || 0}
-                                            onChange={(e) =>
-                                              handleTamanhoChange(tamanho, Number.parseInt(e.target.value) || 0)
-                                            }
-                                            className="w-full h-6 text-center text-xs border border-gray-300 rounded focus:border-primary focus:ring-1 focus:ring-primary"
-                                          />
-                                        </td>
-                                      ))}
-                                    <td className="border-b p-1 text-center font-medium text-xs bg-accent">
-                                      {itemEmEdicao.quantidade}
-                                    </td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-
-                          {/* Linha 3: Observações lado a lado */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label htmlFor="observacaoComercial" className="text-primary text-xs mb-1">
-                                Observação Comercial
-                              </Label>
-                              <Textarea
-                                id="observacaoComercial"
-                                value={itemEmEdicao.observacaoComercial || ""}
-                                onChange={(e) =>
-                                  setItemEmEdicao({
-                                    ...itemEmEdicao,
-                                    observacaoComercial: e.target.value,
-                                  })
-                                }
-                                className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
-                                placeholder="Observações para o cliente..."
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="observacaoTecnica" className="text-primary text-xs mb-1">
-                                Observação Técnica
-                              </Label>
-                              <Textarea
-                                id="observacaoTecnica"
-                                value={itemEmEdicao.observacaoTecnica || ""}
-                                onChange={(e) =>
-                                  setItemEmEdicao({
-                                    ...itemEmEdicao,
-                                    observacaoTecnica: e.target.value,
-                                  })
-                                }
-                                className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
-                                placeholder="Observações técnicas..."
-                              />
-                            </div>
-                          </div>
-
-                          {/* Linha 4: Imagem e Estampas lado a lado */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-primary text-xs mb-1">Imagem para Ficha Técnica</Label>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => editImagemInputRef.current?.click()}
-                                  className="text-xs h-7 border-dashed border-2 hover:bg-accent transition-colors"
-                                >
-                                  <ImageIcon className="h-3 w-3 mr-1" />
-                                  {itemEmEdicao.imagem ? "Trocar" : "Adicionar"}
-                                </Button>
-                                <input
-                                  ref={editImagemInputRef}
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={handleEditarImagem}
-                                  className="hidden"
+                                <Textarea
+                                  id="observacaoComercial-novo"
+                                  value={novoItem.observacaoComercial || ""}
+                                  onChange={(e) => setNovoItem({ ...novoItem, observacaoComercial: e.target.value })}
+                                  className="h-16 text-xs border-gray-300 focus:border-primary resize-none"
+                                  placeholder="Observações para o cliente..."
                                 />
-                                {itemEmEdicao.imagem && (
-                                  <div className="relative">
-                                    <img
-                                      src={itemEmEdicao.imagem || "/placeholder.svg"}
-                                      alt="Prévia"
-                                      className="h-12 w-12 object-cover rounded border shadow-sm"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white hover:bg-red-600"
-                                      onClick={() => setItemEmEdicao({ ...itemEmEdicao, imagem: "" })}
-                                    >
-                                      <X className="h-2 w-2" />
-                                    </Button>
-                                  </div>
-                                )}
+                              </div>
+                              <div>
+                                <Label htmlFor="observacaoTecnica-novo" className="text-primary text-xs mb-1">
+                                  Observação Técnica
+                                </Label>
+                                <Textarea
+                                  id="observacaoTecnica-novo"
+                                  value={novoItem.observacaoTecnica || ""}
+                                  onChange={(e) => setNovoItem({ ...novoItem, observacaoTecnica: e.target.value })}
+                                  className="h-16 text-xs border-gray-300 focus:border-primary resize-none"
+                                  placeholder="Observações técnicas..."
+                                />
                               </div>
                             </div>
 
+                            {/* Linha 4: Estampas */}
                             <div>
                               <Label className="text-primary text-xs mb-1">Estampas</Label>
-                              <div className="max-h-20 overflow-y-auto">
-                                <EstampaInput estampas={itemEmEdicao.estampas || []} onChange={handleEstampasChange} />
-                              </div>
+                              <EstampaInput estampas={novoItem.estampas || []} onChange={handleEstampasChange} />
                             </div>
+
+                            {/* Linha 5: Imagem */}
+                            <GerenciadorImagem
+                              imagem={novoItem.imagem}
+                              onChange={(novaImagem) => setNovoItem({ ...novoItem, imagem: novaImagem })}
+                              inputRef={novoImagemInputRef}
+                              isEditing={true}
+                            />
                           </div>
+                        </td>
+                      </tr>
+                    )}
+                    <td className="p-3 text-right font-medium">
+                      {linhaAtiva === "novo" && novoItem.valorUnitario && novoItem.quantidade ? (
+                        <span className="flex items-center justify-end gap-1">
+                          <DollarSign className="h-3 w-3 text-gray-500" />
+                          {(novoItem.quantidade * novoItem.valorUnitario).toFixed(2)}
+                        </span>
+                      ) : (
+                        ""
+                      )}
+                    </td>
+                    <td className="p-3 text-center">
+                      {linhaAtiva === "novo" && (
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleAdicionarItem}
+                            disabled={isLoading || !novoItem.produtoId || !novoItem.valorUnitario}
+                            className="h-8 w-8 text-white bg-primary hover:bg-primary-dark disabled:bg-gray-300"
+                          >
+                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                          </Button>
                         </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-
-              {/* Adicionar linha de destaque no final da lista */}
-              {dragOverItemId === "end-of-list" && (
-                <tr className="border-t">
-                  <td colSpan={6} className="p-0">
-                    <div className="h-1 bg-primary animate-pulse rounded-full mx-2"></div>
-                  </td>
-                </tr>
-              )}
-              <tr
-                className="border-t hover:bg-accent/30 transition-colors"
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = "move"
-                  if (dragOverItemId !== "end-of-list") {
-                    setDragOverItemId("end-of-list")
-                  }
-                }}
-                onDragLeave={(e) => {
-                  const relatedTarget = e.relatedTarget as Node
-                  if (!e.currentTarget.contains(relatedTarget)) {
-                    setDragOverItemId(null)
-                  }
-                }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  setDragOverItemId(null)
-                  const draggedItemId = e.dataTransfer.getData("text/plain")
-                  const draggedIndex = orcamento.itens.findIndex((i) => i.id === draggedItemId)
-
-                  // Mover para o final da lista
-                  if (draggedIndex !== -1 && draggedIndex !== orcamento.itens.length - 1) {
-                    const novosItens = [...orcamento.itens]
-                    const [itemRemovido] = novosItens.splice(draggedIndex, 1)
-                    novosItens.push(itemRemovido)
-                    atualizarOrcamento({ itens: novosItens })
-
-                    // Mostrar toast de confirmação
-                    toast({
-                      title: "Item reordenado",
-                      description: "O item foi movido para o final da lista.",
-                      duration: 2000,
-                    })
-                  }
-                }}
-              >
-                <td className="p-3"></td>
-                <td className="p-3" onClick={() => setLinhaAtiva("novo")}>
-                  {linhaAtiva === "novo" ? (
-                    <Select value={novoItem.produtoId || ""} onValueChange={handleProdutoChange}>
-                      <SelectTrigger className="h-9 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                        <SelectValue placeholder="Selecione um produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {produtos.map((produto) => (
-                          <SelectItem key={produto.id} value={produto.id}>
-                            {produto.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-primary h-9 hover:bg-primary/10 hover:text-primary-dark"
-                      onClick={() => setLinhaAtiva("novo")}
-                      disabled={isLoading}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Adicionar item...
-                    </Button>
-                  )}
-                </td>
-                <td className="p-3">
-                  {linhaAtiva === "novo" && (
-                    <Input
-                      type="number"
-                      value={novoItem.valorUnitario || ""}
-                      onChange={(e) => setNovoItem({ ...novoItem, valorUnitario: Number.parseFloat(e.target.value) })}
-                      className="h-9 text-center border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                      placeholder="0,00"
-                    />
-                  )}
-                </td>
-                <td className="p-3 text-center">
-                  {linhaAtiva === "novo" && <div className="text-center font-medium">{novoItem.quantidade || 0}</div>}
-                </td>
-                <td className="p-3 text-right font-medium">
-                  {linhaAtiva === "novo" && novoItem.valorUnitario && novoItem.quantidade ? (
-                    <span className="flex items-center justify-end gap-1">
-                      <DollarSign className="h-3 w-3 text-gray-500" />
-                      {(novoItem.quantidade * novoItem.valorUnitario).toFixed(2)}
-                    </span>
-                  ) : (
-                    ""
-                  )}
-                </td>
-                <td className="p-3 text-center">
-                  {linhaAtiva === "novo" && (
-                    <div className="flex items-center justify-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleAdicionarItem}
-                        disabled={isLoading || !novoItem.produtoId || !novoItem.valorUnitario}
-                        className="h-8 w-8 text-white bg-primary hover:bg-primary-dark disabled:bg-gray-300"
-                      >
-                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot className="bg-primary text-white">
-              <tr>
-                <td colSpan={4} className="p-3 text-right font-medium">
-                  Valor dos Produtos:
-                </td>
-                <td className="p-3 text-right font-medium">R$ {calcularTotal().toFixed(2)}</td>
-                <td></td>
-              </tr>
-              <tr>
-                <td colSpan={4} className="p-3 text-right font-medium">
-                  Valor do Frete:
-                </td>
-                <td className="p-3 text-right font-medium">
-                  <div className="flex justify-end">
-                    <span className="mr-2">R$</span>
-                    <Input
-                      type="number"
-                      value={orcamento.valorFrete || ""}
-                      onChange={(e) =>
-                        atualizarOrcamento({ valorFrete: e.target.value ? Number(e.target.value) : undefined })
-                      }
-                      className="w-24 h-7 text-right text-black border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                      placeholder="0,00"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                </td>
-                <td></td>
-              </tr>
-              <tr>
-                <td colSpan={4} className="p-3 text-right font-bold">
-                  Total do Orçamento:
-                </td>
-                <td className="p-3 text-right font-bold">
-                  R$ {(calcularTotal() + (orcamento.valorFrete || 0)).toFixed(2)}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot className="bg-primary text-white">
+                  <tr>
+                    <td colSpan={4} className="p-3 text-right font-medium">
+                      Valor dos Produtos:
+                    </td>
+                    <td className="p-3 text-right font-medium">R$ {calcularTotal().toFixed(2)}</td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td colSpan={4} className="p-3 text-right font-medium">
+                      Valor do Frete:
+                    </td>
+                    <td className="p-3 text-right font-medium">
+                      <div className="flex justify-end">
+                        <span className="mr-2">R$</span>
+                        <Input
+                          type="number"
+                          value={orcamento.valorFrete || ""}
+                          onChange={(e) =>
+                            atualizarOrcamento({ valorFrete: e.target.value ? Number(e.target.value) : undefined })
+                          }
+                          className="w-24 h-7 text-right text-black border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                          placeholder="0,00"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td colSpan={4} className="p-3 text-right font-bold">
+                      Total do Orçamento:
+                    </td>
+                    <td className="p-3 text-right font-bold">
+                      R$ {(calcularTotal() + (orcamento.valorFrete || 0)).toFixed(2)}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div>
-        <Label htmlFor="observacoes" className="text-primary mb-1.5">
-          Observações
-        </Label>
-        <Textarea
-          id="observacoes"
-          value={orcamento.observacoes}
-          onChange={(e) => atualizarOrcamento({ observacoes: e.target.value })}
-          rows={3}
-          className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-        />
-      </div>
+        {/* Coluna da esquerda - Dados do cabeçalho */}
+        <div className="space-y-6">
+          <div className="bg-white p-3 rounded-md border shadow-sm">
+            <h3 className="font-medium text-lg text-primary mb-2">Informações Básicas</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div>
+                <Label htmlFor="numero" className="text-primary mb-1 text-sm">
+                  Número do Orçamento
+                </Label>
+                <Input
+                  id="numero"
+                  value={orcamento.numero.split(" - ")[0]} // Extrair apenas o número
+                  onChange={(e) => {
+                    // Preservar o restante do formato ao atualizar apenas o número
+                    const numeroAtual = e.target.value
+                    const partes = orcamento.numero.split(" - ")
 
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <Label htmlFor="condicoesPagamento" className="text-primary mb-1.5">
-            Condições de Pagamento
-          </Label>
-          <Input
-            id="condicoesPagamento"
-            value={orcamento.condicoesPagamento}
-            onChange={(e) => handleTextUppercase(e, "condicoesPagamento")}
-            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <Label htmlFor="prazoEntrega" className="text-primary mb-1.5">
-            Prazo de Entrega
-          </Label>
-          <Input
-            id="prazoEntrega"
-            value={orcamento.prazoEntrega}
-            onChange={(e) => handleTextUppercase(e, "prazoEntrega")}
-            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <Label htmlFor="validadeOrcamento" className="text-primary mb-1.5">
-            Validade do Orçamento
-          </Label>
-          <Input
-            id="validadeOrcamento"
-            value={orcamento.validadeOrcamento}
-            onChange={(e) => handleTextUppercase(e, "validadeOrcamento")}
-            className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-          />
+                    // Se tiver o formato padrão, manter a parte após o número
+                    if (partes.length > 1) {
+                      atualizarOrcamento({ numero: `${numeroAtual} - ${partes.slice(1).join(" - ")}` })
+                    } else {
+                      // Caso não tenha o formato padrão, usar apenas o número
+                      atualizarOrcamento({ numero: numeroAtual })
+                    }
+                  }}
+                  className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                  placeholder="Apenas o número"
+                />
+                {orcamento.numero.includes(" - ") && (
+                  <p className="text-xs text-gray-500 mt-0.5">Formato completo: {orcamento.numero}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="data" className="text-primary mb-1 text-sm">
+                  Data
+                </Label>
+                <Input
+                  id="data"
+                  type="date"
+                  value={orcamento.data}
+                  onChange={(e) => {
+                    // Garantir que a data seja armazenada no formato YYYY-MM-DD
+                    const dataFormatada = e.target.value
+                    atualizarOrcamento({ data: dataFormatada })
+                  }}
+                  className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <Label htmlFor="status" className="text-primary mb-1 text-sm">
+                  Status
+                </Label>
+                <Select
+                  value={orcamento.status || "5"}
+                  onValueChange={(value) => atualizarOrcamento({ status: value })}
+                >
+                  <SelectTrigger className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 - Proposta</SelectItem>
+                    <SelectItem value="4">4 - Execução</SelectItem>
+                    <SelectItem value="3">3 - Emitir Cobrança</SelectItem>
+                    <SelectItem value="2">2 - Entregue</SelectItem>
+                    <SelectItem value="1">1 - Finalizada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-3 rounded-md border shadow-sm">
+            <h3 className="font-medium text-lg text-primary mb-2">Cliente</h3>
+            <div className="space-y-2">
+              <div>
+                <Label htmlFor="cliente" className="text-primary mb-1 text-sm">
+                  Selecione o Cliente
+                </Label>
+                <Select value={orcamento.cliente?.id || ""} onValueChange={handleClienteChange}>
+                  <SelectTrigger className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                    <SelectValue placeholder="Selecione um cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientes.map((cliente) => (
+                      <SelectItem key={cliente.id} value={cliente.id}>
+                        {cliente.cnpj} - {cliente.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="nomeContato" className="text-primary mb-1 text-sm">
+                    Nome do Contato
+                  </Label>
+                  <Input
+                    id="nomeContato"
+                    value={orcamento.nomeContato || ""}
+                    onChange={(e) => atualizarOrcamento({ nomeContato: e.target.value })}
+                    className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                    placeholder="Nome da pessoa de contato"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="telefoneContato" className="text-primary mb-1 text-sm">
+                    Telefone do Contato
+                  </Label>
+                  <Input
+                    id="telefoneContato"
+                    value={orcamento.telefoneContato || ""}
+                    onChange={(e) => atualizarOrcamento({ telefoneContato: e.target.value })}
+                    className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                    placeholder="(00) 00000-0000"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-3 rounded-md border shadow-sm">
+            <h3 className="font-medium text-lg text-primary mb-2">Condições Comerciais</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div>
+                <Label htmlFor="condicoesPagamento" className="text-primary mb-1 text-sm">
+                  Condições de Pagamento
+                </Label>
+                <Input
+                  id="condicoesPagamento"
+                  value={orcamento.condicoesPagamento}
+                  onChange={(e) => handleTextUppercase(e, "condicoesPagamento")}
+                  className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <Label htmlFor="prazoEntrega" className="text-primary mb-1 text-sm">
+                  Prazo de Entrega
+                </Label>
+                <Input
+                  id="prazoEntrega"
+                  value={orcamento.prazoEntrega}
+                  onChange={(e) => handleTextUppercase(e, "prazoEntrega")}
+                  className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <Label htmlFor="validadeOrcamento" className="text-primary mb-1 text-sm">
+                  Validade do Orçamento
+                </Label>
+                <Input
+                  id="validadeOrcamento"
+                  value={orcamento.validadeOrcamento}
+                  onChange={(e) => handleTextUppercase(e, "validadeOrcamento")}
+                  className="h-8 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-3 rounded-md border shadow-sm">
+            <h3 className="font-medium text-lg text-primary mb-2">Observações</h3>
+            <div>
+              <Label htmlFor="observacoes" className="text-primary mb-1 text-sm">
+                Observações Gerais
+              </Label>
+              <Textarea
+                id="observacoes"
+                value={orcamento.observacoes}
+                onChange={(e) => atualizarOrcamento({ observacoes: e.target.value })}
+                rows={3}
+                className="border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

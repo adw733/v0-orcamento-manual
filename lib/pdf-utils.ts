@@ -25,7 +25,7 @@ export async function generatePDF(
     // Configurações de página A4
     const pageWidth = 210 // largura A4 em mm
     const pageHeight = 297 // altura A4 em mm
-    const margin = 8 // Reduzido de 10mm para 8mm para dar mais espaço
+    const margin = 10 // Mantendo 10mm para garantir margens adequadas
     const contentWidth = pageWidth - margin * 2 // 194mm
     const contentHeight = pageHeight - margin * 2 // 281mm
 
@@ -83,13 +83,39 @@ export async function generatePDF(
       // Ajustar imagens dentro da página
       const imagens = paginaClone.querySelectorAll("img")
       imagens.forEach((img) => {
-        img.style.maxWidth = "100%"
-        img.style.maxHeight = "507px" // Aumentado de 300px para 507px (30% maior)
+        img.style.maxWidth = "70%" // Reduzido para 70%
+        img.style.maxHeight = "420px" // Reduzido em 30% (de 600px para 420px)
         img.style.width = "auto"
         img.style.height = "auto"
         img.style.objectFit = "contain"
         img.style.display = "block"
         img.style.margin = "0 auto"
+        img.style.padding = "15px" // Reduzido de 20px
+      })
+
+      // Ajustar observações para não ultrapassar o espaço
+      const observacoes = paginaClone.querySelectorAll(
+        ".pdf-observacoes, .pdf-observacoes-comercial, .pdf-observacoes-tecnica",
+      )
+      observacoes.forEach((obs) => {
+        obs.style.maxHeight = "60px"
+        obs.style.overflow = "hidden"
+        obs.style.fontSize = "0.8rem"
+        obs.style.lineHeight = "1.3"
+      })
+
+      // Ajustar tabelas de tamanhos
+      const tabelasTamanhos = paginaClone.querySelectorAll(".tamanhos-table")
+      tabelasTamanhos.forEach((table) => {
+        table.style.fontSize = "0.85rem"
+        table.style.width = "100%"
+      })
+
+      // Ajustar espaçamentos gerais
+      paginaClone.style.fontSize = "0.85rem"
+      const espacamentos = paginaClone.querySelectorAll(".space-y-6 > *, .space-y-4 > *")
+      espacamentos.forEach((el) => {
+        el.style.marginTop = "8px"
       })
 
       // Ajustar tabelas para não quebrar
@@ -103,42 +129,18 @@ export async function generatePDF(
       // Adicionar ao DOM temporariamente
       document.body.appendChild(paginaClone)
 
-      // Ajustar especificamente as fichas técnicas para caber melhor
-      if (pagina.classList.contains("ficha-tecnica")) {
-        paginaClone.style.fontSize = "0.85rem"
-
-        // Compactar ainda mais as imagens nas fichas técnicas
-        const imagensFicha = paginaClone.querySelectorAll("img")
-        imagensFicha.forEach((img) => {
-          img.style.maxHeight = "422px" // Aumentado de 250px para 422px (30% maior)
-          img.style.padding = "10px" // Reduzir padding
-        })
-
-        // Compactar cards de especificações
-        const cards = paginaClone.querySelectorAll(".spec-card")
-        cards.forEach((card) => {
-          card.style.fontSize = "0.75rem"
-        })
-
-        // Compactar tabela de tamanhos
-        const tabelaTamanhos = paginaClone.querySelector(".tamanhos-table")
-        if (tabelaTamanhos) {
-          tabelaTamanhos.style.fontSize = "0.8rem"
-        }
-      }
-
       // Aguardar renderização
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       // Capturar a página
       const canvas = await html2canvas(paginaClone, {
-        scale: 2, // Reduzido de 2.5 para 2 para melhor performance e tamanho
+        scale: 2.5, // Aumentado de 2 para 2.5 para melhor qualidade
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
         windowWidth: paginaClone.scrollWidth,
         windowHeight: paginaClone.scrollHeight,
-        allowTaint: true,
+        allowTaint: true, // Adicionar para permitir imagens externas
       })
 
       // Remover o clone

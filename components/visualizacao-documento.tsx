@@ -181,11 +181,49 @@ export default function VisualizacaoDocumento({
     
     /* Controle de tamanho de imagens */
     img {
-      max-height: 400px; /* Reduzido de 600px para 400px */
-      max-width: 100%;
+      max-height: 420px; /* Reduzido em 30% de 600px */
+      max-width: 70%; /* Reduzido para 70% da largura */
       object-fit: contain;
       border: 1px solid #e5e7eb !important;
-      padding: 20px !important;
+      padding: 15px !important; /* Reduzido o padding */
+      margin: 0 auto !important;
+      display: block !important;
+    }
+    
+    /* Garantir que as tabelas de tamanhos caibam na página */
+    .tamanhos-table {
+      width: 100%;
+      max-width: 100%;
+      font-size: 0.85rem !important;
+      margin-top: 10px !important;
+    }
+
+    /* Garantir que observações caibam na página */
+    .pdf-observacoes-comercial, .pdf-observacoes-tecnica {
+      min-height: 30px !important;
+      max-height: 60px !important;
+      overflow: hidden !important;
+      font-size: 0.8rem !important;
+      line-height: 1.3 !important;
+      padding: 8px !important;
+    }
+
+    /* Ajustar espaçamentos gerais para caber melhor na A4 */
+    .pdf-section {
+      padding: 8px !important;
+    }
+
+    .pdf-content {
+      padding: 12px !important;
+    }
+
+    /* Reduzir espaçamento entre seções */
+    .space-y-6 > * + * {
+      margin-top: 12px !important;
+    }
+
+    .space-y-4 > * + * {
+      margin-top: 8px !important;
     }
     
     /* Configurações para fichas técnicas */
@@ -322,7 +360,7 @@ export default function VisualizacaoDocumento({
   }
   
   .pdf-image {
-    max-height: 400px; /* Reduzido de 550px para 400px */
+    max-height: 550px; /* Aumentado de 350px para 550px */
     max-width: 100%;
     object-fit: contain;
   }
@@ -541,67 +579,98 @@ export default function VisualizacaoDocumento({
 
   // Adicionar estilos específicos para controlar o tamanho das imagens
   const imageStyles = `
-  <style>
-    /* Estilos para imagens no PDF */
-    .pdf-image-container {
-      width: 100%;
-      text-align: center;
-      margin: 1rem 0;
-    }
+/* Estilos para imagens no PDF */
+.pdf-image-container {
+  width: 100%;
+  text-align: center;
+  margin: 8px 0;
+  padding: 0;
+}
 
-    .pdf-image-container img {
-      max-width: 100%;
-      max-height: 400px; /* Reduzido de 600px para 400px */
-      width: auto;
-      height: auto;
-      object-fit: contain;
-      display: block;
-      margin: 0 auto;
-      border: 1px solid #e5e7eb;
-      border-radius: 4px;
-      padding: 20px;
-    }
-    
-    /* Ajustes para garantir que o conteúdo caiba em uma página A4 */
-    .orcamento-principal,
-    .ficha-tecnica {
-      max-height: 277mm; /* A4 height - margins */
-      overflow: hidden;
-    }
-    
-    /* Ajustar tamanho de fonte para caber melhor */
-    .pdf-section {
-      font-size: 0.9rem;
-    }
-    
-    .pdf-section h1 {
-      font-size: 1.25rem;
-    }
-    
-    .pdf-section h3 {
-      font-size: 1.1rem;
-    }
-    
-    .pdf-section h4 {
-      font-size: 1rem;
-    }
-    
-    /* Compactar tabelas */
-    .pdf-table th,
-    .pdf-table td {
-      padding: 0.4rem;
-      font-size: 0.8rem;
-    }
-    
-    /* Ajustar cards de especificações */
-    .spec-card {
-      font-size: 0.85rem;
-    }
-    
-    .spec-card h5 {
-      font-size: 0.9rem;
-    }
-  </style>
+.pdf-image-container img {
+  max-width: 70%; /* Reduzido de 100% para 70% */
+  max-height: 420px; /* Reduzido de 600px para 420px (30% menos) */
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 15px; /* Reduzido de 20px */
+}
+
+/* Ajustes para garantir que o conteúdo caiba em uma página A4 */
+.orcamento-principal,
+.ficha-tecnica {
+  max-height: 277mm; /* A4 height - margins */
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+/* Ajustar tamanho de fonte para caber melhor */
+.pdf-section {
+  font-size: 0.85rem; /* Reduzido de 0.9rem */
+}
+
+.pdf-section h1 {
+  font-size: 1.2rem; /* Reduzido de 1.25rem */
+}
+
+.pdf-section h3 {
+  font-size: 1rem; /* Reduzido de 1.1rem */
+}
+
+.pdf-section h4 {
+  font-size: 0.95rem; /* Reduzido de 1rem */
+}
+
+/* Compactar tabelas */
+.pdf-table th,
+.pdf-table td {
+  padding: 0.3rem; /* Reduzido de 0.4rem */
+  font-size: 0.75rem; /* Reduzido de 0.8rem */
+}
+
+/* Ajustar cards de especificações */
+.spec-card {
+  font-size: 0.8rem; /* Reduzido de 0.85rem */
+}
+
+.spec-card h5 {
+  font-size: 0.85rem; /* Reduzido de 0.9rem */
+  padding: 6px 10px; /* Reduzido de 8px 12px */
+}
+
+.spec-card .spec-content {
+  padding: 10px; /* Reduzido de 12px */
+  min-height: 50px; /* Reduzido de 60px */
+}
+
+/* Ajustar tabela de tamanhos */
+.tamanhos-table {
+  font-size: 0.85rem; /* Reduzido de 0.9rem */
+}
+
+.tamanhos-table th, .tamanhos-table td {
+  padding: 4px 6px; /* Reduzido de 6px 8px */
+}
+
+/* Garantir que observações não ultrapassem o espaço */
+.pdf-observacoes {
+  max-height: 60px;
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.pdf-observacoes-comercial, .pdf-observacoes-tecnica {
+  max-height: 50px;
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  padding: 6px;
+}
 `
 
   return (
@@ -902,16 +971,14 @@ export default function VisualizacaoDocumento({
               </h3>
 
               <div className="space-y-4">
-                {item.imagem && (
-                  <div className="pdf-image-container text-center">
-                    <img
-                      src={item.imagem || "/placeholder.svg"}
-                      alt={item.produto?.nome || "Imagem do produto"}
-                      className="pdf-image mx-auto"
-                      style={{ maxWidth: "100%", maxHeight: "400px", objectFit: "contain" }}
-                    />
-                  </div>
-                )}
+                <div className="pdf-image-container text-center">
+                  <img
+                    src={item.imagem || "/placeholder.svg"}
+                    alt={item.produto?.nome || "Imagem do produto"}
+                    className="pdf-image mx-auto"
+                    style={{ maxWidth: "70%", maxHeight: "420px", objectFit: "contain" }}
+                  />
+                </div>
 
                 <div>
                   <h4 className="font-bold mb-2 text-primary">Especificações do Produto</h4>

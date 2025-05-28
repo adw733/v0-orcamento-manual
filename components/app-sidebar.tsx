@@ -1,7 +1,18 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FileText, Users, ShoppingBag, Save, Trash2, Table, Plus, ChevronLeft, ChevronRight } from "lucide-react"
+import {
+  FileText,
+  Users,
+  ShoppingBag,
+  Save,
+  Trash2,
+  Table,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Palette,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface AppSidebarProps {
@@ -144,6 +155,16 @@ export function AppSidebar({ abaAtiva, setAbaAtiva, criandoNovoOrcamento, criarN
             >
               <ShoppingBag className={`h-5 w-5 ${expandido ? "mr-3" : ""}`} />
               {expandido && <span>Produtos</span>}
+            </button>
+
+            <button
+              onClick={() => setAbaAtiva("materiais")}
+              className={`w-full flex items-center ${expandido ? "px-3" : "justify-center px-2"} py-2.5 text-sm rounded-md transition-colors ${
+                abaAtiva === "materiais" ? "bg-primary text-white font-medium" : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              <Palette className={`h-5 w-5 ${expandido ? "mr-3" : ""}`} />
+              {expandido && <span>Materiais</span>}
             </button>
 
             <button
