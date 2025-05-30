@@ -108,3 +108,59 @@ body {
 .drag-handle:active {
   cursor: grabbing;
 }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  /* Adjust padding and margins for mobile */
+  .p-6 {
+    padding: 1rem !important;
+  }
+
+  /* Make sure text doesn't overflow on small screens */
+  .truncate-mobile {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Ensure tables are scrollable on mobile */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Adjust font sizes for mobile */
+  .text-sm {
+    font-size: 0.8125rem !important;
+  }
+
+  .text-xs {
+    font-size: 0.75rem !important;
+  }
+
+  /* Ensure buttons have enough touch area */
+  button,
+  .button,
+  [role="button"] {
+    min-height: 2.5rem;
+  }
+
+  /* Fix for mobile dialogs */
+  [role="dialog"] {
+    max-width: 95vw !important;
+  }
+
+  /* Improve form inputs on mobile */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+}
+
+/* Fix for mobile Safari bottom bar */
+@supports (-webkit-touch-callout: none) {
+  .h-screen, .h-\[calc$$100vh-4rem$$\] {
+    height: -webkit-fill-available;
+  }
+}

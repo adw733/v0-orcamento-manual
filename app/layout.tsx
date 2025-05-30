@@ -11,7 +11,13 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
   },
-    generator: 'v0.dev'
+  generator: "v0.dev",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
 }
 
 export default function RootLayout({

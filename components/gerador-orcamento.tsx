@@ -2091,18 +2091,18 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
 
   // Substituir o return do componente por:
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)]">
       <AppSidebar
         abaAtiva={abaAtiva}
         setAbaAtiva={setAbaAtiva}
         criandoNovoOrcamento={criandoNovoOrcamento}
         criarNovoOrcamento={criarNovoOrcamento}
       />
-      <SidebarInset className="bg-gray-100 overflow-auto">
-        <div className="p-6 space-y-6">
-          <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm">
+      <SidebarInset className="bg-gray-100 overflow-auto flex-1 w-full">
+        <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center bg-white p-3 md:p-6 rounded-lg shadow-sm gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-primary">
+              <h1 className="text-xl md:text-2xl font-bold text-primary">
                 {abaAtiva === "orcamento"
                   ? "Gerador de Orçamento"
                   : abaAtiva === "orcamentos"
@@ -2123,7 +2123,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                                   ? "Tabela de Produtos"
                                   : "Gerador de Orçamento"}
               </h1>
-              <p className="text-gray-500 mt-1">
+              <p className="text-gray-500 mt-1 text-sm md:text-base">
                 {abaAtiva === "orcamento"
                   ? "Crie orçamentos profissionais para uniformes industriais"
                   : abaAtiva === "orcamentos"
@@ -2145,26 +2145,26 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                                   : "Crie orçamentos profissionais para uniformes industriais"}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 justify-start md:justify-end">
               {abaAtiva === "orcamento" && (
                 <>
                   <Button
                     onClick={orcamentoSalvo ? copiarOrcamento : salvarNovoOrcamento}
                     disabled={isLoading || !orcamento.cliente}
-                    className="flex items-center gap-2 bg-secondary hover:bg-secondary-dark text-white transition-all shadow-sm"
+                    className="flex items-center gap-2 bg-secondary hover:bg-secondary-dark text-white transition-all shadow-sm text-xs md:text-sm"
                   >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    {orcamentoSalvo ? "Copiar Orçamento" : "Salvar"}
+                    {orcamentoSalvo ? "Copiar" : "Salvar"}
                   </Button>
 
                   {orcamentoSalvo && (
                     <Button
                       onClick={atualizarOrcamentoExistente}
                       disabled={isLoading || !orcamento.cliente}
-                      className="flex items-center gap-2 bg-success hover:bg-success/80 text-white transition-all shadow-sm"
+                      className="flex items-center gap-2 bg-success hover:bg-success/80 text-white transition-all shadow-sm text-xs md:text-sm"
                     >
                       <Save className="h-4 w-4" />
-                      {isLoading ? "Atualizando..." : "Atualizar Orçamento"}
+                      {isLoading ? "Atualizando..." : "Atualizar"}
                     </Button>
                   )}
 
@@ -2175,7 +2175,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                       }
                     }}
                     disabled={isLoading || !orcamento.cliente || orcamento.itens.length === 0}
-                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
+                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm text-xs md:text-sm"
                   >
                     <FileDown className="h-4 w-4" />
                     {isLoading ? "Gerando..." : "PDF Orçamento"}
@@ -2188,10 +2188,10 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                       }
                     }}
                     disabled={isLoading || !orcamento.cliente || orcamento.itens.length === 0}
-                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm"
+                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white transition-all shadow-sm text-xs md:text-sm"
                   >
                     <FileDown className="h-4 w-4" />
-                    {isLoading ? "Gerando..." : "PDF Ficha Técnica"}
+                    {isLoading ? "Gerando..." : "PDF Ficha"}
                   </Button>
                 </>
               )}
@@ -2225,10 +2225,10 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                             <DialogTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="flex items-center gap-2 border-primary text-primary hover:bg-primary hover:text-white"
+                                className="flex items-center gap-2 border-primary text-primary hover:bg-primary hover:text-white text-xs md:text-sm"
                               >
                                 <Eye className="h-4 w-4" />
-                                Visualizar Documento
+                                Visualizar
                               </Button>
                             </DialogTrigger>
                             <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
@@ -2237,7 +2237,7 @@ export function GeradorOrcamento({ abaAtiva: abaAtivaInicial = "orcamentos", set
                                   Visualização do Documento - {orcamento.numero}
                                 </DialogTitle>
                               </DialogHeader>
-                              <div className="flex-1 overflow-auto p-4 bg-gray-50">
+                              <div className="flex-1 overflow-auto p-2 md:p-4 bg-gray-50">
                                 <div className="max-w-[210mm] mx-auto bg-white shadow-lg">
                                   <div ref={documentoRef}>
                                     <VisualizacaoDocumento

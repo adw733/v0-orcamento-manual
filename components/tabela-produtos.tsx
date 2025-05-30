@@ -1220,12 +1220,12 @@ export default function TabelaProdutos() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <h3 className="text-lg font-medium text-primary flex items-center gap-2">
           <span className="bg-primary text-white p-1 rounded-md text-xs">PRODUTOS</span>
           Tabela de Produtos por Orçamento
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -1234,30 +1234,30 @@ export default function TabelaProdutos() {
             className="flex items-center gap-1"
           >
             {imprimindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-            {imprimindo ? "Imprimindo..." : "Imprimir Tabela"}
+            {imprimindo ? "Imprimindo..." : "Imprimir"}
           </Button>
-          <div className="border-l border-gray-200 h-8 mx-2"></div>
+          <div className="border-l border-gray-200 h-8 mx-2 hidden md:block"></div>
           <div className="flex items-center gap-2">
             <Button
               variant={modoVisualizacao === "orcamento" ? "default" : "outline"}
               size="sm"
               onClick={() => setModoVisualizacao("orcamento")}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 text-xs"
             >
               <FileText className="h-4 w-4" />
-              Por Orçamento
+              <span className="hidden md:inline">Por Orçamento</span>
             </Button>
             <Button
               variant={modoVisualizacao === "produto" ? "default" : "outline"}
               size="sm"
               onClick={() => setModoVisualizacao("produto")}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 text-xs"
             >
               <Tag className="h-4 w-4" />
-              Por Produto
+              <span className="hidden md:inline">Por Produto</span>
             </Button>
           </div>
-          <span className="text-sm text-gray-500">{produtosFiltrados.length} produtos encontrados</span>
+          <span className="text-xs text-gray-500 hidden md:inline">{produtosFiltrados.length} produtos</span>
         </div>
       </div>
 
@@ -1275,8 +1275,8 @@ export default function TabelaProdutos() {
         </div>
       )}
 
-      <div className="flex justify-between items-center gap-4 mb-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+        <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Buscar por número, cliente, produto, cor..."
@@ -1285,10 +1285,10 @@ export default function TabelaProdutos() {
             className="pl-10 pr-4 py-2 w-full"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <Filter className="h-4 w-4 text-gray-500" />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="Filtrar por status" />
             </SelectTrigger>
             <SelectContent>
@@ -1305,293 +1305,295 @@ export default function TabelaProdutos() {
 
       <div className="rounded-md border overflow-hidden" ref={tabelaRef}>
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                {modoVisualizacao === "orcamento" ? (
-                  // Cabeçalho para modo orçamento (original)
-                  <>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("orcamentoData")}
-                    >
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Data
-                        {ordenacao.campo === "orcamentoData" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("orcamentoNumero")}
-                    >
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Descrição do Pedido
-                        {ordenacao.campo === "orcamentoNumero" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("produtoNome")}
-                    >
-                      <div className="flex items-center">
-                        <Tag className="h-4 w-4 mr-2" />
-                        Produto
-                        {ordenacao.campo === "produtoNome" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("cor")}
-                    >
-                      <div className="flex items-center">
-                        <Palette className="h-4 w-4 mr-2" />
-                        Cor
-                        {ordenacao.campo === "cor" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("tamanho")}
-                    >
-                      <div className="flex items-center">
-                        <Ruler className="h-4 w-4 mr-2" />
-                        Tamanho
-                        {ordenacao.campo === "tamanho" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("quantidade")}
-                    >
-                      <div className="flex items-center">
-                        Qtd
-                        {ordenacao.campo === "quantidade" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
+          <div className="min-w-[800px]">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  {modoVisualizacao === "orcamento" ? (
+                    // Cabeçalho para modo orçamento (original)
+                    <>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("orcamentoData")}
+                      >
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Data
+                          {ordenacao.campo === "orcamentoData" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("orcamentoNumero")}
+                      >
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2" />
+                          Descrição do Pedido
+                          {ordenacao.campo === "orcamentoNumero" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("produtoNome")}
+                      >
+                        <div className="flex items-center">
+                          <Tag className="h-4 w-4 mr-2" />
+                          Produto
+                          {ordenacao.campo === "produtoNome" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("cor")}
+                      >
+                        <div className="flex items-center">
+                          <Palette className="h-4 w-4 mr-2" />
+                          Cor
+                          {ordenacao.campo === "cor" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("tamanho")}
+                      >
+                        <div className="flex items-center">
+                          <Ruler className="h-4 w-4 mr-2" />
+                          Tamanho
+                          {ordenacao.campo === "tamanho" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("quantidade")}
+                      >
+                        <div className="flex items-center">
+                          Qtd
+                          {ordenacao.campo === "quantidade" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
 
-                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      <div className="flex items-center">Observação</div>
-                    </TableHead>
-                  </>
+                      <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        <div className="flex items-center">Observação</div>
+                      </TableHead>
+                    </>
+                  ) : (
+                    // Cabeçalho para modo produto
+                    <>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("produtoNome")}
+                      >
+                        <div className="flex items-center">
+                          <Tag className="h-4 w-4 mr-2" />
+                          Produto
+                          {ordenacao.campo === "produtoNome" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("orcamentoNumero")}
+                      >
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2" />
+                          Número e Contato
+                          {ordenacao.campo === "orcamentoNumero" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("tamanho")}
+                      >
+                        <div className="flex items-center">
+                          <Ruler className="h-4 w-4 mr-2" />
+                          Tamanho
+                          {ordenacao.campo === "tamanho" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("cor")}
+                      >
+                        <div className="flex items-center">
+                          <Palette className="h-4 w-4 mr-2" />
+                          Cor
+                          {ordenacao.campo === "cor" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
+                        onClick={() => alternarOrdenacao("quantidade")}
+                      >
+                        <div className="flex items-center">
+                          Qtd
+                          {ordenacao.campo === "quantidade" &&
+                            (ordenacao.direcao === "asc" ? (
+                              <ChevronUp className="ml-1 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="ml-1 h-4 w-4" />
+                            ))}
+                        </div>
+                      </TableHead>
+                      <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
+                        <div className="flex items-center">Observação</div>
+                      </TableHead>
+                    </>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
+                      <div className="flex justify-center items-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : produtosFiltrados.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
+                      <div className="text-center py-8 bg-accent/30 rounded-lg">
+                        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                        <h4 className="text-lg font-medium text-gray-600">Nenhum produto encontrado</h4>
+                        <p className="text-gray-500 mt-1">
+                          {searchTerm || statusFilter !== "todos"
+                            ? "Tente uma busca diferente"
+                            : "Não há produtos cadastrados"}
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  // Cabeçalho para modo produto
-                  <>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("produtoNome")}
-                    >
-                      <div className="flex items-center">
-                        <Tag className="h-4 w-4 mr-2" />
-                        Produto
-                        {ordenacao.campo === "produtoNome" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("orcamentoNumero")}
-                    >
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Número e Contato
-                        {ordenacao.campo === "orcamentoNumero" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("tamanho")}
-                    >
-                      <div className="flex items-center">
-                        <Ruler className="h-4 w-4 mr-2" />
-                        Tamanho
-                        {ordenacao.campo === "tamanho" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("cor")}
-                    >
-                      <div className="flex items-center">
-                        <Palette className="h-4 w-4 mr-2" />
-                        Cor
-                        {ordenacao.campo === "cor" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:bg-muted"
-                      onClick={() => alternarOrdenacao("quantidade")}
-                    >
-                      <div className="flex items-center">
-                        Qtd
-                        {ordenacao.campo === "quantidade" &&
-                          (ordenacao.direcao === "asc" ? (
-                            <ChevronUp className="ml-1 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-1 h-4 w-4" />
-                          ))}
-                      </div>
-                    </TableHead>
-                    <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      <div className="flex items-center">Observação</div>
-                    </TableHead>
-                  </>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
-                    <div className="flex justify-center items-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : produtosFiltrados.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="px-4 py-4 text-center text-muted-foreground">
-                    <div className="text-center py-8 bg-accent/30 rounded-lg">
-                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                      <h4 className="text-lg font-medium text-gray-600">Nenhum produto encontrado</h4>
-                      <p className="text-gray-500 mt-1">
-                        {searchTerm || statusFilter !== "todos"
-                          ? "Tente uma busca diferente"
-                          : "Não há produtos cadastrados"}
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                produtosFiltrados.map((produto, index) => (
-                  <>
-                    {/* Separador entre orçamentos diferentes ou produtos diferentes, dependendo do modo */}
-                    {isNovoOrcamento(index) && index > 0 && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="p-0 h-2 bg-gray-100">
-                          <div className="border-t-2 border-gray-200"></div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-
-                    {/* Separador entre produtos diferentes do mesmo orçamento ou orçamentos diferentes do mesmo produto */}
-                    {isNovoProduto(index) && index > 0 && !isNovoOrcamento(index) && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="p-0 h-0.5">
-                          <div className="border-t-2 border-gray-300"></div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-
-                    {/* Linha do produto */}
-                    <TableRow
-                      key={produto.id}
-                      className={`border-t hover:bg-muted/50 ${
-                        isNovoOrcamento(index) ? "border-t-2 border-t-primary/20" : "border-t-gray-100"
-                      }`}
-                    >
-                      {modoVisualizacao === "orcamento" ? (
-                        // Células para modo orçamento (original)
-                        <>
-                          <TableCell className="px-4 py-0.5 align-middle">
-                            {formatarData(produto.orcamentoData)}
+                  produtosFiltrados.map((produto, index) => (
+                    <>
+                      {/* Separador entre orçamentos diferentes ou produtos diferentes, dependendo do modo */}
+                      {isNovoOrcamento(index) && index > 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="p-0 h-2 bg-gray-100">
+                            <div className="border-t-2 border-gray-200"></div>
                           </TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle">
-                            <div>
-                              <span className="font-medium text-primary">
-                                {formatarDescricaoPedido(
-                                  produto.orcamentoNumero,
-                                  produto.clienteNome,
-                                  produto.nomeContato,
-                                )}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle">{produto.produtoNome}</TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle">{produto.tamanho}</TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle font-medium">{produto.quantidade}</TableCell>
-
-                          <TableCell className="px-4 py-0.5 align-middle min-w-[150px] h-[30px]">
-                            {/* Célula em branco para anotações manuais */}
-                          </TableCell>
-                        </>
-                      ) : (
-                        // Células para modo produto
-                        <>
-                          <TableCell className="px-4 py-0.5 align-middle">
-                            <span className="font-medium">{produto.produtoNome}</span>
-                          </TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle">
-                            {produto.orcamentoNumero.split(" - ")[0] || produto.orcamentoNumero}
-                            {produto.nomeContato && (
-                              <span className="text-gray-500 text-xs block">{produto.nomeContato}</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle">{produto.tamanho}</TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle font-medium">{produto.quantidade}</TableCell>
-                          <TableCell className="px-4 py-0.5 align-middle min-w-[150px] h-[30px]">
-                            {/* Célula em branco para anotações manuais */}
-                          </TableCell>
-                        </>
+                        </TableRow>
                       )}
-                    </TableRow>
-                  </>
-                ))
-              )}
-            </TableBody>
-          </Table>
+
+                      {/* Separador entre produtos diferentes do mesmo orçamento ou orçamentos diferentes do mesmo produto */}
+                      {isNovoProduto(index) && index > 0 && !isNovoOrcamento(index) && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="p-0 h-0.5">
+                            <div className="border-t-2 border-gray-300"></div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+
+                      {/* Linha do produto */}
+                      <TableRow
+                        key={produto.id}
+                        className={`border-t hover:bg-muted/50 ${
+                          isNovoOrcamento(index) ? "border-t-2 border-t-primary/20" : "border-t-gray-100"
+                        }`}
+                      >
+                        {modoVisualizacao === "orcamento" ? (
+                          // Células para modo orçamento (original)
+                          <>
+                            <TableCell className="px-4 py-0.5 align-middle">
+                              {formatarData(produto.orcamentoData)}
+                            </TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle">
+                              <div>
+                                <span className="font-medium text-primary">
+                                  {formatarDescricaoPedido(
+                                    produto.orcamentoNumero,
+                                    produto.clienteNome,
+                                    produto.nomeContato,
+                                  )}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle">{produto.produtoNome}</TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle">{produto.tamanho}</TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle font-medium">{produto.quantidade}</TableCell>
+
+                            <TableCell className="px-4 py-0.5 align-middle min-w-[150px] h-[30px]">
+                              {/* Célula em branco para anotações manuais */}
+                            </TableCell>
+                          </>
+                        ) : (
+                          // Células para modo produto
+                          <>
+                            <TableCell className="px-4 py-0.5 align-middle">
+                              <span className="font-medium">{produto.produtoNome}</span>
+                            </TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle">
+                              {produto.orcamentoNumero.split(" - ")[0] || produto.orcamentoNumero}
+                              {produto.nomeContato && (
+                                <span className="text-gray-500 text-xs block">{produto.nomeContato}</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle">{produto.tamanho}</TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle">{produto.cor}</TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle font-medium">{produto.quantidade}</TableCell>
+                            <TableCell className="px-4 py-0.5 align-middle min-w-[150px] h-[30px]">
+                              {/* Célula em branco para anotações manuais */}
+                            </TableCell>
+                          </>
+                        )}
+                      </TableRow>
+                    </>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
 

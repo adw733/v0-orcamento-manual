@@ -238,8 +238,8 @@ const renderTabelaTamanhos = (
   return (
     <div className="space-y-2">
       <h4 className="font-medium text-primary">Tamanhos</h4>
-      <div className="border border-gray-200 rounded-md">
-        <table className="w-full border-collapse">
+      <div className="border border-gray-200 rounded-md overflow-x-auto">
+        <table className="w-full border-collapse min-w-[500px]">
           <thead>
             <tr className="bg-accent">
               <th className="border-b p-1 text-center font-medium text-xs text-primary w-[5%]">TAM.</th>
@@ -429,6 +429,8 @@ export default function FormularioOrcamento({
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
+  // Novo estado para controlar se o formulário de novo item está expandido
+  const [novoItemExpandido, setNovoItemExpandido] = useState(false)
 
   // Refs para os inputs de arquivo
   const novoImagemInputRef = useRef<HTMLInputElement>(null)
@@ -438,6 +440,7 @@ export default function FormularioOrcamento({
   useEffect(() => {
     if (novoItem.produtoId) {
       // Produto selecionado, mostrar tabela de tamanhos
+      setNovoItemExpandido(true)
     }
   }, [novoItem.produtoId])
 
@@ -574,8 +577,22 @@ export default function FormularioOrcamento({
         })
         setProdutoSelecionado(null)
         setLinhaAtiva(null)
+        setNovoItemExpandido(false)
+
+        // Mostrar feedback ao usuário
+        toast({
+          title: "Produto adicionado",
+          description: "O produto foi adicionado com sucesso.",
+          duration: 2000,
+        })
       } catch (error) {
         console.error("Erro ao adicionar item:", error)
+        toast({
+          title: "Erro ao adicionar produto",
+          description: "Ocorreu um erro ao adicionar o produto. Tente novamente.",
+          variant: "destructive",
+          duration: 3000,
+        })
       } finally {
         setIsLoading(false)
       }
@@ -741,8 +758,8 @@ export default function FormularioOrcamento({
         </div>
       )}
 
-      {/* Layout dividido em duas colunas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Layout responsive - single column on mobile, two columns on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Coluna da direita - Tabela de produtos */}
         <div>
           <div className="bg-white p-6 rounded-lg border shadow-sm">
@@ -755,448 +772,482 @@ export default function FormularioOrcamento({
             </div>
 
             <div className="border rounded-md overflow-hidden shadow-sm">
-              <table className="w-full">
-                <thead className="bg-primary text-white">
-                  <tr>
-                    <th className="p-3 w-[5%] rounded-tl-md"></th>
-                    <th className="text-left p-3 w-[40%]">Produto</th>
-                    <th className="text-center p-3 w-[15%]">Valor Unit.</th>
-                    <th className="text-center p-3 w-[10%]">Qtd.</th>
-                    <th className="text-right p-3 w-[15%]">Total</th>
-                    <th className="p-3 w-[15%] rounded-tr-md text-center">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orcamento.itens.map((item, index) => (
-                    <React.Fragment key={item.id}>
-                      {dragOverItemId === item.id && (
-                        <tr className="border-t">
-                          <td colSpan={6} className="p-0">
-                            <div className="h-1 bg-primary animate-pulse rounded-full mx-2"></div>
-                          </td>
-                        </tr>
-                      )}
-                      <tr
-                        className={`border-t hover:bg-accent/30 transition-colors ${
-                          editandoItem === item.id ? "bg-accent/50" : ""
-                        }`}
-                        draggable={true}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", item.id)
-                          e.currentTarget.classList.add("opacity-50")
-                        }}
-                        onDragEnd={(e) => {
-                          e.currentTarget.classList.remove("opacity-50")
-                          setDragOverItemId(null)
-                        }}
-                        onDragOver={(e) => {
-                          e.preventDefault()
-                          e.dataTransfer.dropEffect = "move"
-                          if (dragOverItemId !== item.id) {
-                            setDragOverItemId(item.id)
-                          }
-                        }}
-                        onDragLeave={(e) => {
-                          // Verificar se realmente saiu do elemento (e não apenas entrou em um filho)
-                          const relatedTarget = e.relatedTarget as Node
-                          if (!e.currentTarget.contains(relatedTarget)) {
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px]">
+                  <thead className="bg-primary text-white">
+                    <tr>
+                      <th className="p-2 md:p-3 w-[5%] rounded-tl-md"></th>
+                      <th className="text-left p-2 md:p-3 w-[40%]">Produto</th>
+                      <th className="text-center p-2 md:p-3 w-[15%]">Valor Unit.</th>
+                      <th className="text-center p-2 md:p-3 w-[10%]">Qtd.</th>
+                      <th className="text-right p-2 md:p-3 w-[15%]">Total</th>
+                      <th className="p-2 md:p-3 w-[15%] rounded-tr-md text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orcamento.itens.map((item, index) => (
+                      <React.Fragment key={item.id}>
+                        {dragOverItemId === item.id && (
+                          <tr className="border-t">
+                            <td colSpan={6} className="p-0">
+                              <div className="h-1 bg-primary animate-pulse rounded-full mx-2"></div>
+                            </td>
+                          </tr>
+                        )}
+                        <tr
+                          className={`border-t hover:bg-accent/30 transition-colors ${
+                            editandoItem === item.id ? "bg-accent/50" : ""
+                          }`}
+                          draggable={true}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("text/plain", item.id)
+                            e.currentTarget.classList.add("opacity-50")
+                          }}
+                          onDragEnd={(e) => {
+                            e.currentTarget.classList.remove("opacity-50")
                             setDragOverItemId(null)
-                          }
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault()
-                          setDragOverItemId(null)
-                          const draggedItemId = e.dataTransfer.getData("text/plain")
-                          const draggedIndex = orcamento.itens.findIndex((i) => i.id === draggedItemId)
-                          const targetIndex = index
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = "move"
+                            if (dragOverItemId !== item.id) {
+                              setDragOverItemId(item.id)
+                            }
+                          }}
+                          onDragLeave={(e) => {
+                            // Verificar se realmente saiu do elemento (e não apenas entrou em um filho)
+                            const relatedTarget = e.relatedTarget as Node
+                            if (!e.currentTarget.contains(relatedTarget)) {
+                              setDragOverItemId(null)
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            setDragOverItemId(null)
+                            const draggedItemId = e.dataTransfer.getData("text/plain")
+                            const draggedIndex = orcamento.itens.findIndex((i) => i.id === draggedItemId)
+                            const targetIndex = index
 
-                          if (draggedIndex !== targetIndex) {
-                            const novosItens = [...orcamento.itens]
-                            const [itemRemovido] = novosItens.splice(draggedIndex, 1)
-                            novosItens.splice(targetIndex, 0, itemRemovido)
-                            atualizarOrcamento({ itens: novosItens })
+                            if (draggedIndex !== targetIndex) {
+                              const novosItens = [...orcamento.itens]
+                              const [itemRemovido] = novosItens.splice(draggedIndex, 1)
+                              novosItens.splice(targetIndex, 0, itemRemovido)
+                              atualizarOrcamento({ itens: novosItens })
 
-                            // Mostrar toast de confirmação
-                            toast({
-                              title: "Item reordenado",
-                              description: "A ordem dos itens foi atualizada e salva com sucesso.",
-                              duration: 2000,
-                            })
-                          }
-                        }}
-                      >
-                        <td className="p-3 text-center">
-                          <div className="flex flex-col items-center gap-1 cursor-grab" title="Arraste para reordenar">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => moverItemParaCima(index)}
-                              disabled={index === 0 || isLoading}
-                              className="h-6 w-6 rounded-full hover:bg-primary/10"
-                              title="Mover para cima"
+                              // Mostrar toast de confirmação
+                              toast({
+                                title: "Item reordenado",
+                                description: "A ordem dos itens foi atualizada e salva com sucesso.",
+                                duration: 2000,
+                              })
+                            }
+                          }}
+                        >
+                          <td className="p-3 text-center">
+                            <div
+                              className="flex flex-col items-center gap-1 cursor-grab"
+                              title="Arraste para reordenar"
                             >
-                              <ChevronUp className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => moverItemParaBaixo(index)}
-                              disabled={index === orcamento.itens.length - 1 || isLoading}
-                              className="h-6 w-6 rounded-full hover:bg-primary/10"
-                              title="Mover para baixo"
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <div className="font-medium">{item.produto?.nome}</div>
-                          {item.observacaoComercial && (
-                            <div className="text-xs mt-1 text-gray-600 italic">{item.observacaoComercial}</div>
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
-                          {editandoItem === item.id ? (
-                            <Input
-                              type="number"
-                              value={itemEmEdicao?.valorUnitario || 0}
-                              onChange={(e) =>
-                                setItemEmEdicao({
-                                  ...itemEmEdicao!,
-                                  valorUnitario: Number.parseFloat(e.target.value) || 0,
-                                })
-                              }
-                              className="h-9 text-center w-28 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
-                          ) : (
-                            <span className="flex items-center justify-center gap-1">
-                              <DollarSign className="h-3 w-3 text-gray-500" />
-                              {item.valorUnitario.toFixed(2)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3 text-center font-medium">{item.quantidade}</td>
-                        <td className="p-3 text-right font-medium">
-                          <span className="flex items-center justify-end gap-1">
-                            <DollarSign className="h-3 w-3 text-gray-500" />
-                            {(item.quantidade * item.valorUnitario).toFixed(2)}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {editandoItem === item.id ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
-                                  onClick={salvarEdicaoItem}
-                                  disabled={isLoading}
-                                >
-                                  {isLoading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Check className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                                  onClick={cancelarEdicaoItem}
-                                  disabled={isLoading}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
-                                  onClick={() => iniciarEdicaoItem(item)}
-                                  disabled={isLoading}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removerItem(item.id)}
-                                  className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                                  disabled={isLoading}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => moverItemParaCima(index)}
+                                disabled={index === 0 || isLoading}
+                                className="h-6 w-6 rounded-full hover:bg-primary/10"
+                                title="Mover para cima"
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => moverItemParaBaixo(index)}
+                                disabled={index === orcamento.itens.length - 1 || isLoading}
+                                className="h-6 w-6 rounded-full hover:bg-primary/10"
+                                title="Mover para baixo"
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-medium">{item.produto?.nome}</div>
+                            {item.observacaoComercial && (
+                              <div className="text-xs mt-1 text-gray-600 italic">{item.observacaoComercial}</div>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                      {editandoItem === item.id && itemEmEdicao && (
-                        <tr>
-                          <td colSpan={6} className="p-3 bg-accent/50 border-t border-b">
-                            <div className="space-y-3">
-                              {/* Linha 1: Tecido e Cor */}
-                              <div className="grid grid-cols-2 gap-3">
-                                {produtoSelecionado?.tecidos && produtoSelecionado.tecidos.length > 0 && (
-                                  <div>
-                                    <Label htmlFor="tecido" className="text-primary text-xs mb-1">
-                                      Tecido
-                                    </Label>
-                                    <Select
-                                      value={itemEmEdicao.tecidoSelecionado?.nome || ""}
-                                      onValueChange={handleTecidoChange}
-                                    >
-                                      <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                                        <SelectValue placeholder="Selecione o tecido" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {produtoSelecionado.tecidos.map((tecido) => (
-                                          <SelectItem key={tecido.nome} value={tecido.nome}>
-                                            {tecido.nome} {tecido.composicao ? `- ${tecido.composicao}` : ""}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-
-                                {produtoSelecionado?.cores && produtoSelecionado.cores.length > 0 && (
-                                  <div>
-                                    <Label htmlFor="cor" className="text-primary text-xs mb-1">
-                                      Cor
-                                    </Label>
-                                    <Select value={itemEmEdicao.corSelecionada || ""} onValueChange={handleCorChange}>
-                                      <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                                        <SelectValue placeholder="Selecione a cor" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {produtoSelecionado.cores.map((cor) => (
-                                          <SelectItem key={cor} value={cor}>
-                                            {cor}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Linha 2: Tabela de tamanhos compacta */}
-                              <div>
-                                <Label className="text-primary text-xs mb-1">Tamanhos</Label>
-                                <div className="border border-gray-200 rounded-md bg-white">
-                                  <table className="w-full border-collapse text-xs">
-                                    <thead>
-                                      <tr className="bg-accent">
-                                        <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
-                                          TAM.
-                                        </th>
-                                        {Object.keys(tamanhosPadrao)
-                                          .filter(
-                                            (tamanho) =>
-                                              !produtoSelecionado?.tamanhosDisponiveis ||
-                                              produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
-                                          )
-                                          .map((tamanho) => (
-                                            <th
-                                              key={`header-${tamanho}`}
-                                              className="border-b p-1 text-center font-medium text-xs text-primary min-w-8"
-                                            >
-                                              {tamanho}
-                                            </th>
-                                          ))}
-                                        <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
-                                          TOT.
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      <tr>
-                                        <td className="border-b p-1 text-center font-medium text-xs bg-accent">QTD.</td>
-                                        {Object.keys(tamanhosPadrao)
-                                          .filter(
-                                            (tamanho) =>
-                                              !produtoSelecionado?.tamanhosDisponiveis ||
-                                              produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
-                                          )
-                                          .map((tamanho) => (
-                                            <td key={`cell-${tamanho}`} className="border-b p-1 text-center">
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                value={itemEmEdicao.tamanhos[tamanho] || 0}
-                                                onChange={(e) =>
-                                                  handleTamanhoChange(tamanho, Number.parseInt(e.target.value) || 0)
-                                                }
-                                                className="w-full h-6 text-center text-xs border border-gray-300 rounded focus:border-primary focus:ring-1 focus:ring-primary"
-                                              />
-                                            </td>
-                                          ))}
-                                        <td className="border-b p-1 text-center font-medium text-xs bg-accent">
-                                          {itemEmEdicao.quantidade}
-                                        </td>
-                                      </tr>
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-
-                              {/* Linha 3: Observações lado a lado */}
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label htmlFor="observacaoComercial" className="text-primary text-xs mb-1">
-                                    Observação Comercial
-                                  </Label>
-                                  <Textarea
-                                    id="observacaoComercial"
-                                    value={itemEmEdicao.observacaoComercial || ""}
-                                    onChange={(e) =>
-                                      setItemEmEdicao({
-                                        ...itemEmEdicao,
-                                        observacaoComercial: e.target.value,
-                                      })
-                                    }
-                                    className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
-                                    placeholder="Observações para o cliente..."
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="observacaoTecnica" className="text-primary text-xs mb-1">
-                                    Observação Técnica
-                                  </Label>
-                                  <Textarea
-                                    id="observacaoTecnica"
-                                    value={itemEmEdicao.observacaoTecnica || ""}
-                                    onChange={(e) =>
-                                      setItemEmEdicao({
-                                        ...itemEmEdicao,
-                                        observacaoTecnica: e.target.value,
-                                      })
-                                    }
-                                    className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
-                                    placeholder="Observações técnicas..."
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Linha 4: Estampas com largura total */}
-                              <div>
-                                <Label className="text-primary text-xs mb-1">Estampas</Label>
-                                <div className="max-h-32 overflow-y-auto">
-                                  <EstampaInput
-                                    estampas={itemEmEdicao.estampas || []}
-                                    onChange={handleEstampasChange}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Linha 5: Imagem para Ficha Técnica */}
-                              <GerenciadorImagem
-                                imagem={itemEmEdicao.imagem}
-                                onChange={(novaImagem) => setItemEmEdicao({ ...itemEmEdicao, imagem: novaImagem })}
-                                inputRef={editImagemInputRef}
-                                isEditing={true}
+                          </td>
+                          <td className="p-3 text-center">
+                            {editandoItem === item.id ? (
+                              <Input
+                                type="number"
+                                value={itemEmEdicao?.valorUnitario || 0}
+                                onChange={(e) =>
+                                  setItemEmEdicao({
+                                    ...itemEmEdicao!,
+                                    valorUnitario: Number.parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                className="h-9 text-center w-28 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
                               />
+                            ) : (
+                              <span className="flex items-center justify-center gap-1">
+                                <DollarSign className="h-3 w-3 text-gray-500" />
+                                {item.valorUnitario.toFixed(2)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center font-medium">{item.quantidade}</td>
+                          <td className="p-3 text-right font-medium">
+                            <span className="flex items-center justify-end gap-1">
+                              <DollarSign className="h-3 w-3 text-gray-500" />
+                              {(item.quantidade * item.valorUnitario).toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {editandoItem === item.id ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
+                                    onClick={salvarEdicaoItem}
+                                    disabled={isLoading}
+                                  >
+                                    {isLoading ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Check className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                    onClick={cancelarEdicaoItem}
+                                    disabled={isLoading}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-primary hover:text-primary-dark hover:bg-primary/10"
+                                    onClick={() => iniciarEdicaoItem(item)}
+                                    disabled={isLoading}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removerItem(item.id)}
+                                    className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                                    disabled={isLoading}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
+                        {editandoItem === item.id && itemEmEdicao && (
+                          <tr>
+                            <td colSpan={6} className="p-3 bg-accent/50 border-t border-b">
+                              <div className="space-y-3">
+                                {/* Linha 1: Tecido e Cor */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  {produtoSelecionado?.tecidos && produtoSelecionado.tecidos.length > 0 && (
+                                    <div>
+                                      <Label htmlFor="tecido" className="text-primary text-xs mb-1">
+                                        Tecido
+                                      </Label>
+                                      <Select
+                                        value={itemEmEdicao.tecidoSelecionado?.nome || ""}
+                                        onValueChange={handleTecidoChange}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                          <SelectValue placeholder="Selecione o tecido" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {produtoSelecionado.tecidos.map((tecido) => (
+                                            <SelectItem key={tecido.nome} value={tecido.nome}>
+                                              {tecido.nome} {tecido.composicao ? `- ${tecido.composicao}` : ""}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
 
-                  {/* Adicionar linha de destaque no final da lista */}
-                  {dragOverItemId === "end-of-list" && (
-                    <tr className="border-t">
-                      <td colSpan={6} className="p-0">
-                        <div className="h-1 bg-primary animate-pulse rounded-full mx-2"></div>
+                                  {produtoSelecionado?.cores && produtoSelecionado.cores.length > 0 && (
+                                    <div>
+                                      <Label htmlFor="cor" className="text-primary text-xs mb-1">
+                                        Cor
+                                      </Label>
+                                      <Select value={itemEmEdicao.corSelecionada || ""} onValueChange={handleCorChange}>
+                                        <SelectTrigger className="h-8 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                                          <SelectValue placeholder="Selecione a cor" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {produtoSelecionado.cores.map((cor) => (
+                                            <SelectItem key={cor} value={cor}>
+                                              {cor}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Linha 2: Tabela de tamanhos compacta */}
+                                <div>
+                                  <Label className="text-primary text-xs mb-1">Tamanhos</Label>
+                                  <div className="border border-gray-200 rounded-md bg-white">
+                                    <table className="w-full border-collapse text-xs">
+                                      <thead>
+                                        <tr className="bg-accent">
+                                          <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
+                                            TAM.
+                                          </th>
+                                          {Object.keys(tamanhosPadrao)
+                                            .filter(
+                                              (tamanho) =>
+                                                !produtoSelecionado?.tamanhosDisponiveis ||
+                                                produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
+                                            )
+                                            .map((tamanho) => (
+                                              <th
+                                                key={`header-${tamanho}`}
+                                                className="border-b p-1 text-center font-medium text-xs text-primary min-w-8"
+                                              >
+                                                {tamanho}
+                                              </th>
+                                            ))}
+                                          <th className="border-b p-1 text-center font-medium text-xs text-primary w-12">
+                                            TOT.
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        <tr>
+                                          <td className="border-b p-1 text-center font-medium text-xs bg-accent">
+                                            QTD.
+                                          </td>
+                                          {Object.keys(tamanhosPadrao)
+                                            .filter(
+                                              (tamanho) =>
+                                                !produtoSelecionado?.tamanhosDisponiveis ||
+                                                produtoSelecionado.tamanhosDisponiveis.includes(tamanho),
+                                            )
+                                            .map((tamanho) => (
+                                              <td key={`cell-${tamanho}`} className="border-b p-1 text-center">
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  value={itemEmEdicao.tamanhos[tamanho] || 0}
+                                                  onChange={(e) =>
+                                                    handleTamanhoChange(tamanho, Number.parseInt(e.target.value) || 0)
+                                                  }
+                                                  className="w-full h-6 text-center text-xs border border-gray-300 rounded focus:border-primary focus:ring-1 focus:ring-primary"
+                                                />
+                                              </td>
+                                            ))}
+                                          <td className="border-b p-1 text-center font-medium text-xs bg-accent">
+                                            {itemEmEdicao.quantidade}
+                                          </td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+
+                                {/* Linha 3: Observações lado a lado */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label htmlFor="observacaoComercial" className="text-primary text-xs mb-1">
+                                      Observação Comercial
+                                    </Label>
+                                    <Textarea
+                                      id="observacaoComercial"
+                                      value={itemEmEdicao.observacaoComercial || ""}
+                                      onChange={(e) =>
+                                        setItemEmEdicao({
+                                          ...itemEmEdicao,
+                                          observacaoComercial: e.target.value,
+                                        })
+                                      }
+                                      className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                                      placeholder="Observações para o cliente..."
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="observacaoTecnica" className="text-primary text-xs mb-1">
+                                      Observação Técnica
+                                    </Label>
+                                    <Textarea
+                                      id="observacaoTecnica"
+                                      value={itemEmEdicao.observacaoTecnica || ""}
+                                      onChange={(e) =>
+                                        setItemEmEdicao({
+                                          ...itemEmEdicao,
+                                          observacaoTecnica: e.target.value,
+                                        })
+                                      }
+                                      className="h-16 text-xs border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                                      placeholder="Observações técnicas..."
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Linha 4: Estampas com largura total */}
+                                <div>
+                                  <Label className="text-primary text-xs mb-1">Estampas</Label>
+                                  <div className="max-h-32 overflow-y-auto">
+                                    <EstampaInput
+                                      estampas={itemEmEdicao.estampas || []}
+                                      onChange={handleEstampasChange}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Linha 5: Imagem para Ficha Técnica */}
+                                <GerenciadorImagem
+                                  imagem={itemEmEdicao.imagem}
+                                  onChange={(novaImagem) => setItemEmEdicao({ ...itemEmEdicao, imagem: novaImagem })}
+                                  inputRef={editImagemInputRef}
+                                  isEditing={true}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+
+                    {/* Adicionar linha de destaque no final da lista */}
+                    {dragOverItemId === "end-of-list" && (
+                      <tr className="border-t">
+                        <td colSpan={6} className="p-0">
+                          <div className="h-1 bg-primary animate-pulse rounded-full mx-2"></div>
+                        </td>
+                      </tr>
+                    )}
+                    <tr
+                      className="border-t hover:bg-accent/30 transition-colors"
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = "move"
+                        if (dragOverItemId !== "end-of-list") {
+                          setDragOverItemId("end-of-list")
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        const relatedTarget = e.relatedTarget as Node
+                        if (!e.currentTarget.contains(relatedTarget)) {
+                          setDragOverItemId(null)
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOverItemId(null)
+                        const draggedItemId = e.dataTransfer.getData("text/plain")
+                        const draggedIndex = orcamento.itens.findIndex((i) => i.id === draggedItemId)
+
+                        // Mover para o final da lista
+                        if (draggedIndex !== -1 && draggedIndex !== orcamento.itens.length - 1) {
+                          const novosItens = [...orcamento.itens]
+                          const [itemRemovido] = novosItens.splice(draggedIndex, 1)
+                          novosItens.push(itemRemovido)
+                          atualizarOrcamento({ itens: novosItens })
+
+                          // Mostrar toast de confirmação
+                          toast({
+                            title: "Item reordenado",
+                            description: "O item foi movido para o final da lista.",
+                            duration: 2000,
+                          })
+                        }
+                      }}
+                    >
+                      <td className="p-3"></td>
+                      <td className="p-3" onClick={() => setLinhaAtiva("novo")}>
+                        {linhaAtiva === "novo" ? (
+                          <Select value={novoItem.produtoId || ""} onValueChange={handleProdutoChange}>
+                            <SelectTrigger className="h-9 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
+                              <SelectValue placeholder="Selecione um produto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {produtos.map((produto) => (
+                                <SelectItem key={produto.id} value={produto.id}>
+                                  {produto.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-primary h-9 hover:bg-primary/10 hover:text-primary-dark"
+                            onClick={() => setLinhaAtiva("novo")}
+                            disabled={isLoading}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Adicionar item...
+                          </Button>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {linhaAtiva === "novo" && (
+                          <Input
+                            type="number"
+                            value={novoItem.valorUnitario || ""}
+                            onChange={(e) =>
+                              setNovoItem({ ...novoItem, valorUnitario: Number.parseFloat(e.target.value) })
+                            }
+                            className="h-9 text-center border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            placeholder="0,00"
+                          />
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {linhaAtiva === "novo" && (
+                          <div className="text-center font-medium">{novoItem.quantidade || 0}</div>
+                        )}
+                      </td>
+                      <td className="p-3 text-right font-medium">
+                        {linhaAtiva === "novo" && novoItem.valorUnitario && novoItem.quantidade ? (
+                          <span className="flex items-center justify-end gap-1">
+                            <DollarSign className="h-3 w-3 text-gray-500" />
+                            {(novoItem.quantidade * novoItem.valorUnitario).toFixed(2)}
+                          </span>
+                        ) : (
+                          ""
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {linhaAtiva === "novo" && (
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={handleAdicionarItem}
+                              disabled={isLoading || !novoItem.produtoId || !novoItem.valorUnitario}
+                              className="h-8 w-8 text-white bg-primary hover:bg-primary-dark disabled:bg-gray-300"
+                            >
+                              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        )}
                       </td>
                     </tr>
-                  )}
-                  <tr
-                    className="border-t hover:bg-accent/30 transition-colors"
-                    onDragOver={(e) => {
-                      e.preventDefault()
-                      e.dataTransfer.dropEffect = "move"
-                      if (dragOverItemId !== "end-of-list") {
-                        setDragOverItemId("end-of-list")
-                      }
-                    }}
-                    onDragLeave={(e) => {
-                      const relatedTarget = e.relatedTarget as Node
-                      if (!e.currentTarget.contains(relatedTarget)) {
-                        setDragOverItemId(null)
-                      }
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      setDragOverItemId(null)
-                      const draggedItemId = e.dataTransfer.getData("text/plain")
-                      const draggedIndex = orcamento.itens.findIndex((i) => i.id === draggedItemId)
 
-                      // Mover para o final da lista
-                      if (draggedIndex !== -1 && draggedIndex !== orcamento.itens.length - 1) {
-                        const novosItens = [...orcamento.itens]
-                        const [itemRemovido] = novosItens.splice(draggedIndex, 1)
-                        novosItens.push(itemRemovido)
-                        atualizarOrcamento({ itens: novosItens })
-
-                        // Mostrar toast de confirmação
-                        toast({
-                          title: "Item reordenado",
-                          description: "O item foi movido para o final da lista.",
-                          duration: 2000,
-                        })
-                      }
-                    }}
-                  >
-                    <td className="p-3"></td>
-                    <td className="p-3" onClick={() => setLinhaAtiva("novo")}>
-                      {linhaAtiva === "novo" ? (
-                        <Select value={novoItem.produtoId || ""} onValueChange={handleProdutoChange}>
-                          <SelectTrigger className="h-9 border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary">
-                            <SelectValue placeholder="Selecione um produto" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {produtos.map((produto) => (
-                              <SelectItem key={produto.id} value={produto.id}>
-                                {produto.nome}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-primary h-9 hover:bg-primary/10 hover:text-primary-dark"
-                          onClick={() => setLinhaAtiva("novo")}
-                          disabled={isLoading}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Adicionar item...
-                        </Button>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      {linhaAtiva === "novo" && (
-                        <Input
-                          type="number"
-                          value={novoItem.valorUnitario || ""}
-                          onChange={(e) =>
-                            setNovoItem({ ...novoItem, valorUnitario: Number.parseFloat(e.target.value) })
-                          }
-                          className="h-9 text-center border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          placeholder="0,00"
-                        />
-                      )}
-                    </td>
-                    <td className="p-3 text-center">
-                      {linhaAtiva === "novo" && (
-                        <div className="text-center font-medium">{novoItem.quantidade || 0}</div>
-                      )}
-                    </td>
+                    {/* Formulário expandido para novo item */}
                     {linhaAtiva === "novo" && novoItem.produtoId && (
                       <tr>
                         <td colSpan={6} className="p-3 bg-accent/20 border-t">
@@ -1297,78 +1348,94 @@ export default function FormularioOrcamento({
                               inputRef={novoImagemInputRef}
                               isEditing={true}
                             />
+
+                            {/* Botões de ação */}
+                            <div className="flex justify-end gap-2 mt-4">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setLinhaAtiva(null)
+                                  setNovoItem({
+                                    produtoId: "",
+                                    quantidade: 0,
+                                    valorUnitario: 0,
+                                    tamanhos: { ...tamanhosPadrao },
+                                    imagem: "",
+                                    observacaoComercial: "",
+                                    observacaoTecnica: "",
+                                    estampas: [],
+                                  })
+                                  setProdutoSelecionado(null)
+                                }}
+                                className="h-8"
+                              >
+                                <X className="h-4 w-4 mr-1" /> Cancelar
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="default"
+                                size="sm"
+                                onClick={handleAdicionarItem}
+                                disabled={isLoading || !novoItem.produtoId || !novoItem.valorUnitario}
+                                className="h-8 bg-primary hover:bg-primary-dark"
+                              >
+                                {isLoading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                ) : (
+                                  <Plus className="h-4 w-4 mr-1" />
+                                )}
+                                Adicionar Item
+                              </Button>
+                            </div>
                           </div>
                         </td>
                       </tr>
                     )}
-                    <td className="p-3 text-right font-medium">
-                      {linhaAtiva === "novo" && novoItem.valorUnitario && novoItem.quantidade ? (
-                        <span className="flex items-center justify-end gap-1">
-                          <DollarSign className="h-3 w-3 text-gray-500" />
-                          {(novoItem.quantidade * novoItem.valorUnitario).toFixed(2)}
-                        </span>
-                      ) : (
-                        ""
-                      )}
-                    </td>
-                    <td className="p-3 text-center">
-                      {linhaAtiva === "novo" && (
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleAdicionarItem}
-                            disabled={isLoading || !novoItem.produtoId || !novoItem.valorUnitario}
-                            className="h-8 w-8 text-white bg-primary hover:bg-primary-dark disabled:bg-gray-300"
-                          >
-                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                          </Button>
+                  </tbody>
+                  <tfoot className="bg-primary text-white">
+                    <tr>
+                      <td colSpan={4} className="p-3 text-right font-medium">
+                        Valor dos Produtos:
+                      </td>
+                      <td className="p-3 text-right font-medium">R$ {calcularTotal().toFixed(2)}</td>
+                      <td></td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="p-3 text-right font-medium">
+                        Valor do Frete:
+                      </td>
+                      <td className="p-3 text-right font-medium">
+                        <div className="flex justify-end">
+                          <span className="mr-2">R$</span>
+                          <Input
+                            type="number"
+                            value={orcamento.valorFrete || ""}
+                            onChange={(e) =>
+                              atualizarOrcamento({ valorFrete: e.target.value ? Number(e.target.value) : undefined })
+                            }
+                            className="w-24 h-7 text-right text-black border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
+                            placeholder="0,00"
+                            min="0"
+                            step="0.01"
+                          />
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                </tbody>
-                <tfoot className="bg-primary text-white">
-                  <tr>
-                    <td colSpan={4} className="p-3 text-right font-medium">
-                      Valor dos Produtos:
-                    </td>
-                    <td className="p-3 text-right font-medium">R$ {calcularTotal().toFixed(2)}</td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td colSpan={4} className="p-3 text-right font-medium">
-                      Valor do Frete:
-                    </td>
-                    <td className="p-3 text-right font-medium">
-                      <div className="flex justify-end">
-                        <span className="mr-2">R$</span>
-                        <Input
-                          type="number"
-                          value={orcamento.valorFrete || ""}
-                          onChange={(e) =>
-                            atualizarOrcamento({ valorFrete: e.target.value ? Number(e.target.value) : undefined })
-                          }
-                          className="w-24 h-7 text-right text-black border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary"
-                          placeholder="0,00"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                    </td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td colSpan={4} className="p-3 text-right font-bold">
-                      Total do Orçamento:
-                    </td>
-                    <td className="p-3 text-right font-bold">
-                      R$ {(calcularTotal() + (orcamento.valorFrete || 0)).toFixed(2)}
-                    </td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
+                      </td>
+                      <td></td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="p-3 text-right font-bold">
+                        Total do Orçamento:
+                      </td>
+                      <td className="p-3 text-right font-bold">
+                        R$ {(calcularTotal() + (orcamento.valorFrete || 0)).toFixed(2)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -1402,7 +1469,7 @@ export default function FormularioOrcamento({
                   placeholder="Apenas o número"
                 />
                 {orcamento.numero.includes(" - ") && (
-                  <p className="text-xs text-gray-500 mt-0.5">Formato completo: {orcamento.numero}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">Formato: {orcamento.numero}</p>
                 )}
               </div>
               <div>
